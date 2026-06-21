@@ -57,7 +57,7 @@ export default function EditTemplatePage({
     return (
       <PageContainer className="space-y-4">
         <p className="text-sm text-gray-700">Template not found.</p>
-        <Button variant="outline" size="sm" onClick={() => router.push("/admin/templates")}>
+        <Button variant="outline" size="sm" onClick={() => router.push("/templates")}>
           Back to catalog
         </Button>
       </PageContainer>
@@ -68,7 +68,7 @@ export default function EditTemplatePage({
     return (
       <PageContainer className="space-y-4">
         <p className="text-destructive text-sm">Couldn’t load this template’s PDF.</p>
-        <Button variant="outline" size="sm" onClick={() => router.push("/admin/templates")}>
+        <Button variant="outline" size="sm" onClick={() => router.push("/templates")}>
           Back to catalog
         </Button>
       </PageContainer>

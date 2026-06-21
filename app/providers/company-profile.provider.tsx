@@ -44,9 +44,16 @@ export function CompanyProfileProvider({ children }: { children: React.ReactNode
     staleTime: Infinity,
   });
 
-  // Gate: redirect to login on 401 (isError catches axios 401)
-  if (isError && !pathname.startsWith("/company/login") && !pathname.startsWith("/company/register")) {
-    router.replace("/company/login");
+  // Gate: redirect to login on 401 (isError catches axios 401).
+  // pathname is the browser URL path — on subdomain routing it won't carry the /company prefix.
+  const onAuthPage =
+    pathname.startsWith("/company/login") ||
+    pathname.startsWith("/company/register") ||
+    pathname === "/login" ||
+    pathname.startsWith("/register");
+  const loginRedirect = pathname.startsWith("/company/") ? "/company/login" : "/login";
+  if (isError && !onAuthPage) {
+    router.replace(loginRedirect);
   }
 
   return (

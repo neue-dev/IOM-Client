@@ -19,7 +19,7 @@ export default function UniversityLoginPage() {
   const login = useMutation({
     mutationFn: () =>
       preconfiguredAxios.post("/api/auth/university/login", { email, password }),
-    onSuccess: () => router.replace("/university/partners"),
+    onSuccess: () => router.replace("/partners"),
     onError: (e: Error) => setError(e.message),
   });
 
@@ -56,7 +56,7 @@ export default function UniversityLoginPage() {
           <div className="flex items-center justify-between">
             <Label htmlFor="password">Password</Label>
             <Link
-              href="/university/forgot-password"
+              href="/forgot-password"
               className="text-muted-foreground hover:text-primary text-xs"
             >
               Forgot password?

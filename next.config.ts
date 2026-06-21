@@ -30,6 +30,42 @@ const nextConfig: NextConfig = {
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: true },
   images: { unoptimized: true },
+
+  async rewrites() {
+    const routes = [
+      {
+        hosts: ["moa.betterinternship.com", "moa.localhost"],
+        destination: "company",
+      },
+      {
+        hosts: ["uni.betterinternship.com", "uni.localhost"],
+        destination: "university",
+      },
+      {
+        hosts: ["admin.iom.betterinternship.com", "admin.iom.localhost"],
+        destination: "admin",
+      },
+    ];
+
+    const rewrites: {
+      source: string;
+      has: { type: string; value: string }[];
+      destination: string;
+    }[] = [];
+
+    routes.forEach(({ hosts, destination }) => {
+      hosts.forEach((host) => {
+        rewrites.push({
+          source: "/:path((?!_next|company/|university/|admin/).*)*",
+          has: [{ type: "host", value: host }],
+          destination: `/${destination}/:path*`,
+        });
+      });
+    });
+
+    return { beforeFiles: rewrites };
+  },
+
   async headers() {
     return [
       {

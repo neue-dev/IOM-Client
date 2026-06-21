@@ -61,7 +61,7 @@ export default function CompanyMoaDetailPage() {
   return (
     <PageContainer className="max-w-3xl space-y-6">
       <Link
-        href="/company/dashboard"
+        href="/dashboard"
         className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
       >
         <ArrowLeft className="h-4 w-4" /> Active MOAs

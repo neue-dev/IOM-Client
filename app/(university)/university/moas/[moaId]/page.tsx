@@ -102,7 +102,7 @@ export default function UniversityMoaDetailPage() {
       preconfiguredAxios.post(`/api/university/moas/${moaId}/confirm`),
     onSuccess: () => {
       invalidate();
-      router.push("/university/partners");
+      router.push("/partners");
     },
   });
 
@@ -114,7 +114,7 @@ export default function UniversityMoaDetailPage() {
     onSuccess: () => {
       invalidate();
       setShowReject(false);
-      router.push("/university/partners");
+      router.push("/partners");
     },
   });
 
@@ -155,7 +155,7 @@ export default function UniversityMoaDetailPage() {
   return (
     <PageContainer className="max-w-3xl space-y-6">
       <Link
-        href="/university/partners"
+        href="/partners"
         className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
       >
         <ArrowLeft className="h-4 w-4" /> Partners

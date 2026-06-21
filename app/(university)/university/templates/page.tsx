@@ -29,7 +29,7 @@ export default function UniversityTemplatesPage() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!isLoading && !isSuperadmin) router.replace("/university/partners");
+    if (!isLoading && !isSuperadmin) router.replace("/partners");
   }, [isLoading, isSuperadmin, router]);
 
   const { data, isLoading: tLoading } = useQuery({

@@ -21,17 +21,17 @@ export function CompanyHeader() {
   return (
     <AppHeader
       portal="Company"
-      homeHref="/company/dashboard"
+      homeHref="/dashboard"
       nav={[
-        { href: "/company/dashboard", label: "Active MOAs" },
-        { href: "/company/universities", label: "Request MOA" },
-        { href: "/company/profile", label: "Profile" },
+        { href: "/dashboard", label: "Active MOAs" },
+        { href: "/universities", label: "Request MOA" },
+        { href: "/profile", label: "Profile" },
       ]}
       userPrimary={company?.display_name ?? undefined}
       userSecondary={company?.rep_email ?? undefined}
       logoutPath="/api/auth/company/logout"
-      postLogoutPath="/company/login"
-      profileHref="/company/profile"
+      postLogoutPath="/login"
+      profileHref="/profile"
     />
   );
 }

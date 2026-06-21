@@ -64,7 +64,7 @@ function RequestDialog({
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["company-moas"] });
       onClose();
-      router.push(`/company/moas/${res.moa.id}`);
+      router.push(`/moas/${res.moa.id}`);
     },
     onError: (e: Error) => {
       const err = e as ApiError;

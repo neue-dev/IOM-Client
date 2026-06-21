@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 export default function UniversityDashboardRedirectPage() {
   const router = useRouter();
   useEffect(() => {
-    router.replace("/university/partners");
+    router.replace("/partners");
   }, [router]);
   return null;
 }

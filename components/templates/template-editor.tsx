@@ -201,7 +201,7 @@ export function TemplateEditor({ mode, templateId, initial }: TemplateEditorProp
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-templates"] });
       toast.success(mode === "new" ? "Template created" : "Template saved");
-      router.push("/admin/templates");
+      router.push("/templates");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -219,7 +219,7 @@ export function TemplateEditor({ mode, templateId, initial }: TemplateEditorProp
           <Button
             variant="outline"
             size="sm"
-            onClick={() => router.push("/admin/templates")}
+            onClick={() => router.push("/templates")}
             disabled={save.isPending}
           >
             <ChevronLeft /> Catalog

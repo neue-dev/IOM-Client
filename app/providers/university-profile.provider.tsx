@@ -52,8 +52,15 @@ export function UniversityProfileProvider({ children }: { children: React.ReactN
     staleTime: Infinity,
   });
 
-  if (isError && !pathname.startsWith("/university/login") && !pathname.startsWith("/university/accept-invite")) {
-    router.replace("/university/login");
+  // pathname is the browser URL path — on subdomain routing it won't carry the /university prefix.
+  const onAuthPage =
+    pathname.startsWith("/university/login") ||
+    pathname.startsWith("/university/accept-invite") ||
+    pathname === "/login" ||
+    pathname === "/accept-invite";
+  const loginRedirect = pathname.startsWith("/university/") ? "/university/login" : "/login";
+  if (isError && !onAuthPage) {
+    router.replace(loginRedirect);
   }
 
   return (

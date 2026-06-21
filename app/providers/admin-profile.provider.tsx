@@ -29,8 +29,11 @@ export function AdminProfileProvider({ children }: { children: React.ReactNode }
     staleTime: Infinity,
   });
 
-  if (isError && !pathname.startsWith("/admin/login")) {
-    router.replace("/admin/login");
+  // pathname is the browser URL path — on subdomain routing it won't carry the /admin prefix.
+  const onAuthPage = pathname.startsWith("/admin/login") || pathname === "/login";
+  const loginRedirect = pathname.startsWith("/admin/") ? "/admin/login" : "/login";
+  if (isError && !onAuthPage) {
+    router.replace(loginRedirect);
   }
 
   return (

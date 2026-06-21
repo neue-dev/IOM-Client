@@ -19,7 +19,7 @@ export default function CompanyLoginPage() {
   const login = useMutation({
     mutationFn: () =>
       preconfiguredAxios.post("/api/auth/company/login", { tin, password }),
-    onSuccess: () => router.replace("/company/dashboard"),
+    onSuccess: () => router.replace("/dashboard"),
     onError: (e: Error) => setError(e.message),
   });
 
@@ -37,7 +37,7 @@ export default function CompanyLoginPage() {
       footer={
         <>
           New here?{" "}
-          <Link href="/company/register" className="text-primary font-medium">
+          <Link href="/register" className="text-primary font-medium">
             Register your company
           </Link>
         </>
@@ -64,7 +64,7 @@ export default function CompanyLoginPage() {
           <div className="flex items-center justify-between">
             <Label htmlFor="password">Password</Label>
             <Link
-              href="/company/forgot-password"
+              href="/forgot-password"
               className="text-muted-foreground hover:text-primary text-xs"
             >
               Forgot password?

@@ -18,7 +18,7 @@ export default function AdminLoginPage() {
   const login = useMutation({
     mutationFn: () =>
       preconfiguredAxios.post("/api/auth/admin/login", { email, password }),
-    onSuccess: () => router.replace("/admin/universities"),
+    onSuccess: () => router.replace("/universities"),
     onError: (e: Error) => setError(e.message),
   });
 

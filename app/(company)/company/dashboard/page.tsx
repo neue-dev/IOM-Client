@@ -129,7 +129,7 @@ export default function CompanyDashboardPage() {
       >
         {canRequest && (
           <Button asChild>
-            <Link href="/company/universities">
+            <Link href="/universities">
               <Plus /> Request MOA
             </Link>
           </Button>
@@ -160,7 +160,7 @@ export default function CompanyDashboardPage() {
                 </p>
               </div>
               <Button asChild size="lg">
-                <Link href="/company/profile">Complete your profile</Link>
+                <Link href="/profile">Complete your profile</Link>
               </Button>
             </Card>
           </div>
@@ -180,7 +180,7 @@ export default function CompanyDashboardPage() {
           description="Browse partner universities and request your first memorandum of agreement."
         >
           <Button asChild variant="outline" scheme="primary">
-            <Link href="/company/universities">Browse universities</Link>
+            <Link href="/universities">Browse universities</Link>
           </Button>
         </EmptyState>
       ) : (

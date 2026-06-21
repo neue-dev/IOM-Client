@@ -68,7 +68,7 @@ export default function CompanyRegisterPage() {
         repEmail: form.repEmail,
         code,
       }),
-    onSuccess: () => router.replace("/company/dashboard"),
+    onSuccess: () => router.replace("/dashboard"),
     onError: (e: Error) => setError(e.message),
   });
 
@@ -172,7 +172,7 @@ export default function CompanyRegisterPage() {
       footer={
         <>
           Already registered?{" "}
-          <Link href="/company/login" className="text-primary font-medium">
+          <Link href="/login" className="text-primary font-medium">
             Sign in
           </Link>
         </>

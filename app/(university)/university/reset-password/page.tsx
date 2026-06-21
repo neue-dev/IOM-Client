@@ -40,7 +40,7 @@ function UniversityResetPasswordForm() {
           size="lg"
           variant="outline"
           scheme="primary"
-          onClick={() => router.push("/university/forgot-password")}
+          onClick={() => router.push("/forgot-password")}
         >
           Request a new link
         </Button>
@@ -66,7 +66,7 @@ function UniversityResetPasswordForm() {
           <Button
             className="w-full"
             size="lg"
-            onClick={() => router.push("/university/login")}
+            onClick={() => router.push("/login")}
           >
             Go to sign in
           </Button>

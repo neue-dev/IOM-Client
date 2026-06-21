@@ -60,7 +60,7 @@ export default function AdminTemplatesPage() {
         title="MOA Templates"
         description="Author the shared catalog of MOA templates. Universities choose which to offer."
       >
-        <Button onClick={() => router.push("/admin/templates/new")}>
+        <Button onClick={() => router.push("/templates/new")}>
           <Plus /> New template
         </Button>
       </PageHeader>
@@ -111,7 +111,7 @@ export default function AdminTemplatesPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => router.push(`/admin/templates/${t.id}`)}
+                  onClick={() => router.push(`/templates/${t.id}`)}
                 >
                   <Pencil /> Edit
                 </Button>

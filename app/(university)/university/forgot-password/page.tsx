@@ -30,7 +30,7 @@ export default function UniversityForgotPasswordPage() {
       title="Reset password"
       description="Enter your account email and we'll send you a reset link."
       footer={
-        <Link href="/university/login" className="text-primary font-medium">
+        <Link href="/login" className="text-primary font-medium">
           Back to sign in
         </Link>
       }

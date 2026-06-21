@@ -29,7 +29,7 @@ export default function CompanyForgotPasswordPage() {
       title="Reset password"
       description="Enter your company TIN and we'll email a reset link to your representative."
       footer={
-        <Link href="/company/login" className="text-primary font-medium">
+        <Link href="/login" className="text-primary font-medium">
           Back to sign in
         </Link>
       }
