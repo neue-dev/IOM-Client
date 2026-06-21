@@ -17,8 +17,11 @@ preconfiguredAxios.interceptors.response.use(
     return resp;
   },
   (err: AxiosError<any>) => {
-    const msg = err.response?.data?.message || err.message || "Network error";
-    return Promise.reject(new Error(msg));
+    const data = err.response?.data;
+    const msg = (typeof data === "object" && data?.message) || err.message || "Network error";
+    const error = new Error(msg) as Error & Record<string, unknown>;
+    if (data && typeof data === "object") Object.assign(error, data);
+    return Promise.reject(error);
   }
 );
 

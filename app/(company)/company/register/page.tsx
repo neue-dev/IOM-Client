@@ -9,6 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { OtpInput } from "@/components/ui/otp-input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { ArrowLeft, Loader2, ShieldCheck } from "lucide-react";
 
 type Step = "details" | "otp";
@@ -25,6 +33,7 @@ export default function CompanyRegisterPage() {
   });
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
+  const [tinTakenEmail, setTinTakenEmail] = useState("");
   const [resendIn, setResendIn] = useState(0);
 
   useEffect(() => {
@@ -39,8 +48,17 @@ export default function CompanyRegisterPage() {
       setResendIn(res.data?.resendIn ?? 60);
       setStep("otp");
       setError("");
+      setTinTakenEmail("");
     },
-    onError: (e: any) => setError(e.message),
+    onError: (e: any) => {
+      if (e?.code === "TIN_TAKEN") {
+        setTinTakenEmail(e.censoredEmail ?? "");
+        setError("");
+      } else {
+        setError(e.message);
+        setTinTakenEmail("");
+      }
+    },
   });
 
   const verify = useMutation({
@@ -163,6 +181,7 @@ export default function CompanyRegisterPage() {
         onSubmit={(e) => {
           e.preventDefault();
           setError("");
+          setTinTakenEmail("");
           register.mutate();
         }}
         className="space-y-4"
@@ -262,6 +281,35 @@ export default function CompanyRegisterPage() {
           We&apos;ll email a verification code after BIR check.
         </p>
       </form>
+
+      <Dialog open={!!tinTakenEmail} onOpenChange={(open) => !open && setTinTakenEmail("")}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>TIN Already Registered</DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-2 pt-1 text-sm">
+                <p>
+                  This TIN is already registered under the account{" "}
+                  <span className="text-foreground font-mono font-medium">{tinTakenEmail}</span>.
+                </p>
+                <p>
+                  Don&apos;t recognize this email?{" "}
+                  <a
+                    href="mailto:hello@betterinternship.com"
+                    className="text-primary font-medium underline underline-offset-2"
+                  >
+                    Contact us at hello@betterinternship.com
+                  </a>
+                  .
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setTinTakenEmail("")}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AuthShell>
   );
 }
