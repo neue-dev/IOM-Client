@@ -1,9 +1,25 @@
 "use client";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { useCompanyProfile } from "@/app/providers/company-profile.provider";
 import { preconfiguredAxios } from "@/app/api/preconfig.axios";
-import { useRouter } from "next/navigation";
+import { PageContainer, PageHeader, EmptyState } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { FormError } from "@/components/auth-shell";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
+import { Building2, Check, Loader2 } from "lucide-react";
 
 interface University {
   id: string;
@@ -20,7 +36,7 @@ interface Template {
   term_months: number;
 }
 
-function RequestModal({
+function RequestDialog({
   university,
   onClose,
 }: {
@@ -54,13 +70,19 @@ function RequestModal({
       const code = e?.response?.data?.code || "";
       if (code === "AT_ACTIVE_MOA_CAP") {
         const limit = e?.response?.data?.data?.limit ?? "the maximum";
-        setError(`You have reached the maximum of ${limit} active MOAs with this university.`);
+        setError(
+          `You have reached the maximum of ${limit} active MOAs with this university.`
+        );
       } else if (code === "PROFILE_INCOMPLETE") {
-        setError("Your profile is incomplete. Please complete your profile and try again.");
+        setError(
+          "Your profile is incomplete. Please complete your profile and try again."
+        );
       } else if (code === "DOCUMENTS_MISSING") {
         setError("You must upload all required documents before requesting an MOA.");
       } else {
-        setError("Couldn't request from this university at this time. Please contact us for help.");
+        setError(
+          "Couldn't request from this university at this time. Please contact us for help."
+        );
       }
     },
   });
@@ -68,62 +90,83 @@ function RequestModal({
   const templates = data?.templates ?? [];
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-lg w-full max-w-md p-6 space-y-4">
-        <h2 className="text-lg font-semibold text-gray-900">
-          Request MOA — {university.registered_name}
-        </h2>
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Request MOA</DialogTitle>
+          <DialogDescription>{university.registered_name}</DialogDescription>
+        </DialogHeader>
 
-        {isLoading && <p className="text-sm text-gray-500">Loading templates…</p>}
+        <div className="space-y-3">
+          {isLoading && (
+            <>
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
+            </>
+          )}
 
-        {!isLoading && templates.length === 0 && (
-          <p className="text-sm text-gray-500">No available templates at this university.</p>
-        )}
+          {!isLoading && templates.length === 0 && (
+            <p className="text-muted-foreground text-sm">
+              No available templates at this university.
+            </p>
+          )}
 
-        {templates.map((t) => (
-          <label
-            key={t.id}
-            className={`flex items-start gap-3 border rounded-lg p-3 cursor-pointer transition-colors ${
-              selectedTemplate === t.id
-                ? "border-blue-500 bg-blue-50"
-                : "border-gray-200 hover:border-gray-300"
-            }`}
-          >
-            <input
-              type="radio"
-              name="template"
-              value={t.id}
-              checked={selectedTemplate === t.id}
-              onChange={() => setSelectedTemplate(t.id)}
-              className="mt-0.5"
-            />
-            <div>
-              <p className="text-sm font-medium text-gray-900">{t.name}</p>
-              {t.description && <p className="text-xs text-gray-500 mt-0.5">{t.description}</p>}
-              <p className="text-xs text-gray-400 mt-0.5">Term: {t.term_months} months</p>
-            </div>
-          </label>
-        ))}
+          {templates.map((t) => {
+            const selected = selectedTemplate === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setSelectedTemplate(t.id)}
+                className={cn(
+                  "flex w-full items-start gap-3 rounded-[0.33em] border p-3 text-left transition-colors",
+                  selected
+                    ? "border-primary bg-primary/5"
+                    : "border-gray-200 hover:border-gray-300"
+                )}
+              >
+                <span
+                  className={cn(
+                    "mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border",
+                    selected ? "border-primary bg-primary text-white" : "border-gray-300"
+                  )}
+                >
+                  {selected && <Check className="h-3 w-3" />}
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium text-gray-900">
+                    {t.name}
+                  </span>
+                  {t.description && (
+                    <span className="text-muted-foreground mt-0.5 block text-xs">
+                      {t.description}
+                    </span>
+                  )}
+                  <span className="text-muted-foreground mt-1 block text-xs">
+                    Term: {t.term_months} months
+                  </span>
+                </span>
+              </button>
+            );
+          })}
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <FormError>{error}</FormError>}
+        </div>
 
-        <div className="flex gap-3 pt-2">
-          <button
-            onClick={onClose}
-            className="flex-1 border border-gray-300 text-gray-700 text-sm px-4 py-2 rounded-md hover:bg-gray-50"
-          >
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => selectedTemplate && request.mutate(selectedTemplate)}
             disabled={!selectedTemplate || request.isPending}
-            className="flex-1 bg-blue-600 text-white text-sm px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
           >
+            {request.isPending && <Loader2 className="animate-spin" />}
             {request.isPending ? "Requesting…" : "Request MOA"}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -140,7 +183,14 @@ export default function UniversityDirectoryPage() {
     enabled: !!company,
   });
 
-  if (isLoading) return <div className="p-8 text-sm text-gray-500">Loading…</div>;
+  if (isLoading) {
+    return (
+      <PageContainer className="space-y-6">
+        <Skeleton className="h-8 w-40" />
+        <Skeleton className="h-20 w-full" />
+      </PageContainer>
+    );
+  }
   if (!company) return null;
 
   const universities = data?.universities ?? [];
@@ -153,48 +203,68 @@ export default function UniversityDirectoryPage() {
   );
 
   return (
-    <div className="max-w-3xl mx-auto p-8 space-y-6">
-      <h1 className="text-2xl font-semibold text-gray-900">Universities</h1>
+    <PageContainer className="space-y-6">
+      <PageHeader
+        title="Universities"
+        description="Partner institutions you can request a memorandum of agreement with."
+      />
 
       {!profileComplete && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+        <div className="border-warning/30 bg-warning/10 rounded-[0.33em] border p-4 text-sm text-gray-700">
           Complete your profile and upload all required documents to request MOAs.
         </div>
       )}
 
-      {uniLoading && <p className="text-sm text-gray-500">Loading…</p>}
+      {uniLoading ? (
+        <div className="space-y-2.5">
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-20 w-full" />
+        </div>
+      ) : universities.length === 0 ? (
+        <EmptyState title="No universities found" />
+      ) : (
+        <div className="space-y-2.5">
+          {universities.map((uni) => (
+            <Card
+              key={uni.id}
+              className="flex-row items-center justify-between gap-4 px-5 py-4"
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="bg-muted text-muted-foreground flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[0.33em]">
+                  <Building2 className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-gray-900">
+                    {uni.registered_name}
+                  </p>
+                  {uni.address && (
+                    <p className="text-muted-foreground mt-0.5 truncate text-xs">
+                      {uni.address}
+                    </p>
+                  )}
+                </div>
+              </div>
+              {uni.requestable && profileComplete ? (
+                <Button
+                  className="flex-shrink-0"
+                  size="sm"
+                  onClick={() => setSelected(uni)}
+                >
+                  Request MOA
+                </Button>
+              ) : (
+                <Badge type="default" className="flex-shrink-0">
+                  Unavailable
+                </Badge>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
 
-      <div className="space-y-3">
-        {universities.map((uni) => (
-          <div
-            key={uni.id}
-            className="flex items-center justify-between border rounded-lg p-4 gap-4"
-          >
-            <div>
-              <p className="font-medium text-sm text-gray-900">{uni.registered_name}</p>
-              {uni.address && <p className="text-xs text-gray-500 mt-0.5">{uni.address}</p>}
-            </div>
-            {uni.requestable && profileComplete ? (
-              <button
-                onClick={() => setSelected(uni)}
-                className="shrink-0 bg-blue-600 text-white text-sm px-4 py-2 rounded-md hover:bg-blue-700"
-              >
-                Request MOA
-              </button>
-            ) : (
-              <span className="shrink-0 text-xs text-gray-400 bg-gray-100 px-3 py-1.5 rounded-md">
-                Unavailable
-              </span>
-            )}
-          </div>
-        ))}
-
-        {!uniLoading && universities.length === 0 && (
-          <p className="text-sm text-gray-500 text-center py-8">No universities found.</p>
-        )}
-      </div>
-
-      {selected && <RequestModal university={selected} onClose={() => setSelected(null)} />}
-    </div>
+      {selected && (
+        <RequestDialog university={selected} onClose={() => setSelected(null)} />
+      )}
+    </PageContainer>
   );
 }

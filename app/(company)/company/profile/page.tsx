@@ -1,8 +1,24 @@
 "use client";
 import { useState, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { useCompanyProfile } from "@/app/providers/company-profile.provider";
 import { preconfiguredAxios } from "@/app/api/preconfig.axios";
+import { PageContainer, PageHeader } from "@/components/page-header";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+import { CheckCircle2, Loader2, Upload } from "lucide-react";
 
 const COMPANY_TYPES = [
   { value: "corporation", label: "Corporation" },
@@ -24,34 +40,32 @@ export default function CompanyProfilePage() {
   const sigRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState<Record<string, string>>({});
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState("");
 
   const { data: docsData, refetch: refetchDocs } = useQuery({
     queryKey: ["company-docs"],
-    queryFn: () => preconfiguredAxios.get("/api/company/documents").then((r) => r.data),
+    queryFn: () =>
+      preconfiguredAxios.get("/api/company/documents").then((r) => r.data),
     enabled: !!company,
   });
 
   const patchProfile = useMutation({
-    mutationFn: () => preconfiguredAxios.patch("/api/company/profile", {
-      registered_name: get("registered_name"),
-      company_type: get("company_type") || undefined,
-      registered_address: get("registered_address"),
-      rep_name: get("rep_name"),
-      rep_title: get("rep_title"),
-      description: get("description"),
-      website: get("website"),
-      phone: get("phone"),
-      industry: get("industry"),
-    }),
+    mutationFn: () =>
+      preconfiguredAxios.patch("/api/company/profile", {
+        registered_name: get("registered_name"),
+        company_type: get("company_type") || undefined,
+        registered_address: get("registered_address"),
+        rep_name: get("rep_name"),
+        rep_title: get("rep_title"),
+        description: get("description"),
+        website: get("website"),
+        phone: get("phone"),
+        industry: get("industry"),
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["company-me"] });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-      setError("");
+      toast.success("Profile saved");
     },
-    onError: (e: any) => setError(e.message),
+    onError: (e: any) => toast.error(e.message),
   });
 
   const uploadSig = useMutation({
@@ -60,8 +74,11 @@ export default function CompanyProfilePage() {
       fd.append("file", file);
       return preconfiguredAxios.post("/api/company/profile/signature", fd);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["company-me"] }),
-    onError: (e: any) => setError(e.message),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["company-me"] });
+      toast.success("Signature uploaded");
+    },
+    onError: (e: any) => toast.error(e.message),
   });
 
   const uploadDoc = useMutation({
@@ -71,154 +88,221 @@ export default function CompanyProfilePage() {
       fd.append("type", type);
       return preconfiguredAxios.post("/api/company/documents", fd);
     },
-    onSuccess: () => refetchDocs(),
-    onError: (e: any) => setError(e.message),
+    onSuccess: () => {
+      refetchDocs();
+      toast.success("Document uploaded");
+    },
+    onError: (e: any) => toast.error(e.message),
   });
 
-  if (isLoading) return <div className="p-8 text-sm text-gray-500">Loading…</div>;
+  if (isLoading) return null;
   if (!company) return null;
 
   function get(key: string): string {
-    return key in form ? form[key] : ((company as any)?.[key] ?? (company?.cosmetic as any)?.[key] ?? "");
+    return key in form
+      ? form[key]
+      : ((company as any)?.[key] ?? (company?.cosmetic as any)?.[key] ?? "");
   }
-
   function set(key: string, val: string) {
     setForm((f) => ({ ...f, [key]: val }));
   }
 
-  const docs = (docsData?.documents ?? []) as Array<{ id: string; type: string; filename: string; uploaded_at: string }>;
+  const docs = (docsData?.documents ?? []) as Array<{
+    id: string;
+    type: string;
+    filename: string;
+    uploaded_at: string;
+  }>;
   const latestDoc = (type: string) => docs.find((d) => d.type === type);
 
   return (
-    <div className="max-w-2xl mx-auto p-8 space-y-8">
-      <h1 className="text-2xl font-semibold text-gray-900">Company Profile</h1>
+    <PageContainer className="max-w-2xl space-y-6">
+      <PageHeader
+        title="Company profile"
+        description="Keep your details current — these appear on your MOAs."
+      />
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      {saved && <p className="text-sm text-green-600">Saved.</p>}
-
-      {/* Read-only rep email */}
-      <div className="bg-gray-50 border rounded-lg p-4 text-sm">
-        <p className="text-xs text-gray-400 mb-1">Representative email (managed by platform admin)</p>
-        <p className="text-gray-700">{company.rep_email}</p>
-      </div>
+      <Card>
+        <CardContent className="text-sm">
+          <p className="text-muted-foreground mb-1 text-xs">
+            Representative email (managed by platform admin)
+          </p>
+          <p className="text-gray-800">{company.rep_email}</p>
+        </CardContent>
+      </Card>
 
       {/* Material fields */}
-      <section className="space-y-4">
-        <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-          Material fields
-          <span className="ml-2 text-xs font-normal text-amber-600 normal-case">Editing these notifies active MOA partners</span>
-        </h2>
-        {[
-          { key: "registered_name", label: "Legal / registered name" },
-          { key: "registered_address", label: "Registered address" },
-          { key: "rep_name", label: "Representative name" },
-          { key: "rep_title", label: "Representative title" },
-        ].map(({ key, label }) => (
-          <div key={key}>
-            <label className="text-xs text-gray-500">{label}</label>
-            <input
-              className="w-full border rounded px-3 py-2 text-sm mt-0.5"
-              value={get(key)}
-              onChange={(e) => set(key, e.target.value)}
-            />
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Material fields</CardTitle>
+          <p className="text-warning text-xs">
+            Editing these notifies your active MOA partners.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {[
+            { key: "registered_name", label: "Legal / registered name" },
+            { key: "registered_address", label: "Registered address" },
+            { key: "rep_name", label: "Representative name" },
+            { key: "rep_title", label: "Representative title" },
+          ].map(({ key, label }) => (
+            <div key={key} className="space-y-1.5">
+              <Label htmlFor={key}>{label}</Label>
+              <Input
+                id={key}
+                value={get(key)}
+                onChange={(e) => set(key, e.target.value)}
+              />
+            </div>
+          ))}
+          <div className="space-y-1.5">
+            <Label>Company type</Label>
+            <Select
+              value={get("company_type") || undefined}
+              onValueChange={(v) => set("company_type", v)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select a type" />
+              </SelectTrigger>
+              <SelectContent>
+                {COMPANY_TYPES.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>
+                    {t.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        ))}
-        <div>
-          <label className="text-xs text-gray-500">Company type</label>
-          <select
-            className="w-full border rounded px-3 py-2 text-sm mt-0.5 bg-white"
-            value={get("company_type")}
-            onChange={(e) => set("company_type", e.target.value)}
-          >
-            <option value="">— select —</option>
-            {COMPANY_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>{t.label}</option>
-            ))}
-          </select>
-        </div>
-      </section>
+        </CardContent>
+      </Card>
 
       {/* Cosmetic fields */}
-      <section className="space-y-4">
-        <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Other info</h2>
-        {[
-          { key: "description", label: "Description" },
-          { key: "website", label: "Website" },
-          { key: "phone", label: "Phone" },
-          { key: "industry", label: "Industry" },
-        ].map(({ key, label }) => (
-          <div key={key}>
-            <label className="text-xs text-gray-500">{label}</label>
-            <input
-              className="w-full border rounded px-3 py-2 text-sm mt-0.5"
-              value={get(key)}
-              onChange={(e) => set(key, e.target.value)}
-            />
-          </div>
-        ))}
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Other info</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {[
+            { key: "description", label: "Description" },
+            { key: "website", label: "Website" },
+            { key: "phone", label: "Phone" },
+            { key: "industry", label: "Industry" },
+          ].map(({ key, label }) => (
+            <div key={key} className="space-y-1.5">
+              <Label htmlFor={key}>{label}</Label>
+              <Input
+                id={key}
+                value={get(key)}
+                onChange={(e) => set(key, e.target.value)}
+              />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
-      <button
-        onClick={() => patchProfile.mutate()}
-        disabled={patchProfile.isPending}
-        className="bg-blue-600 text-white text-sm px-6 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
-      >
-        {patchProfile.isPending ? "Saving…" : "Save profile"}
-      </button>
+      <div>
+        <Button
+          onClick={() => patchProfile.mutate()}
+          disabled={patchProfile.isPending}
+        >
+          {patchProfile.isPending && <Loader2 className="animate-spin" />}
+          {patchProfile.isPending ? "Saving…" : "Save profile"}
+        </Button>
+      </div>
 
       {/* Signature */}
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Representative signature</h2>
-        {company.rep_signature_url && (
-          <p className="text-xs text-green-600">Signature uploaded ✓</p>
-        )}
-        <input ref={sigRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadSig.mutate(f); }} />
-        <button
-          onClick={() => sigRef.current?.click()}
-          disabled={uploadSig.isPending}
-          className="border border-gray-300 text-sm px-4 py-2 rounded-md hover:bg-gray-50 disabled:opacity-50"
-        >
-          {uploadSig.isPending ? "Uploading…" : company.rep_signature_url ? "Replace signature" : "Upload signature"}
-        </button>
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Representative signature</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {company.rep_signature_url && (
+            <p className="text-supportive flex items-center gap-1.5 text-xs">
+              <CheckCircle2 className="h-3.5 w-3.5" /> Signature uploaded
+            </p>
+          )}
+          <input
+            ref={sigRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) uploadSig.mutate(f);
+            }}
+          />
+          <Button
+            variant="outline"
+            onClick={() => sigRef.current?.click()}
+            disabled={uploadSig.isPending}
+          >
+            {uploadSig.isPending ? (
+              <Loader2 className="animate-spin" />
+            ) : (
+              <Upload />
+            )}
+            {company.rep_signature_url ? "Replace signature" : "Upload signature"}
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Required documents */}
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-          Required documents
-          <span className="ml-2 text-xs font-normal text-gray-500 normal-case">All four required to request MOAs</span>
-        </h2>
-        {DOC_TYPES.map(({ value, label }) => {
-          const existing = latestDoc(value);
-          return (
-            <div key={value} className="flex items-center justify-between border rounded-lg p-3">
-              <div>
-                <p className="text-sm font-medium text-gray-800">{label}</p>
-                {existing ? (
-                  <p className="text-xs text-green-600 mt-0.5">
-                    {existing.filename} · {new Date(existing.uploaded_at).toLocaleDateString()}
-                  </p>
-                ) : (
-                  <p className="text-xs text-gray-400 mt-0.5">Not uploaded</p>
-                )}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Required documents</CardTitle>
+          <p className="text-muted-foreground text-xs">
+            All four are required before you can request MOAs.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-2.5">
+          {DOC_TYPES.map(({ value, label }) => {
+            const existing = latestDoc(value);
+            return (
+              <div
+                key={value}
+                className="flex items-center justify-between gap-3 rounded-[0.33em] border border-gray-200 p-3"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-gray-800">{label}</p>
+                    {existing ? (
+                      <Badge type="supportive" strength="medium">
+                        Uploaded
+                      </Badge>
+                    ) : (
+                      <Badge type="default" strength="light">
+                        Missing
+                      </Badge>
+                    )}
+                  </div>
+                  {existing && (
+                    <p className="text-muted-foreground mt-0.5 truncate text-xs">
+                      {existing.filename}
+                    </p>
+                  )}
+                </div>
+                <label
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "sm" }),
+                    "flex-shrink-0 cursor-pointer"
+                  )}
+                >
+                  {existing ? "Replace" : "Upload"}
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) uploadDoc.mutate({ file: f, type: value });
+                    }}
+                  />
+                </label>
               </div>
-              <label className="cursor-pointer border border-gray-300 text-sm px-3 py-1.5 rounded-md hover:bg-gray-50">
-                {existing ? "Replace" : "Upload"}
-                <input
-                  type="file"
-                  accept="application/pdf"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) uploadDoc.mutate({ file: f, type: value });
-                  }}
-                />
-              </label>
-            </div>
-          );
-        })}
-      </section>
-    </div>
+            );
+          })}
+        </CardContent>
+      </Card>
+    </PageContainer>
   );
 }

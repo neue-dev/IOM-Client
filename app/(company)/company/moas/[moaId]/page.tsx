@@ -1,8 +1,15 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
-import { preconfiguredAxios } from "@/app/api/preconfig.axios";
 import Link from "next/link";
+import { preconfiguredAxios } from "@/app/api/preconfig.axios";
+import { PageContainer } from "@/components/page-header";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { MoaStatusBadge } from "@/components/status-badge";
+import { formatDateWithoutTime } from "@/lib/utils";
+import { ArrowLeft, ExternalLink, FileText } from "lucide-react";
 
 export default function CompanyMoaDetailPage() {
   const { moaId } = useParams<{ moaId: string }>();
@@ -16,82 +23,96 @@ export default function CompanyMoaDetailPage() {
     enabled: !!moaId,
   });
 
-  if (isLoading) return <div className="p-8 text-sm text-gray-500">Loading…</div>;
-  if (!data?.moa) return <div className="p-8 text-sm text-red-500">MOA not found.</div>;
+  if (isLoading) {
+    return (
+      <PageContainer className="max-w-3xl space-y-6">
+        <Skeleton className="h-5 w-28" />
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-[60vh] w-full" />
+      </PageContainer>
+    );
+  }
+  if (!data?.moa) {
+    return (
+      <PageContainer className="max-w-3xl">
+        <Card>
+          <CardContent className="text-destructive py-8 text-center text-sm">
+            MOA not found.
+          </CardContent>
+        </Card>
+      </PageContainer>
+    );
+  }
 
   const { moa, pdfUrl } = data;
-  const isActive = moa.status === "active" && !moa.is_expired;
-  const isExpired = !!moa.is_expired;
-  const isRejected = moa.status === "rejected";
 
   return (
-    <div className="max-w-3xl mx-auto p-8 space-y-6">
-      <div className="flex items-center gap-3">
-        <Link href="/company/dashboard" className="text-sm text-blue-600 hover:underline">
-          ← Dashboard
-        </Link>
-      </div>
+    <PageContainer className="max-w-3xl space-y-6">
+      <Link
+        href="/company/dashboard"
+        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
+      >
+        <ArrowLeft className="h-4 w-4" /> Dashboard
+      </Link>
 
-      <div className="border rounded-xl p-6 space-y-4">
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900">{moa.university.registered_name}</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              {new Date(moa.effective_date).toLocaleDateString()} –{" "}
-              {new Date(moa.expiry_date).toLocaleDateString()}
-            </p>
+      <Card>
+        <CardContent className="space-y-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="truncate text-xl font-semibold text-gray-900">
+                {moa.university.registered_name}
+              </h1>
+              <p className="text-muted-foreground mt-1 text-sm">
+                {formatDateWithoutTime(moa.effective_date)} &ndash;{" "}
+                {formatDateWithoutTime(moa.expiry_date)}
+              </p>
+            </div>
+            <MoaStatusBadge status={moa.status} isExpired={moa.is_expired} />
           </div>
-          <span
-            className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-              isActive
-                ? "bg-green-100 text-green-800"
-                : isExpired
-                  ? "bg-gray-100 text-gray-600"
-                  : "bg-red-100 text-red-700"
-            }`}
-          >
-            {isActive ? "Active" : isExpired ? "Expired" : "Rejected"}
-          </span>
-        </div>
 
-        {isRejected && moa.rejection_reason && (
-          <div className="bg-red-50 border border-red-100 rounded-lg p-3 text-sm text-red-700">
-            <span className="font-medium">Rejection reason:</span> {moa.rejection_reason}
-          </div>
-        )}
+          {moa.status === "rejected" && moa.rejection_reason && (
+            <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-[0.33em] border p-3 text-sm">
+              <span className="font-medium">Rejection reason:</span>{" "}
+              {moa.rejection_reason}
+            </div>
+          )}
 
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <p className="text-xs text-gray-400 mb-1">Template</p>
-            <p className="text-gray-700">{moa.template?.name ?? "—"}</p>
+          <div className="grid grid-cols-2 gap-4 border-t border-gray-100 pt-4 text-sm">
+            <div>
+              <p className="text-muted-foreground mb-1 text-xs">Template</p>
+              <p className="text-gray-700">{moa.template?.name ?? "—"}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground mb-1 text-xs">Requested</p>
+              <p className="text-gray-700">
+                {formatDateWithoutTime(moa.created_at)}
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-xs text-gray-400 mb-1">Requested</p>
-            <p className="text-gray-700">{new Date(moa.created_at).toLocaleDateString()}</p>
-          </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {pdfUrl ? (
-        <div className="border rounded-xl overflow-hidden">
-          <div className="bg-gray-50 border-b px-4 py-3 flex items-center justify-between">
-            <p className="text-sm font-medium text-gray-700">MOA Document</p>
-            <a
-              href={pdfUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="text-sm text-blue-600 hover:underline"
-            >
-              Open in new tab
-            </a>
+        <Card className="overflow-hidden p-0">
+          <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+            <p className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <FileText className="text-muted-foreground h-4 w-4" /> MOA document
+            </p>
+            <Button asChild variant="ghost" size="sm">
+              <a href={pdfUrl} target="_blank" rel="noreferrer">
+                Open <ExternalLink />
+              </a>
+            </Button>
           </div>
-          <iframe src={pdfUrl} className="w-full h-[70vh]" title="MOA PDF" />
-        </div>
+          <iframe src={pdfUrl} className="h-[70vh] w-full" title="MOA PDF" />
+        </Card>
       ) : (
-        <div className="border rounded-xl p-8 text-center text-sm text-gray-500">
-          PDF not available.
-        </div>
+        <Card>
+          <CardContent className="text-muted-foreground py-10 text-center text-sm">
+            PDF not available.
+          </CardContent>
+        </Card>
       )}
-    </div>
+    </PageContainer>
   );
 }
