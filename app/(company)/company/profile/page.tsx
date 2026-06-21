@@ -333,6 +333,9 @@ export default function CompanyProfilePage() {
 
             <div className="space-y-2 border-t border-gray-100 pt-4">
               <Label>Representative signature</Label>
+              <p className="text-muted-foreground text-xs">
+                PNG only — a transparent background works best on the MOA.
+              </p>
               {company.rep_signature_url ? (
                 <p className="text-supportive flex items-center gap-1.5 text-xs">
                   <CheckCircle2 className="h-3.5 w-3.5" /> Signature uploaded
@@ -345,7 +348,7 @@ export default function CompanyProfilePage() {
               <input
                 ref={sigRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                accept="image/png"
                 className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0];

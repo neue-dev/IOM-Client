@@ -13,7 +13,10 @@ export function AdminHeader() {
     <AppHeader
       portal="Platform Admin"
       homeHref="/admin/universities"
-      nav={[{ href: "/admin/universities", label: "Universities" }]}
+      nav={[
+        { href: "/admin/universities", label: "Universities" },
+        { href: "/admin/templates", label: "MOA Templates" },
+      ]}
       userPrimary="Administrator"
       logoutPath="/api/auth/admin/logout"
       postLogoutPath="/admin/login"
