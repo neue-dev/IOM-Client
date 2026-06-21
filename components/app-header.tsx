@@ -79,14 +79,14 @@ export function AppHeader({
           </span>
         </Link>
 
-        <nav className="ml-2 hidden flex-1 items-center gap-1 md:flex">
+        <nav className="ml-2 hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto md:flex [&::-webkit-scrollbar]:hidden">
           {nav.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               aria-current={isActive(item.href) ? "page" : undefined}
               className={cn(
-                "rounded-[0.33em] px-3 py-1.5 text-sm font-medium transition-colors",
+                "flex-shrink-0 rounded-[0.33em] px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors",
                 isActive(item.href)
                   ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted"

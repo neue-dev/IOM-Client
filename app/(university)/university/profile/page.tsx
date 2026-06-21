@@ -1,8 +1,15 @@
 "use client";
 import { useState, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { useUniversityProfile } from "@/app/providers/university-profile.provider";
 import { preconfiguredAxios } from "@/app/api/preconfig.axios";
+import { PageContainer, PageHeader } from "@/components/page-header";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { AlertTriangle, CheckCircle2, Loader2, Upload } from "lucide-react";
 
 export default function UniversityProfilePage() {
   const { account, isLoading, isSuperadmin } = useUniversityProfile();
@@ -11,13 +18,13 @@ export default function UniversityProfilePage() {
   const logoRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState<Record<string, string>>({});
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState("");
 
   const { data } = useQuery({
     queryKey: ["university-profile"],
     queryFn: () =>
-      preconfiguredAxios.get("/api/university/profile").then((r) => r.data as { university: any }),
+      preconfiguredAxios
+        .get("/api/university/profile")
+        .then((r) => r.data as { university: any }),
     enabled: !!account,
   });
 
@@ -34,11 +41,9 @@ export default function UniversityProfilePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["university-profile"] });
       queryClient.invalidateQueries({ queryKey: ["university-me"] });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-      setError("");
+      toast.success("Profile saved");
     },
-    onError: (e: any) => setError(e.message),
+    onError: (e: any) => toast.error(e.message),
   });
 
   const uploadLogo = useMutation({
@@ -47,8 +52,11 @@ export default function UniversityProfilePage() {
       fd.append("file", file);
       return preconfiguredAxios.post("/api/university/profile/logo", fd);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["university-profile"] }),
-    onError: (e: any) => setError(e.message),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["university-profile"] });
+      toast.success("Logo uploaded");
+    },
+    onError: (e: any) => toast.error(e.message),
   });
 
   const uploadSig = useMutation({
@@ -57,117 +65,173 @@ export default function UniversityProfilePage() {
       fd.append("file", file);
       return preconfiguredAxios.post("/api/university/profile/signature", fd);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["university-profile"] }),
-    onError: (e: any) => setError(e.message),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["university-profile"] });
+      toast.success("Signature uploaded");
+    },
+    onError: (e: any) => toast.error(e.message),
   });
 
-  if (isLoading) return <div className="p-8 text-sm text-gray-500">Loading…</div>;
-  if (!account) return null;
+  if (isLoading || !account) return null;
 
   function get(key: string): string {
     return key in form ? form[key] : (uni?.[key] ?? "");
   }
-
   function set(key: string, val: string) {
     setForm((f) => ({ ...f, [key]: val }));
   }
 
-  const signatoryComplete = uni?.rep_name && uni?.rep_title && uni?.rep_signature_url;
+  const signatoryComplete =
+    uni?.rep_name && uni?.rep_title && uni?.rep_signature_url;
 
   return (
-    <div className="max-w-2xl mx-auto p-8 space-y-8">
-      <h1 className="text-2xl font-semibold text-gray-900">University Profile</h1>
+    <PageContainer className="max-w-2xl space-y-6">
+      <PageHeader
+        title="University profile"
+        description="Institution details and the signatory used on your MOA templates."
+      />
 
       {!signatoryComplete && isSuperadmin && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
-          Complete the institution signatory (name, title, signature image) before you can offer MOA templates to companies.
+        <div className="border-warning/30 bg-warning/10 flex items-start gap-3 rounded-[0.33em] border p-4 text-sm">
+          <AlertTriangle className="text-warning mt-0.5 h-4 w-4 flex-shrink-0" />
+          <p className="text-gray-700">
+            Complete the institution signatory (name, title, and signature image)
+            before you can offer MOA templates to companies.
+          </p>
         </div>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      {saved && <p className="text-sm text-green-600">Saved.</p>}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Institution info</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {[
+            { key: "registered_name", label: "Registered name" },
+            {
+              key: "address",
+              label: "Address (used as execution place in MOAs)",
+            },
+          ].map(({ key, label }) => (
+            <div key={key} className="space-y-1.5">
+              <Label htmlFor={key}>{label}</Label>
+              <Input
+                id={key}
+                value={get(key)}
+                onChange={(e) => set(key, e.target.value)}
+                disabled={!isSuperadmin}
+              />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
-      <section className="space-y-4">
-        <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Institution info</h2>
-        {[
-          { key: "registered_name", label: "Registered name" },
-          { key: "address", label: "Address (used as execution place in MOAs)" },
-        ].map(({ key, label }) => (
-          <div key={key}>
-            <label className="text-xs text-gray-500">{label}</label>
-            <input
-              className="w-full border rounded px-3 py-2 text-sm mt-0.5 disabled:bg-gray-50 disabled:text-gray-500"
-              value={get(key)}
-              onChange={(e) => set(key, e.target.value)}
-              disabled={!isSuperadmin}
-            />
-          </div>
-        ))}
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Institution signatory</CardTitle>
+          <p className="text-muted-foreground text-xs">
+            Signs all offered MOA templates.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {[
+            { key: "rep_name", label: "Signatory name" },
+            { key: "rep_title", label: "Signatory title" },
+          ].map(({ key, label }) => (
+            <div key={key} className="space-y-1.5">
+              <Label htmlFor={key}>{label}</Label>
+              <Input
+                id={key}
+                value={get(key)}
+                onChange={(e) => set(key, e.target.value)}
+                disabled={!isSuperadmin}
+              />
+            </div>
+          ))}
 
-      <section className="space-y-4">
-        <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-          Institution signatory
-          <span className="ml-2 text-xs font-normal text-gray-500 normal-case">
-            Signs all offered MOA templates
-          </span>
-        </h2>
-        {[
-          { key: "rep_name", label: "Signatory name" },
-          { key: "rep_title", label: "Signatory title" },
-        ].map(({ key, label }) => (
-          <div key={key}>
-            <label className="text-xs text-gray-500">{label}</label>
+          <div className="space-y-2">
+            <Label>Signature image</Label>
+            {uni?.rep_signature_url && (
+              <p className="text-supportive flex items-center gap-1.5 text-xs">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Signature uploaded
+              </p>
+            )}
             <input
-              className="w-full border rounded px-3 py-2 text-sm mt-0.5 disabled:bg-gray-50 disabled:text-gray-500"
-              value={get(key)}
-              onChange={(e) => set(key, e.target.value)}
-              disabled={!isSuperadmin}
+              ref={sigRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) uploadSig.mutate(f);
+              }}
             />
+            {isSuperadmin && (
+              <Button
+                variant="outline"
+                onClick={() => sigRef.current?.click()}
+                disabled={uploadSig.isPending}
+              >
+                {uploadSig.isPending ? (
+                  <Loader2 className="animate-spin" />
+                ) : (
+                  <Upload />
+                )}
+                {uni?.rep_signature_url ? "Replace signature" : "Upload signature"}
+              </Button>
+            )}
           </div>
-        ))}
-        <div>
-          <p className="text-xs text-gray-500 mb-1">Signature image (required to offer templates)</p>
-          {uni?.rep_signature_url && <p className="text-xs text-green-600 mb-1">Signature uploaded ✓</p>}
-          <input ref={sigRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadSig.mutate(f); }} />
-          {isSuperadmin && (
-            <button
-              onClick={() => sigRef.current?.click()}
-              disabled={uploadSig.isPending}
-              className="border border-gray-300 text-sm px-4 py-2 rounded-md hover:bg-gray-50 disabled:opacity-50"
-            >
-              {uploadSig.isPending ? "Uploading…" : uni?.rep_signature_url ? "Replace signature" : "Upload signature"}
-            </button>
-          )}
-        </div>
-      </section>
+        </CardContent>
+      </Card>
 
       {isSuperadmin && (
-        <button
-          onClick={() => patchProfile.mutate()}
-          disabled={patchProfile.isPending}
-          className="bg-blue-600 text-white text-sm px-6 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
-        >
-          {patchProfile.isPending ? "Saving…" : "Save profile"}
-        </button>
+        <div>
+          <Button
+            onClick={() => patchProfile.mutate()}
+            disabled={patchProfile.isPending}
+          >
+            {patchProfile.isPending && <Loader2 className="animate-spin" />}
+            {patchProfile.isPending ? "Saving…" : "Save profile"}
+          </Button>
+        </div>
       )}
 
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Logo</h2>
-        {uni?.logo_url && <p className="text-xs text-green-600">Logo uploaded ✓</p>}
-        <input ref={logoRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadLogo.mutate(f); }} />
-        {isSuperadmin && (
-          <button
-            onClick={() => logoRef.current?.click()}
-            disabled={uploadLogo.isPending}
-            className="border border-gray-300 text-sm px-4 py-2 rounded-md hover:bg-gray-50 disabled:opacity-50"
-          >
-            {uploadLogo.isPending ? "Uploading…" : uni?.logo_url ? "Replace logo" : "Upload logo"}
-          </button>
-        )}
-      </section>
-    </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Logo</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {uni?.logo_url && (
+            <p className="text-supportive flex items-center gap-1.5 text-xs">
+              <CheckCircle2 className="h-3.5 w-3.5" /> Logo uploaded
+            </p>
+          )}
+          <input
+            ref={logoRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) uploadLogo.mutate(f);
+            }}
+          />
+          {isSuperadmin && (
+            <Button
+              variant="outline"
+              onClick={() => logoRef.current?.click()}
+              disabled={uploadLogo.isPending}
+            >
+              {uploadLogo.isPending ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                <Upload />
+              )}
+              {uni?.logo_url ? "Replace logo" : "Upload logo"}
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+    </PageContainer>
   );
 }

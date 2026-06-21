@@ -2,6 +2,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { useUniversityProfile } from "@/app/providers/university-profile.provider";
 import { preconfiguredAxios } from "@/app/api/preconfig.axios";
+import { PageContainer, PageHeader, EmptyState } from "@/components/page-header";
+import { Card } from "@/components/ui/card";
+import { Badge, type BadgeProps } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { formatDateTime } from "@/lib/utils";
 
 interface AuditEvent {
   id: string;
@@ -23,14 +28,14 @@ const EVENT_LABELS: Record<string, string> = {
   company_unblacklisted: "Company removed from blacklist",
 };
 
-const EVENT_COLORS: Record<string, string> = {
-  request_received: "bg-blue-100 text-blue-800",
-  moa_confirmed: "bg-green-100 text-green-800",
-  moa_rejected: "bg-red-100 text-red-700",
-  partner_details_changed: "bg-amber-100 text-amber-800",
-  moa_revoked: "bg-red-100 text-red-700",
-  company_blacklisted: "bg-red-100 text-red-700",
-  company_unblacklisted: "bg-gray-100 text-gray-700",
+const EVENT_TYPES: Record<string, BadgeProps["type"]> = {
+  request_received: "primary",
+  moa_confirmed: "supportive",
+  moa_rejected: "destructive",
+  partner_details_changed: "warning",
+  moa_revoked: "destructive",
+  company_blacklisted: "destructive",
+  company_unblacklisted: "default",
 };
 
 export default function AuditPage() {
@@ -45,46 +50,50 @@ export default function AuditPage() {
     enabled: !!account,
   });
 
-  if (isLoading) return <div className="p-8 text-sm text-gray-500">Loading…</div>;
+  if (isLoading) return null;
   if (!account) return null;
 
   const events = data?.logs ?? [];
 
   return (
-    <div className="max-w-3xl mx-auto p-8 space-y-6">
-      <h1 className="text-2xl font-semibold text-gray-900">Audit Log</h1>
+    <PageContainer className="space-y-6">
+      <PageHeader
+        title="Audit log"
+        description="A record of MOA and partner activity for your institution."
+      />
 
-      {aLoading && <p className="text-sm text-gray-500">Loading…</p>}
-
-      {!aLoading && events.length === 0 && (
-        <div className="text-center py-12 border rounded-lg bg-gray-50">
-          <p className="text-gray-500 text-sm">No audit events yet.</p>
+      {aLoading ? (
+        <div className="space-y-2.5">
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-full" />
+        </div>
+      ) : events.length === 0 ? (
+        <EmptyState title="No audit events yet" />
+      ) : (
+        <div className="space-y-2.5">
+          {events.map((ev) => (
+            <Card key={ev.id} className="gap-1.5 px-5 py-4">
+              <div className="flex items-center justify-between gap-3">
+                <Badge type={EVENT_TYPES[ev.event_type] ?? "default"}>
+                  {EVENT_LABELS[ev.event_type] ?? ev.event_type}
+                </Badge>
+                <span className="text-muted-foreground text-xs">
+                  {formatDateTime(ev.created_at)}
+                </span>
+              </div>
+              {ev.company && (
+                <p className="text-sm text-gray-800">{ev.company.display_name}</p>
+              )}
+              {ev.detail && (
+                <p className="text-muted-foreground text-xs">{ev.detail}</p>
+              )}
+              {ev.actor_email && (
+                <p className="text-muted-foreground text-xs">By {ev.actor_email}</p>
+              )}
+            </Card>
+          ))}
         </div>
       )}
-
-      <div className="space-y-2">
-        {events.map((ev) => (
-          <div key={ev.id} className="border rounded-lg p-4 space-y-1">
-            <div className="flex items-center justify-between gap-3">
-              <span
-                className={`text-xs px-2 py-0.5 rounded-full font-medium ${EVENT_COLORS[ev.event_type] ?? "bg-gray-100 text-gray-700"}`}
-              >
-                {EVENT_LABELS[ev.event_type] ?? ev.event_type}
-              </span>
-              <span className="text-xs text-gray-400">
-                {new Date(ev.created_at).toLocaleString()}
-              </span>
-            </div>
-            {ev.company && (
-              <p className="text-sm text-gray-700">{ev.company.display_name}</p>
-            )}
-            {ev.detail && <p className="text-xs text-gray-500">{ev.detail}</p>}
-            {ev.actor_email && (
-              <p className="text-xs text-gray-400">By {ev.actor_email}</p>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
+    </PageContainer>
   );
 }

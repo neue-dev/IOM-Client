@@ -1,8 +1,14 @@
 "use client";
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { useUniversityProfile } from "@/app/providers/university-profile.provider";
 import { preconfiguredAxios } from "@/app/api/preconfig.axios";
-import Link from "next/link";
+import { PageContainer, PageHeader, EmptyState } from "@/components/page-header";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { formatDateWithoutTime } from "@/lib/utils";
+import { ChevronRight } from "lucide-react";
 
 interface MoaSummary {
   id: string;
@@ -26,52 +32,61 @@ export default function ReviewQueuePage() {
     refetchInterval: 30_000,
   });
 
-  if (isLoading) return <div className="p-8 text-sm text-gray-500">Loading…</div>;
+  if (isLoading) return null;
   if (!account) return null;
 
   const moas = data?.moas ?? [];
 
   return (
-    <div className="max-w-3xl mx-auto p-8 space-y-6">
-      <h1 className="text-2xl font-semibold text-gray-900">Review Queue</h1>
+    <PageContainer className="space-y-6">
+      <PageHeader
+        title="Review queue"
+        description="MOA requests from companies awaiting your decision."
+      />
 
-      {qLoading && <p className="text-sm text-gray-500">Loading…</p>}
-
-      {!qLoading && moas.length === 0 && (
-        <div className="text-center py-12 border rounded-lg bg-gray-50">
-          <p className="text-gray-500 text-sm">No pending MOAs to review.</p>
+      {qLoading ? (
+        <div className="space-y-2.5">
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-20 w-full" />
+        </div>
+      ) : moas.length === 0 ? (
+        <EmptyState
+          title="All caught up"
+          description="There are no pending MOA requests to review."
+        />
+      ) : (
+        <div className="space-y-2.5">
+          {moas.map((moa) => (
+            <Link
+              key={moa.id}
+              href={`/university/moas/${moa.id}`}
+              className="block"
+            >
+              <Card className="flex-row items-center justify-between gap-3 px-5 py-4 transition-colors hover:bg-gray-50">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-gray-900">
+                    {moa.company.display_name}
+                    {moa.company.registered_name &&
+                      moa.company.registered_name !== moa.company.display_name && (
+                        <span className="text-muted-foreground ml-1 font-normal">
+                          ({moa.company.registered_name})
+                        </span>
+                      )}
+                  </p>
+                  <p className="text-muted-foreground mt-0.5 text-xs">
+                    {moa.template.name} &middot; requested{" "}
+                    {formatDateWithoutTime(moa.created_at)}
+                  </p>
+                </div>
+                <div className="flex flex-shrink-0 items-center gap-3">
+                  <Badge type="warning">Pending</Badge>
+                  <ChevronRight className="text-muted-foreground h-4 w-4" />
+                </div>
+              </Card>
+            </Link>
+          ))}
         </div>
       )}
-
-      <div className="space-y-3">
-        {moas.map((moa) => (
-          <Link
-            key={moa.id}
-            href={`/university/moas/${moa.id}`}
-            className="block border rounded-lg p-4 hover:bg-gray-50 transition-colors"
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="font-medium text-sm text-gray-900">
-                  {moa.company.display_name}
-                  {moa.company.registered_name && moa.company.registered_name !== moa.company.display_name && (
-                    <span className="text-gray-400 font-normal ml-1">
-                      ({moa.company.registered_name})
-                    </span>
-                  )}
-                </p>
-                <p className="text-xs text-gray-500 mt-0.5">{moa.template.name}</p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  Requested {new Date(moa.created_at).toLocaleDateString()}
-                </p>
-              </div>
-              <span className="shrink-0 text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-medium">
-                Pending review
-              </span>
-            </div>
-          </Link>
-        ))}
-      </div>
-    </div>
+    </PageContainer>
   );
 }

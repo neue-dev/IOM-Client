@@ -1,8 +1,58 @@
 "use client";
-import { useUniversityProfile } from "@/app/providers/university-profile.provider";
-import { useQuery } from "@tanstack/react-query";
-import { preconfiguredAxios } from "@/app/api/preconfig.axios";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
+import { useUniversityProfile } from "@/app/providers/university-profile.provider";
+import { preconfiguredAxios } from "@/app/api/preconfig.axios";
+import { PageContainer } from "@/components/page-header";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  ClipboardCheck,
+  Users2,
+  Ban,
+  ScrollText,
+  FileStack,
+  Building2,
+  ChevronRight,
+  type LucideIcon,
+} from "lucide-react";
+
+function HubCard({
+  href,
+  icon: Icon,
+  title,
+  description,
+  badge,
+}: {
+  href: string;
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  badge?: number;
+}) {
+  return (
+    <Link href={href} className="block">
+      <Card className="h-full gap-0 px-5 py-5 transition-colors hover:bg-gray-50">
+        <div className="flex items-start justify-between">
+          <span className="bg-primary/10 text-primary flex h-9 w-9 items-center justify-center rounded-[0.33em]">
+            <Icon className="h-4 w-4" />
+          </span>
+          <div className="flex items-center gap-2">
+            {badge ? (
+              <Badge type="warning" strength="medium">
+                {badge}
+              </Badge>
+            ) : null}
+            <ChevronRight className="text-muted-foreground h-4 w-4" />
+          </div>
+        </div>
+        <p className="mt-3 text-sm font-medium text-gray-900">{title}</p>
+        <p className="text-muted-foreground mt-0.5 text-xs">{description}</p>
+      </Card>
+    </Link>
+  );
+}
 
 export default function UniversityDashboardPage() {
   const { account, isLoading, isSuperadmin } = useUniversityProfile();
@@ -10,84 +60,82 @@ export default function UniversityDashboardPage() {
   const { data: queueData } = useQuery({
     queryKey: ["university-review-queue"],
     queryFn: () =>
-      preconfiguredAxios.get("/api/university/review-queue?limit=5").then((r) => r.data),
+      preconfiguredAxios
+        .get("/api/university/review-queue?limit=5")
+        .then((r) => r.data),
     enabled: !!account,
   });
 
-  if (isLoading) return <div className="p-8 text-sm text-gray-500">Loading…</div>;
+  if (isLoading) {
+    return (
+      <PageContainer className="space-y-6">
+        <Skeleton className="h-8 w-64" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Skeleton className="h-28 w-full" />
+          <Skeleton className="h-28 w-full" />
+        </div>
+      </PageContainer>
+    );
+  }
   if (!account) return null;
 
   const pendingCount = queueData?.moas?.length ?? 0;
 
   return (
-    <div className="max-w-3xl mx-auto p-8 space-y-6">
+    <PageContainer className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900">{account.university.registered_name}</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Logged in as {account.display_name} · {account.role}
+        <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
+          {account.university.registered_name}
+        </h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Signed in as {account.display_name} &middot;{" "}
+          <span className="capitalize">{account.role}</span>
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <Link
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <HubCard
           href="/university/review-queue"
-          className="border rounded-xl p-5 hover:bg-gray-50 transition-colors space-y-1"
-        >
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-gray-700">Review Queue</p>
-            {pendingCount > 0 && (
-              <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-medium">
-                {pendingCount}
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-gray-400">Unreviewed MOA requests</p>
-        </Link>
-
-        <Link
+          icon={ClipboardCheck}
+          title="Review queue"
+          description="Unreviewed MOA requests"
+          badge={pendingCount}
+        />
+        <HubCard
           href="/university/partners"
-          className="border rounded-xl p-5 hover:bg-gray-50 transition-colors space-y-1"
-        >
-          <p className="text-sm font-medium text-gray-700">Partners</p>
-          <p className="text-xs text-gray-400">Companies with active MOAs</p>
-        </Link>
-
-        <Link
+          icon={Users2}
+          title="Partners"
+          description="Companies with active MOAs"
+        />
+        <HubCard
           href="/university/blacklist"
-          className="border rounded-xl p-5 hover:bg-gray-50 transition-colors space-y-1"
-        >
-          <p className="text-sm font-medium text-gray-700">Blacklist</p>
-          <p className="text-xs text-gray-400">Manage blocked companies</p>
-        </Link>
-
-        <Link
+          icon={Ban}
+          title="Blacklist"
+          description="Manage blocked companies"
+        />
+        <HubCard
           href="/university/audit"
-          className="border rounded-xl p-5 hover:bg-gray-50 transition-colors space-y-1"
-        >
-          <p className="text-sm font-medium text-gray-700">Audit Log</p>
-          <p className="text-xs text-gray-400">Activity history</p>
-        </Link>
-
+          icon={ScrollText}
+          title="Audit log"
+          description="Activity history"
+        />
         {isSuperadmin && (
-          <Link
+          <HubCard
             href="/university/templates"
-            className="border rounded-xl p-5 hover:bg-gray-50 transition-colors space-y-1"
-          >
-            <p className="text-sm font-medium text-gray-700">Offered Templates</p>
-            <p className="text-xs text-gray-400">Manage available MOA templates</p>
-          </Link>
+            icon={FileStack}
+            title="Offered templates"
+            description="Manage available MOA templates"
+          />
         )}
-
         {isSuperadmin && (
-          <Link
+          <HubCard
             href="/university/profile"
-            className="border rounded-xl p-5 hover:bg-gray-50 transition-colors space-y-1"
-          >
-            <p className="text-sm font-medium text-gray-700">University Profile</p>
-            <p className="text-xs text-gray-400">Signatory & institution info</p>
-          </Link>
+            icon={Building2}
+            title="University profile"
+            description="Signatory & institution info"
+          />
         )}
       </div>
-    </div>
+    </PageContainer>
   );
 }
