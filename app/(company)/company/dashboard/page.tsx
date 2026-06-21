@@ -9,7 +9,14 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MoaStatusBadge } from "@/components/status-badge";
 import { formatDateWithoutTime } from "@/lib/utils";
-import { AlertTriangle, ChevronRight, Plus } from "lucide-react";
+import { ChevronRight, ClipboardList, Plus } from "lucide-react";
+
+const REQUIRED_DOC_TYPES = [
+  "business_permit",
+  "sec_dti_registration",
+  "mayor_permit",
+  "or_registration",
+];
 
 interface Moa {
   id: string;
@@ -72,6 +79,13 @@ export default function CompanyDashboardPage() {
     enabled: !!company,
   });
 
+  const { data: docsData, isLoading: docsLoading } = useQuery({
+    queryKey: ["company-docs"],
+    queryFn: () =>
+      preconfiguredAxios.get("/api/company/documents").then((r) => r.data),
+    enabled: !!company,
+  });
+
   if (isLoading) {
     return (
       <PageContainer className="space-y-8">
@@ -98,37 +112,68 @@ export default function CompanyDashboardPage() {
     company.rep_title
   );
 
+  const docs = (docsData?.documents ?? []) as Array<{ type: string }>;
+  const docsComplete = REQUIRED_DOC_TYPES.every((t) =>
+    docs.some((d) => d.type === t)
+  );
+
+  // Whether the company is eligible to request MOAs yet.
+  const canRequest = profileComplete && docsComplete;
+  const gatesLoading = moasLoading || docsLoading;
+
   return (
     <PageContainer className="space-y-8">
       <PageHeader
         title={company.display_name}
         description="Your memoranda of agreement with partner universities."
       >
-        <Button asChild>
-          <Link href="/company/universities">
-            <Plus /> Request MOA
-          </Link>
-        </Button>
+        {canRequest && (
+          <Button asChild>
+            <Link href="/company/universities">
+              <Plus /> Request MOA
+            </Link>
+          </Button>
+        )}
       </PageHeader>
 
-      {!profileComplete && (
-        <div className="border-warning/30 bg-warning/10 flex items-start gap-3 rounded-[0.33em] border p-4 text-sm">
-          <AlertTriangle className="text-warning mt-0.5 h-4 w-4 flex-shrink-0" />
-          <p className="text-gray-700">
-            Complete your profile and upload all four required documents before you
-            can request MOAs.{" "}
-            <Link href="/company/profile" className="text-primary font-medium">
-              Complete profile
-            </Link>
-          </p>
-        </div>
-      )}
-
-      {moasLoading ? (
+      {gatesLoading ? (
         <div className="space-y-2.5">
           <Skeleton className="h-20 w-full" />
           <Skeleton className="h-20 w-full" />
         </div>
+      ) : !canRequest ? (
+        <>
+          {/* Onboarding gate — dominates the screen until setup is complete. */}
+          <div className="flex min-h-[60vh] items-center justify-center">
+            <Card className="w-full max-w-lg items-center gap-4 px-6 py-12 text-center">
+              <span className="bg-primary/10 text-primary flex h-14 w-14 items-center justify-center rounded-full">
+                <ClipboardList className="h-7 w-7" />
+              </span>
+              <div className="space-y-1.5">
+                <h2 className="text-xl font-semibold tracking-tight text-gray-900">
+                  Finish setting up your account
+                </h2>
+                <p className="text-muted-foreground mx-auto max-w-sm text-sm">
+                  Complete your company profile and upload all four required
+                  documents. Once everything&apos;s in, you can start requesting
+                  MOAs from partner universities.
+                </p>
+              </div>
+              <Button asChild size="lg">
+                <Link href="/company/profile">Complete your profile</Link>
+              </Button>
+            </Card>
+          </div>
+
+          {/* Defensive: still surface any existing MOAs below the gate. */}
+          {moas.length > 0 && (
+            <div className="space-y-8">
+              <MoaSection title="Active" items={active} />
+              <MoaSection title="Rejected" items={rejected} />
+              <MoaSection title="Expired" items={expired} />
+            </div>
+          )}
+        </>
       ) : moas.length === 0 ? (
         <EmptyState
           title="No MOAs yet"

@@ -31,6 +31,7 @@ export function CompanyHeader() {
       userSecondary={company?.rep_email ?? undefined}
       logoutPath="/api/auth/company/logout"
       postLogoutPath="/company/login"
+      profileHref="/company/profile"
     />
   );
 }

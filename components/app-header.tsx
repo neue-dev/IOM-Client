@@ -29,6 +29,11 @@ interface AppHeaderProps {
   userSecondary?: string;
   logoutPath: string;
   postLogoutPath: string;
+  /**
+   * When set, the avatar links directly to this profile page and a separate
+   * sign-out button is shown beside it (instead of the account dropdown).
+   */
+  profileHref?: string;
 }
 
 /**
@@ -43,6 +48,7 @@ export function AppHeader({
   userSecondary,
   logoutPath,
   postLogoutPath,
+  profileHref,
 }: AppHeaderProps) {
   const pathname = usePathname() ?? "";
   const router = useRouter();
@@ -115,47 +121,75 @@ export function AppHeader({
             </DropdownMenu>
           )}
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                aria-label="Account menu"
+          {profileHref ? (
+            <>
+              <Link
+                href={profileHref}
+                title={userPrimary ?? "Profile"}
+                aria-label="Profile"
                 className="bg-primary/10 text-primary hover:bg-primary/15 flex h-9 w-9 items-center justify-center rounded-full text-xs font-semibold transition-colors focus:outline-none"
               >
                 {initials}
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-60">
-              <DropdownMenuLabel className="font-normal">
-                <div className="flex flex-col gap-0.5">
-                  <span className="truncate text-sm font-medium text-gray-900">
-                    {userPrimary ?? portal}
-                  </span>
-                  {userSecondary && (
-                    <span className="text-muted-foreground truncate text-xs">
-                      {userSecondary}
-                    </span>
-                  )}
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onSelect={(e) => {
-                  e.preventDefault();
-                  logout.mutate();
-                }}
+              </Link>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Sign out"
+                title="Sign out"
+                onClick={() => logout.mutate()}
                 disabled={logout.isPending}
-                className="text-destructive focus:text-destructive"
+                className="text-muted-foreground hover:text-destructive"
               >
                 {logout.isPending ? (
                   <Loader2 className="animate-spin" />
                 ) : (
                   <LogOut />
                 )}
-                Sign out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              </Button>
+            </>
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="Account menu"
+                  className="bg-primary/10 text-primary hover:bg-primary/15 flex h-9 w-9 items-center justify-center rounded-full text-xs font-semibold transition-colors focus:outline-none"
+                >
+                  {initials}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-60">
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="truncate text-sm font-medium text-gray-900">
+                      {userPrimary ?? portal}
+                    </span>
+                    {userSecondary && (
+                      <span className="text-muted-foreground truncate text-xs">
+                        {userSecondary}
+                      </span>
+                    )}
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    logout.mutate();
+                  }}
+                  disabled={logout.isPending}
+                  className="text-destructive focus:text-destructive"
+                >
+                  {logout.isPending ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    <LogOut />
+                  )}
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
     </header>
