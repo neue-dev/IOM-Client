@@ -225,7 +225,7 @@ export default function UniversityProfilePage() {
             {textField(
               "university",
               "address",
-              "Address (used as execution place in MOAs)"
+              "Address (used in MOAs)"
             )}
             {editControls("university", ["registered_name", "address"])}
           </AccordionContent>
