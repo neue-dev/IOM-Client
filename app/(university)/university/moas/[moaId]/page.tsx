@@ -58,13 +58,28 @@ interface MoaHistoryEntry {
   created_at: string;
 }
 
+interface CompanyDoc {
+  id: string;
+  type: string;
+  filename: string;
+  url: string | null;
+}
+
 interface MoaDetail {
   moa: MoaRecord;
   snapshot: { snapshot_json: Record<string, string | null> | null } | null;
   history: MoaHistoryEntry[];
   detailsChanged: boolean;
   pdfUrl: string | null;
+  companyDocuments: CompanyDoc[];
 }
+
+const DOC_LABELS: Record<string, string> = {
+  business_permit: "Business Permit",
+  mayor_permit: "Mayor's Permit",
+  or_registration: "OR Registration",
+  sec_dti_registration: "SEC/DTI Registration",
+};
 
 const FIELD_LABELS: Record<string, string> = {
   registered_name: "Legal name",
@@ -137,7 +152,7 @@ export default function UniversityMoaDetailPage() {
     );
   }
 
-  const { moa, snapshot, history, detailsChanged, pdfUrl } = data;
+  const { moa, snapshot, history, detailsChanged, pdfUrl, companyDocuments = [] } = data;
   const company = moa.company;
   const isPendingReview = moa.status === "active" && !moa.reviewed_at;
   const snapshotJson: Record<string, string | null> = snapshot?.snapshot_json ?? {};
@@ -269,8 +284,21 @@ export default function UniversityMoaDetailPage() {
             </div>
           )}
         </CardContent>
+        {companyDocuments.map((doc) =>
+          doc.url ? (
+            <div key={doc.id} className="border-t border-gray-100">
+              <p className="text-muted-foreground px-6 py-2 text-xs font-medium uppercase tracking-wide">
+                {DOC_LABELS[doc.type] ?? doc.type}
+              </p>
+              <iframe src={`${doc.url}#navpanes=0`} className="aspect-[210/297] w-full" title={DOC_LABELS[doc.type] ?? doc.type} />
+            </div>
+          ) : null
+        )}
         {pdfUrl ? (
           <div className="border-t border-gray-100">
+            <p className="text-muted-foreground px-6 py-2 text-xs font-medium uppercase tracking-wide">
+              MOA Document
+            </p>
             <iframe src={`${pdfUrl}#navpanes=0`} className="aspect-[210/297] w-full" title="MOA PDF" />
           </div>
         ) : (

@@ -10,6 +10,13 @@ import { MoaStatusBadge } from "@/components/status-badge";
 import { formatDateWithoutTime } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
 
+interface CompanyDoc {
+  id: string;
+  type: string;
+  filename: string;
+  url: string | null;
+}
+
 interface CompanyMoaDetail {
   moa: {
     university: { registered_name: string };
@@ -21,7 +28,15 @@ interface CompanyMoaDetail {
     rejection_reason: string | null;
   };
   pdfUrl: string | null;
+  companyDocuments: CompanyDoc[];
 }
+
+const DOC_LABELS: Record<string, string> = {
+  business_permit: "Business Permit",
+  mayor_permit: "Mayor's Permit",
+  or_registration: "OR Registration",
+  sec_dti_registration: "SEC/DTI Registration",
+};
 
 export default function CompanyMoaDetailPage() {
   const { moaId } = useParams<{ moaId: string }>();
@@ -56,7 +71,7 @@ export default function CompanyMoaDetailPage() {
     );
   }
 
-  const { moa, pdfUrl } = data;
+  const { moa, pdfUrl, companyDocuments = [] } = data;
 
   return (
     <PageContainer className="max-w-3xl space-y-6">
@@ -93,13 +108,22 @@ export default function CompanyMoaDetailPage() {
           )}
         </CardContent>
 
+        {companyDocuments.map((doc) =>
+          doc.url ? (
+            <div key={doc.id} className="border-t border-gray-100">
+              <p className="text-muted-foreground px-6 py-2 text-xs font-medium uppercase tracking-wide">
+                {DOC_LABELS[doc.type] ?? doc.type}
+              </p>
+              <iframe src={`${doc.url}#navpanes=0`} className="aspect-[210/297] w-full" title={DOC_LABELS[doc.type] ?? doc.type} />
+            </div>
+          ) : null
+        )}
         {pdfUrl ? (
-          <div className="border-t border-gray-100 px-6 pb-4 pt-4">
-            <iframe
-              src={`${pdfUrl}#navpanes=0`}
-              className="aspect-[210/297] w-full"
-              title="MOA PDF"
-            />
+          <div className="border-t border-gray-100">
+            <p className="text-muted-foreground px-6 py-2 text-xs font-medium uppercase tracking-wide">
+              MOA Document
+            </p>
+            <iframe src={`${pdfUrl}#navpanes=0`} className="aspect-[210/297] w-full" title="MOA PDF" />
           </div>
         ) : (
           <p className="text-muted-foreground border-t border-gray-100 px-6 py-10 text-center text-sm">
