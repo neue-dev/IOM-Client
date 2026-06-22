@@ -5,6 +5,7 @@ import Link from "next/link";
 import { preconfiguredAxios } from "@/app/api/preconfig.axios";
 import { PageContainer } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MoaStatusBadge } from "@/components/status-badge";
 import { formatDateWithoutTime } from "@/lib/utils";
@@ -108,22 +109,29 @@ export default function CompanyMoaDetailPage() {
           )}
         </CardContent>
 
-        {companyDocuments.map((doc) =>
-          doc.url ? (
-            <div key={doc.id} className="border-t border-gray-100">
-              <p className="text-muted-foreground px-6 py-2 text-xs font-medium uppercase tracking-wide">
-                {DOC_LABELS[doc.type] ?? doc.type}
-              </p>
-              <iframe src={`${doc.url}#navpanes=0`} className="aspect-[210/297] w-full" title={DOC_LABELS[doc.type] ?? doc.type} />
-            </div>
-          ) : null
+        {companyDocuments.length > 0 && (
+          <div className="border-t border-gray-100 px-6 py-4 space-y-2">
+            {companyDocuments.map((doc) => (
+              <div key={doc.id} className="flex items-center justify-between gap-3">
+                <span className="text-sm text-gray-700">{DOC_LABELS[doc.type] ?? doc.type}</span>
+                {doc.url ? (
+                  <Button variant="outline" size="sm" asChild>
+                    <a href={doc.url} target="_blank" rel="noopener noreferrer">Preview</a>
+                  </Button>
+                ) : (
+                  <span className="text-muted-foreground text-xs">Unavailable</span>
+                )}
+              </div>
+            ))}
+          </div>
         )}
         {pdfUrl ? (
-          <div className="border-t border-gray-100">
-            <p className="text-muted-foreground px-6 py-2 text-xs font-medium uppercase tracking-wide">
-              MOA Document
-            </p>
-            <iframe src={`${pdfUrl}#navpanes=0`} className="aspect-[210/297] w-full" title="MOA PDF" />
+          <div className="border-t border-gray-100 px-6 pb-4 pt-4">
+            <iframe
+              src={`${pdfUrl}#navpanes=0`}
+              className="aspect-[210/297] w-full"
+              title="MOA PDF"
+            />
           </div>
         ) : (
           <p className="text-muted-foreground border-t border-gray-100 px-6 py-10 text-center text-sm">
