@@ -68,6 +68,8 @@ interface DataTableProps<TData, TValue> {
   searchLabel?: string;
   /** single key or multiple keys to search across */
   searchKey?: string | string[];
+  /** Optional: show the search bar (default: true) */
+  enableSearch?: boolean;
   /** Optional: show column visibility menu (default: true) */
   enableColumnVisibility?: boolean;
   /** Optional: enable row selection with checkboxes (default: false) */
@@ -176,6 +178,7 @@ export function DataTable<TData, TValue>({
   data,
   searchLabel,
   searchKey,
+  enableSearch = true,
   enableColumnVisibility = false,
   enableRowSelection = false,
   initialSorting,
@@ -350,7 +353,7 @@ export function DataTable<TData, TValue>({
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          {effectiveSearchKeys.length > 0 && (
+          {enableSearch && effectiveSearchKeys.length > 0 && (
             <div className="flex items-center gap-2">
               <Input
                 placeholder={searchPlaceholder}

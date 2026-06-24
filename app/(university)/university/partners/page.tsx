@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { MoaStatusBadge } from "@/components/status-badge";
 import { formatDateWithoutTime, cn } from "@/lib/utils";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, ShieldCheck } from "lucide-react";
 
 interface Partner {
   company: {
@@ -59,6 +59,83 @@ interface PartnerMoaEntry {
   expiry_date: string;
   is_expired: boolean | null;
   template: { name: string } | null;
+}
+
+type DocReviewDetails = Record<string, Record<string, string>>;
+
+interface CompanyDoc {
+  type: string;
+  filename: string;
+  url: string | null;
+}
+
+const DOC_LABELS: Record<string, string> = {
+  business_permit: "Business Permit",
+  mayor_permit: "Mayor's Permit",
+  or_registration: "OR Registration",
+  sec_dti_registration: "SEC/DTI Registration",
+};
+
+function VerifiedDocumentDetails({
+  details,
+  documents,
+}: {
+  details: DocReviewDetails;
+  documents: CompanyDoc[];
+}) {
+  const entries = Object.entries(details).filter(([, pairs]) => Object.keys(pairs).length > 0);
+  if (entries.length === 0) return null;
+  const docByType = new Map(documents.map((d) => [d.type, d]));
+  return (
+    <div className="space-y-0 rounded-[0.33em] border border-gray-200">
+      <div className="flex items-center gap-1.5 border-b border-gray-100 px-3 py-2 text-xs font-medium text-gray-700">
+        <ShieldCheck className="h-3.5 w-3.5 text-supportive" />
+        Verified document details
+      </div>
+      <div className="divide-y divide-gray-100">
+        {entries.map(([docType, pairs]) => {
+          const doc = docByType.get(docType);
+          const kvPairs = Object.entries(pairs).filter(([k, v]) => k || v);
+          return (
+            <div key={docType} className="flex gap-0">
+              <div className="flex w-44 flex-shrink-0 flex-col justify-start gap-1 py-2 pl-3 pr-3">
+                <span className="text-muted-foreground text-xs">
+                  {DOC_LABELS[docType] ?? docType.replace(/_/g, " ")}
+                </span>
+                {doc?.url ? (
+                  <a
+                    href={doc.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary text-xs underline"
+                  >
+                    Open
+                  </a>
+                ) : (
+                  <span className="text-muted-foreground text-xs">Unavailable</span>
+                )}
+              </div>
+              <div className="w-px self-stretch bg-gray-100" />
+              <div className="min-w-0 flex-1 py-2 pl-3 pr-3">
+                {kvPairs.length > 0 ? (
+                  <div className="space-y-0.5">
+                    {kvPairs.map(([k, v]) => (
+                      <p key={k} className="text-xs text-gray-700">
+                        <span className="text-muted-foreground">{k}:</span>{" "}
+                        <span className="font-medium">{v}</span>
+                      </p>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground text-xs">—</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 interface CombinedEntry {
@@ -117,7 +194,7 @@ export default function PartnersPage() {
     queryFn: () =>
       preconfiguredAxios
         .get(`/api/university/partners/${currentCompanyId}/moas`)
-        .then((r) => r.data as { company: Partner["company"]; moas: PartnerMoaEntry[] }),
+        .then((r) => r.data as { company: Partner["company"] & { document_review_details?: DocReviewDetails }; moas: PartnerMoaEntry[]; companyDocuments: CompanyDoc[] }),
     enabled: !!currentCompanyId,
   });
 
@@ -334,12 +411,14 @@ export default function PartnersPage() {
             )}
           >
             <div className="flex items-center justify-between gap-3">
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={navigateToList}
-                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
+                className="text-muted-foreground hover:text-foreground gap-1.5 px-0"
               >
                 <ArrowLeft className="h-4 w-4" /> Partners
-              </button>
+              </Button>
               {entry &&
                 (entry.isBlacklisted ? (
                   <Button variant="outline" size="sm" onClick={() => setUnblacklistTarget(entry)}>
@@ -383,6 +462,13 @@ export default function PartnersPage() {
                   {entry.blacklistEntry.actor_email && ` by ${entry.blacklistEntry.actor_email}`}
                 </p>
               </div>
+            )}
+
+            {partnerMoasData?.company?.document_review_details && (
+              <VerifiedDocumentDetails
+                details={partnerMoasData.company.document_review_details}
+                documents={partnerMoasData.companyDocuments ?? []}
+              />
             )}
 
             {isMoasLoading ? (

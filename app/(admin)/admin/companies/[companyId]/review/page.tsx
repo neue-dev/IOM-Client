@@ -1,16 +1,25 @@
 "use client";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import type { ColumnDef } from "@tanstack/react-table";
 import { preconfiguredAxios } from "@/app/api/preconfig.axios";
 import { PageContainer } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DataTable } from "@/components/ui/data-table";
+import * as AccordionPrimitive from "@radix-ui/react-accordion";
+import {
+  Accordion,
+  AccordionItem,
+  AccordionContent,
+} from "@/components/ui/accordion";
 import {
   Dialog,
   DialogContent,
@@ -30,14 +39,8 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import {
-  Accordion,
-  AccordionItem,
-  AccordionTrigger,
-  AccordionContent,
-} from "@/components/ui/accordion";
 import { formatDateWithoutTime } from "@/lib/utils";
-import { ArrowLeft, Check, Loader2, X } from "lucide-react";
+import { ArrowLeft, Check, Loader2, Plus, Trash2, X } from "lucide-react";
 
 interface ReviewDoc {
   type: string;
@@ -52,6 +55,7 @@ interface HistoryEntry {
   reviewed_at: string | null;
   reviewer_email: string | null;
   rejection_reason: string | null;
+  document_review_details: Record<string, Record<string, string>>;
   material: Record<string, string | null> | null;
   documents: ReviewDoc[];
 }
@@ -109,40 +113,207 @@ function MaterialFields({ entry }: { entry: HistoryEntry }) {
   );
 }
 
-function DocumentsList({ entry }: { entry: HistoryEntry }) {
+type DocDetails = Record<string, Record<string, string>>;
+
+function docDetailsComplete(docs: ReviewDoc[], details: DocDetails): boolean {
+  if (docs.length === 0) return false;
+  return docs.every((doc) => {
+    const pairs = details[doc.type];
+    return (
+      pairs &&
+      Object.keys(pairs).length > 0 &&
+      Object.entries(pairs).every(([k, v]) => k.trim() && v.trim())
+    );
+  });
+}
+
+function DocumentsEditor({
+  entry,
+  value,
+  onChange,
+}: {
+  entry: HistoryEntry;
+  value: DocDetails;
+  onChange: (next: DocDetails) => void;
+}) {
   if (entry.documents.length === 0) return null;
+
+  const addRow = (docType: string) => {
+    const existing = value[docType] ?? {};
+    onChange({ ...value, [docType]: { ...existing, "": "" } });
+  };
+
+  const updateKey = (docType: string, oldKey: string, newKey: string) => {
+    const pairs = { ...(value[docType] ?? {}) };
+    const val = pairs[oldKey] ?? "";
+    delete pairs[oldKey];
+    pairs[newKey] = val;
+    onChange({ ...value, [docType]: pairs });
+  };
+
+  const updateVal = (docType: string, key: string, newVal: string) => {
+    onChange({ ...value, [docType]: { ...(value[docType] ?? {}), [key]: newVal } });
+  };
+
+  const removeRow = (docType: string, key: string) => {
+    const pairs = { ...(value[docType] ?? {}) };
+    delete pairs[key];
+    onChange({ ...value, [docType]: pairs });
+  };
+
   return (
     <div className="divide-y divide-gray-100 rounded-[0.33em] border border-gray-200">
-      {entry.documents.map((doc, i) => (
-        <div key={i} className="flex items-center gap-4 px-3 py-2">
-          <span className="text-muted-foreground w-44 flex-shrink-0 text-xs">
-            {DOC_LABELS[doc.type] ?? doc.type}
-          </span>
-          <div className="min-w-0 flex-1">
-            {doc.url ? (
-              <a
-                href={doc.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary text-sm underline"
+      {entry.documents.map((doc) => {
+        const pairs = Object.entries(value[doc.type] ?? {});
+        return (
+          <div key={doc.type} className="flex gap-0">
+            {/* Left: label + open link */}
+            <div className="flex w-44 flex-shrink-0 flex-col justify-start gap-1 py-2 pl-3 pr-3">
+              <span className="text-muted-foreground text-xs">
+                {DOC_LABELS[doc.type] ?? doc.type}
+              </span>
+              {doc.url ? (
+                <a
+                  href={doc.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary text-xs underline"
+                >
+                  Open
+                </a>
+              ) : (
+                <span className="text-muted-foreground text-xs">Unavailable</span>
+              )}
+            </div>
+            {/* Vertical divider */}
+            <div className="w-px self-stretch bg-gray-100" />
+            {/* Right: KV editor */}
+            <div className="min-w-0 flex-1 space-y-1.5 py-2 pl-3 pr-3">
+              {pairs.map(([key, val], i) => (
+                <div key={i} className="flex items-center gap-1.5">
+                  <Input
+                    className="h-7 text-xs"
+                    placeholder="Field name"
+                    value={key}
+                    onChange={(e) => updateKey(doc.type, key, e.target.value)}
+                  />
+                  <Input
+                    className="h-7 text-xs"
+                    placeholder="Value"
+                    value={val}
+                    onChange={(e) => updateVal(doc.type, key, e.target.value)}
+                  />
+                  <Button
+                    variant="ghost"
+                    scheme="destructive"
+                    size="xs"
+                    className="h-6 w-6 flex-shrink-0 p-0"
+                    onClick={() => removeRow(doc.type, key)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+              <Button
+                variant="outline"
+                size="xs"
+                className="w-full border-dashed border-primary text-primary opacity-60 hover:opacity-100"
+                onClick={() => addRow(doc.type)}
               >
-                Open
-              </a>
-            ) : (
-              <span className="text-muted-foreground text-xs">Unavailable</span>
-            )}
+                <Plus className="h-3 w-3" /> Add field
+              </Button>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
+
+function DocumentsReadOnly({ entry, details }: { entry: HistoryEntry; details: DocDetails }) {
+  if (entry.documents.length === 0) return null;
+  return (
+    <div className="divide-y divide-gray-100 rounded-[0.33em] border border-gray-200">
+      {entry.documents.map((doc) => {
+        const pairs = Object.entries(details[doc.type] ?? {}).filter(([k, v]) => k || v);
+        return (
+          <div key={doc.type} className="flex gap-0">
+            {/* Left: label + open link */}
+            <div className="flex w-44 flex-shrink-0 flex-col justify-start gap-1 py-2 pl-3 pr-3">
+              <span className="text-muted-foreground text-xs">
+                {DOC_LABELS[doc.type] ?? doc.type}
+              </span>
+              {doc.url ? (
+                <a
+                  href={doc.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary text-xs underline"
+                >
+                  Open
+                </a>
+              ) : (
+                <span className="text-muted-foreground text-xs">Unavailable</span>
+              )}
+            </div>
+            {/* Vertical divider */}
+            <div className="w-px self-stretch bg-gray-100" />
+            {/* Right: KV details */}
+            <div className="min-w-0 flex-1 py-2 pl-3 pr-3">
+              {pairs.length > 0 ? (
+                <div className="space-y-0.5">
+                  {pairs.map(([k, v]) => (
+                    <p key={k} className="text-xs text-gray-700">
+                      <span className="text-muted-foreground">{k}:</span>{" "}
+                      <span className="font-medium">{v}</span>
+                    </p>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-muted-foreground text-xs">—</span>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const pastColumns: ColumnDef<HistoryEntry>[] = [
+  {
+    id: "status",
+    header: "Status",
+    enableSorting: false,
+    cell: ({ row }) => <ReviewStatusBadge status={row.original.status} />,
+  },
+  {
+    id: "requested",
+    header: "Request date",
+    accessorFn: (row) => row.created_at,
+    cell: ({ row }) => (
+      <span className="text-muted-foreground text-sm">
+        {formatDateWithoutTime(row.original.created_at)}
+      </span>
+    ),
+  },
+  {
+    id: "reviewer",
+    header: "Reviewer",
+    accessorFn: (row) => row.reviewer_email ?? "—",
+    cell: ({ row }) => (
+      <span className="text-sm">{row.original.reviewer_email ?? "—"}</span>
+    ),
+  },
+];
 
 export default function AdminCompanyReviewPage() {
   const { companyId } = useParams<{ companyId: string }>();
   const queryClient = useQueryClient();
   const [showReject, setShowReject] = useState(false);
   const [reason, setReason] = useState("");
+  const [docDetails, setDocDetails] = useState<DocDetails>({});
+  const [selectedPast, setSelectedPast] = useState<HistoryEntry | null>(null);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["admin-company-review", companyId],
@@ -169,9 +340,13 @@ export default function AdminCompanyReviewPage() {
   };
 
   const approve = useMutation({
-    mutationFn: () => preconfiguredAxios.post(`/api/admin/companies/${companyId}/approve`),
+    mutationFn: () =>
+      preconfiguredAxios.post(`/api/admin/companies/${companyId}/approve`, {
+        document_review_details: docDetails,
+      }),
     onSuccess: () => {
       toast.success("Company verified");
+      setDocDetails({});
       invalidate();
     },
     onError: (e: Error) => {
@@ -195,6 +370,15 @@ export default function AdminCompanyReviewPage() {
     },
   });
 
+  const { openEntry, pastEntries } = useMemo(() => {
+    const visible = (data?.history ?? []).filter((h) => h.status !== "superseded");
+    const open = data?.openReviewId ? visible.find((h) => h.id === data.openReviewId) : undefined;
+    const past = visible.filter((h) => h.id !== data?.openReviewId);
+    return { openEntry: open ?? null, pastEntries: past };
+  }, [data]);
+
+  const canApprove = openEntry ? docDetailsComplete(openEntry.documents, docDetails) : false;
+
   if (isLoading) {
     return (
       <PageContainer className="max-w-3xl space-y-6">
@@ -216,9 +400,7 @@ export default function AdminCompanyReviewPage() {
     );
   }
 
-  const { company, history, openReviewId } = data;
-  // Show only states that were actually acted on, plus the current pending one.
-  const visible = history.filter((h) => h.status !== "superseded");
+  const { company } = data;
 
   return (
     <PageContainer className="max-w-3xl space-y-6">
@@ -237,108 +419,127 @@ export default function AdminCompanyReviewPage() {
         </p>
       </div>
 
-      {visible.length === 0 ? (
+      {/* Pending review */}
+      {openEntry ? (
+        <Card className="overflow-hidden">
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-2">
+              <ReviewStatusBadge status={openEntry.status} />
+              <span className="text-muted-foreground text-xs">
+                Submitted {formatDateWithoutTime(openEntry.created_at)}
+              </span>
+            </div>
+            <MaterialFields entry={openEntry} />
+            <DocumentsEditor entry={openEntry} value={docDetails} onChange={setDocDetails} />
+            <div className="flex gap-3 border-t border-gray-100 pt-4">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    scheme="supportive"
+                    className="flex-1"
+                    disabled={approve.isPending || !canApprove}
+                  >
+                    {approve.isPending ? <Loader2 className="animate-spin" /> : <Check />}
+                    Approve
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Verify {company.display_name}?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      The company will be able to request MOAs from any university and is emailed a
+                      confirmation.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-supportive text-supportive-foreground hover:bg-supportive/90"
+                      onClick={() => approve.mutate()}
+                    >
+                      Approve
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+              <Button
+                variant="outline"
+                scheme="destructive"
+                className="flex-1"
+                onClick={() => setShowReject(true)}
+              >
+                <X /> Reject
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : !pastEntries.length ? (
         <Card>
           <CardContent className="text-muted-foreground py-8 text-center text-sm">
             No review history yet.
           </CardContent>
         </Card>
-      ) : (
-        <div className="space-y-3">
-          {visible.map((entry) => {
-            const isOpen = entry.id === openReviewId;
-            return (
-              <Card key={entry.id} className="overflow-hidden">
-                <CardContent className="space-y-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <ReviewStatusBadge status={entry.status} />
-                        <span className="text-muted-foreground text-xs">
-                          Submitted {formatDateWithoutTime(entry.created_at)}
-                        </span>
-                      </div>
-                      {entry.reviewed_at && (
-                        <p className="text-muted-foreground mt-1 text-xs">
-                          {entry.status === "approved" ? "Approved" : "Reviewed"} by{" "}
-                          {entry.reviewer_email ?? "—"} on{" "}
-                          {formatDateWithoutTime(entry.reviewed_at)}
-                        </p>
-                      )}
-                      {entry.rejection_reason && (
-                        <p className="text-destructive mt-1 text-xs">
-                          Reason: {entry.rejection_reason}
-                        </p>
-                      )}
-                    </div>
-                  </div>
+      ) : null}
 
-                  {/* Material + documents: visible for the pending review, collapsed for past ones */}
-                  {isOpen ? (
-                    <div className="space-y-4">
-                      <MaterialFields entry={entry} />
-                      <DocumentsList entry={entry} />
-                    </div>
-                  ) : (
-                    <Accordion type="single" collapsible>
-                      <AccordionItem value="details" className="border-none">
-                        <AccordionTrigger className="cursor-pointer py-2 text-sm font-medium text-gray-700 hover:no-underline">
-                          View submitted details
-                        </AccordionTrigger>
-                        <AccordionContent className="space-y-4 pt-1">
-                          <MaterialFields entry={entry} />
-                          <DocumentsList entry={entry} />
-                        </AccordionContent>
-                      </AccordionItem>
-                    </Accordion>
-                  )}
-
-                  {/* Actions for the open (pending) review */}
-                  {isOpen && (
-                    <div className="flex gap-3 border-t border-gray-100 pt-4">
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button scheme="supportive" className="flex-1" disabled={approve.isPending}>
-                            {approve.isPending ? <Loader2 className="animate-spin" /> : <Check />}
-                            Approve
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Verify {company.display_name}?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              The company will be able to request MOAs from any university and is
-                              emailed a confirmation.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              className="bg-supportive text-supportive-foreground hover:bg-supportive/90"
-                              onClick={() => approve.mutate()}
-                            >
-                              Approve
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-
-                      <Button
-                        variant="outline"
-                        scheme="destructive"
-                        className="flex-1"
-                        onClick={() => setShowReject(true)}
-                      >
-                        <X /> Reject
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+      {/* Past requests table */}
+      {pastEntries.length > 0 && (
+        <Accordion type="single" collapsible>
+          <AccordionItem value="past" className="border-none">
+            <AccordionPrimitive.Header>
+              <AccordionPrimitive.Trigger className="font-normal text-primary cursor-pointer py-1 text-sm outline-none underline">
+                Previous requests
+              </AccordionPrimitive.Trigger>
+            </AccordionPrimitive.Header>
+            <br />
+            <AccordionContent className="pb-0">
+              <DataTable
+                id="past-reviews"
+                columns={pastColumns}
+                data={pastEntries}
+                enableSearch={false}
+                rowLabelSingular="request"
+                rowLabelPlural="requests"
+                onRowClick={(entry) => setSelectedPast(entry)}
+              />
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       )}
+
+      {/* Past request detail modal */}
+      <Dialog open={!!selectedPast} onOpenChange={(o) => !o && setSelectedPast(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ReviewStatusBadge status={selectedPast?.status ?? null} />
+              <span>
+                Request — {selectedPast ? formatDateWithoutTime(selectedPast.created_at) : ""}
+              </span>
+            </DialogTitle>
+            {selectedPast?.reviewed_at && (
+              <DialogDescription>
+                {selectedPast.status === "approved" ? "Approved" : "Reviewed"} by{" "}
+                {selectedPast.reviewer_email ?? "—"} on{" "}
+                {formatDateWithoutTime(selectedPast.reviewed_at)}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          {selectedPast && (
+            <div className="space-y-4">
+              {selectedPast.rejection_reason && (
+                <p className="text-destructive text-xs">
+                  Reason: {selectedPast.rejection_reason}
+                </p>
+              )}
+              <MaterialFields entry={selectedPast} />
+              <DocumentsReadOnly
+                entry={selectedPast}
+                details={selectedPast.document_review_details ?? {}}
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Reject dialog */}
       <Dialog
@@ -366,7 +567,11 @@ export default function AdminCompanyReviewPage() {
             <Button variant="outline" onClick={() => setShowReject(false)}>
               Cancel
             </Button>
-            <Button scheme="destructive" disabled={reject.isPending} onClick={() => reject.mutate()}>
+            <Button
+              scheme="destructive"
+              disabled={reject.isPending}
+              onClick={() => reject.mutate()}
+            >
               {reject.isPending && <Loader2 className="animate-spin" />}
               {reject.isPending ? "Rejecting…" : "Reject"}
             </Button>
