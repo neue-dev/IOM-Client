@@ -12,8 +12,6 @@ export interface PatchCompanyProfileDto {
   registered_name?: string;
   company_type?: PatchCompanyProfileDtoCompanyType;
   registered_address?: string;
-  rep_name?: string;
-  rep_title?: string;
   description?: string;
   website?: string;
   phone?: string;

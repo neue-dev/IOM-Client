@@ -17,7 +17,7 @@ interface ReviewRow {
     id: string;
     display_name: string;
     registered_name: string | null;
-    rep_email: string;
+    email: string;
     company_type: string | null;
   } | null;
 }
@@ -74,7 +74,7 @@ export default function AdminReviewsPage() {
                     </Badge>
                   </div>
                   <p className="text-muted-foreground mt-0.5 truncate text-xs">
-                    {r.company?.rep_email}
+                    {r.company?.email}
                     {r.company?.company_type && ` · ${r.company.company_type.replace(/_/g, " ")}`}
                   </p>
                 </div>

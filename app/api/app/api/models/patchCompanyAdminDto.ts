@@ -7,6 +7,6 @@
  */
 
 export interface PatchCompanyAdminDto {
-  rep_email?: string;
-  rep_email_verified?: boolean;
+  email?: string;
+  email_verified?: boolean;
 }

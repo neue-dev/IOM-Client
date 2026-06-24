@@ -65,7 +65,7 @@ interface ReviewDetail {
     id: string;
     display_name: string;
     registered_name: string | null;
-    rep_email: string;
+    email: string;
     company_type: string | null;
   };
   history: HistoryEntry[];
@@ -76,8 +76,6 @@ const FIELD_LABELS: Record<string, string> = {
   registered_name: "Legal name",
   company_type: "Company type",
   registered_address: "Address",
-  rep_name: "Representative name",
-  rep_title: "Representative title",
 };
 
 const DOC_LABELS: Record<string, string> = {
@@ -414,7 +412,7 @@ export default function AdminCompanyReviewPage() {
       <div>
         <h1 className="text-xl font-semibold text-gray-900">{company.display_name}</h1>
         <p className="text-muted-foreground mt-0.5 text-sm">
-          {company.rep_email}
+          {company.email}
           {company.company_type && ` · ${company.company_type.replace(/_/g, " ")}`}
         </p>
       </div>

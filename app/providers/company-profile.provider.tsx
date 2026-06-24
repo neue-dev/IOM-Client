@@ -8,13 +8,10 @@ interface CompanyProfile {
   id: string;
   tin: string;
   display_name: string;
-  rep_email: string;
+  email: string;
   registered_name: string | null;
   company_type: string | null;
   registered_address: string | null;
-  rep_name: string | null;
-  rep_title: string | null;
-  rep_signature_url: string | null;
   cosmetic: Record<string, unknown>;
   is_deactivated: boolean | null;
 }

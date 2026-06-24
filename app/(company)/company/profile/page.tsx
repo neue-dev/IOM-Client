@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -49,11 +49,9 @@ import {
   Info,
   Loader2,
   Pencil,
-  Upload,
-  UserRound,
 } from "lucide-react";
 
-type SectionKey = "company" | "representative" | "documents" | "other";
+type SectionKey = "company" | "documents" | "other";
 
 const COSMETIC_KEYS = ["description", "website", "phone", "industry"];
 
@@ -84,7 +82,6 @@ interface CompanyDoc {
 export default function CompanyProfilePage() {
   const { company, isLoading } = useCompanyProfile();
   const queryClient = useQueryClient();
-  const sigRef = useRef<HTMLInputElement>(null);
 
   const [openSections, setOpenSections] = useState<string[]>(["company"]);
   const [editing, setEditing] = useState<SectionKey | null>(null);
@@ -114,8 +111,6 @@ export default function CompanyProfilePage() {
         registered_name: g("registered_name"),
         registered_address: g("registered_address"),
         company_type: g("company_type") || undefined,
-        rep_name: g("rep_name"),
-        rep_title: g("rep_title"),
         description: g("description"),
         website: g("website"),
         phone: g("phone"),
@@ -127,19 +122,6 @@ export default function CompanyProfilePage() {
       queryClient.invalidateQueries({ queryKey: ["company-verification"] });
       toast.success("Profile saved");
       cancelEdit();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const uploadSig = useMutation({
-    mutationFn: (file: File) => {
-      const fd = new FormData();
-      fd.append("file", file);
-      return preconfiguredAxios.post("/api/company/profile/signature", fd);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["company-me"] });
-      toast.success("Signature uploaded");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -186,7 +168,6 @@ export default function CompanyProfilePage() {
   // Material fields whose change forces re-verification (the hash inputs).
   const MATERIAL_KEYS_BY_SECTION: Record<string, string[]> = {
     company: ["registered_name", "registered_address", "company_type"],
-    representative: ["rep_name", "rep_title"],
   };
 
   function attemptSave(sectionKey: SectionKey) {
@@ -317,6 +298,12 @@ export default function CompanyProfilePage() {
         <AccordionItem value="company" className="">
           {sectionTrigger(Building2, "Company Profile")}
           <AccordionContent className="space-y-4 px-5 pb-5">
+            <div className="flex items-center gap-4">
+              <Label className="w-44 flex-shrink-0 truncate text-gray-400">Account email</Label>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-gray-900">{company.email}</p>
+              </div>
+            </div>
             {textField("company", "registered_name", "Legal / registered name")}
             {textField("company", "registered_address", "Registered address")}
             <div className="flex items-center gap-4">
@@ -355,78 +342,7 @@ export default function CompanyProfilePage() {
           </AccordionContent>
         </AccordionItem>
 
-        {/* 2 — Representative Details */}
-        <AccordionItem value="representative" className="">
-          {sectionTrigger(UserRound, "Representative Details")}
-          <AccordionContent className="space-y-4 px-5 pb-5">
-            <p className="text-muted-foreground text-xs">
-              The representative&apos;s name and signature will be used on
-              requested MOAs.
-            </p>
-            <div className="flex items-center gap-4">
-              <Label className="w-44 flex-shrink-0 truncate text-gray-400">
-                Representative email
-              </Label>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-gray-900">
-                  {company.rep_email}
-                </p>
-              </div>
-            </div>
-            {textField("representative", "rep_name", "Representative name")}
-            {textField("representative", "rep_title", "Representative title")}
-
-            {editControls("representative", ["rep_name", "rep_title"])}
-            <div className="space-y-2 border-t border-gray-100 pt-4">
-              <Label className="text-gray-500">Representative signature</Label>
-              <p className="text-muted-foreground text-xs">
-                PNG only. A transparent background works best.
-              </p>
-              <div className="flex items-center justify-center rounded-[0.33em] bg-gray-100 p-4">
-                {company.rep_signature_url ? (
-                  <img
-                    src={company.rep_signature_url}
-                    alt="Signature"
-                    className="h-16 max-w-xs object-contain"
-                  />
-                ) : (
-                  <p className="text-muted-foreground text-xs">
-                    No signature uploaded
-                  </p>
-                )}
-              </div>
-              <input
-                ref={sigRef}
-                type="file"
-                accept="image/png"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) uploadSig.mutate(f);
-                }}
-              />
-              <div className="flex justify-end">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => sigRef.current?.click()}
-                  disabled={uploadSig.isPending}
-                >
-                  {uploadSig.isPending ? (
-                    <Loader2 className="animate-spin" />
-                  ) : (
-                    <Upload />
-                  )}
-                  {company.rep_signature_url
-                    ? "Replace signature"
-                    : "Upload signature"}
-                </Button>
-              </div>
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-
-        {/* 3 — Required Documents */}
+        {/* 2 — Required Documents */}
         <AccordionItem value="documents" className="">
           {sectionTrigger(
             FileText,
@@ -503,7 +419,7 @@ export default function CompanyProfilePage() {
           </AccordionContent>
         </AccordionItem>
 
-        {/* 4 — Other Info */}
+        {/* 3 — Other Info */}
         <AccordionItem value="other" className="">
           {sectionTrigger(
             Info,

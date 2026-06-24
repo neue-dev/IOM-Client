@@ -36,7 +36,7 @@ export function CompanyHeader() {
       homeHref="/dashboard"
       nav={nav}
       userPrimary={company?.display_name ?? undefined}
-      userSecondary={company?.rep_email ?? undefined}
+      userSecondary={company?.email ?? undefined}
       logoutPath="/api/auth/company/logout"
       postLogoutPath="/login"
     />

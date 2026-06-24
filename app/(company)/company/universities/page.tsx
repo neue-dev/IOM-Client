@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -12,6 +12,8 @@ import { PageContainer, PageHeader, EmptyState } from "@/components/page-header"
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FormError } from "@/components/auth-shell";
 import {
@@ -23,7 +25,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { Building2, Check, Loader2 } from "lucide-react";
+import { Building2, Check, Loader2, Upload } from "lucide-react";
 
 interface University {
   id: string;
@@ -49,8 +51,15 @@ function RequestDialog({
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [step, setStep] = useState<1 | 2>(1);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [repName, setRepName] = useState("");
+  const [repTitle, setRepTitle] = useState("");
+  const [sigMode, setSigMode] = useState<"type" | "upload">("type");
+  const [sigText, setSigText] = useState("");
+  const [sigFile, setSigFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["university-templates", university.id],
@@ -61,10 +70,21 @@ function RequestDialog({
   });
 
   const request = useMutation({
-    mutationFn: (templateId: string) =>
-      preconfiguredAxios
-        .post("/api/company/moas", { universityId: university.id, templateId })
-        .then((r) => r.data as { moa: { id: string } }),
+    mutationFn: () => {
+      const fd = new FormData();
+      fd.append("universityId", university.id);
+      fd.append("templateId", selectedTemplate!);
+      fd.append("repName", repName);
+      fd.append("repTitle", repTitle);
+      if (sigMode === "upload" && sigFile) {
+        fd.append("signature", sigFile);
+      } else {
+        fd.append("repSignatureText", sigText);
+      }
+      return preconfiguredAxios
+        .post("/api/company/moas", fd)
+        .then((r) => r.data as { moa: { id: string } });
+    },
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["company-moas"] });
       onClose();
@@ -75,23 +95,21 @@ function RequestDialog({
       const code = err.response?.data?.code || "";
       if (code === "AT_ACTIVE_MOA_CAP") {
         const limit = err.response?.data?.data?.limit ?? "the maximum";
-        setError(
-          `You have reached the maximum of ${limit} active MOAs with this university.`
-        );
+        setError(`You have reached the maximum of ${limit} active MOAs with this university.`);
       } else if (code === "COMPANY_NOT_VERIFIED") {
         setError(
           "Your company must be verified by the platform team before you can request MOAs. " +
             "If you recently changed your details, they need to be re-verified."
         );
       } else {
-        setError(
-          "Couldn't request from this university at this time. Please contact us for help."
-        );
+        setError("Couldn't request from this university at this time. Please contact us for help.");
       }
     },
   });
 
   const templates = data?.templates ?? [];
+  const sigReady = sigMode === "upload" ? !!sigFile : !!sigText.trim();
+  const step2Ready = !!repName.trim() && !!repTitle.trim() && sigReady;
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -101,73 +119,140 @@ function RequestDialog({
           <DialogDescription>{university.registered_name}</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
-          {isLoading && (
-            <>
-              <Skeleton className="h-16 w-full" />
-              <Skeleton className="h-16 w-full" />
-            </>
-          )}
-
-          {!isLoading && templates.length === 0 && (
-            <p className="text-muted-foreground text-sm">
-              No available templates at this university.
-            </p>
-          )}
-
-          {templates.map((t) => {
-            const selected = selectedTemplate === t.id;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setSelectedTemplate(t.id)}
-                className={cn(
-                  "flex w-full items-start gap-3 rounded-[0.33em] border p-3 text-left transition-colors",
-                  selected
-                    ? "border-primary bg-primary/5"
-                    : "border-gray-200 hover:border-gray-300"
-                )}
-              >
-                <span
+        {step === 1 && (
+          <div className="space-y-3">
+            {isLoading && (
+              <>
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </>
+            )}
+            {!isLoading && templates.length === 0 && (
+              <p className="text-muted-foreground text-sm">No available templates at this university.</p>
+            )}
+            {templates.map((t) => {
+              const selected = selectedTemplate === t.id;
+              return (
+                <Button
+                  key={t.id}
+                  variant="ghost"
                   className={cn(
-                    "mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border",
-                    selected ? "border-primary bg-primary text-white" : "border-gray-300"
+                    "h-auto w-full items-start justify-start gap-3 rounded-[0.33em] border p-3 text-left",
+                    selected ? "border-primary bg-primary/5" : "border-gray-200 hover:border-gray-300"
                   )}
+                  onClick={() => setSelectedTemplate(t.id)}
                 >
-                  {selected && <Check className="h-3 w-3" />}
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-medium text-gray-900">
-                    {t.name}
+                  <span
+                    className={cn(
+                      "mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border",
+                      selected ? "border-primary bg-primary text-white" : "border-gray-300"
+                    )}
+                  >
+                    {selected && <Check className="h-3 w-3" />}
                   </span>
-                  {t.description && (
-                    <span className="text-muted-foreground mt-0.5 block text-xs">
-                      {t.description}
-                    </span>
-                  )}
-                  <span className="text-muted-foreground mt-1 block text-xs">
-                    Term: {t.term_months} months
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-gray-900">{t.name}</span>
+                    {t.description && (
+                      <span className="text-muted-foreground mt-0.5 block text-xs">{t.description}</span>
+                    )}
+                    <span className="text-muted-foreground mt-1 block text-xs">Term: {t.term_months} months</span>
                   </span>
-                </span>
-              </button>
-            );
-          })}
+                </Button>
+              );
+            })}
+          </div>
+        )}
 
-          {error && <FormError>{error}</FormError>}
-        </div>
+        {step === 2 && (
+          <div className="space-y-4">
+            <p className="text-muted-foreground text-xs">
+              These details will appear on the MOA document. They are not stored after generation.
+            </p>
+            <div className="space-y-1.5">
+              <Label htmlFor="rep-name">Representative name</Label>
+              <Input id="rep-name" value={repName} onChange={(e) => setRepName(e.target.value)} placeholder="Full name" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="rep-title">Representative title</Label>
+              <Input id="rep-title" value={repTitle} onChange={(e) => setRepTitle(e.target.value)} placeholder="e.g. CEO, HR Manager" />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Signature</Label>
+              <div className="flex gap-1 rounded-[0.33em] border border-gray-200 p-0.5">
+                <Button
+                  variant={sigMode === "type" ? "default" : "ghost"}
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => setSigMode("type")}
+                >
+                  Type
+                </Button>
+                <Button
+                  variant={sigMode === "upload" ? "default" : "ghost"}
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => setSigMode("upload")}
+                >
+                  Upload image
+                </Button>
+              </div>
+
+              {sigMode === "type" ? (
+                <Input
+                  value={sigText}
+                  onChange={(e) => setSigText(e.target.value)}
+                  placeholder="Type your signature"
+                  className="font-serif italic"
+                />
+              ) : (
+                <div className="space-y-2">
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/png,image/jpeg"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] ?? null;
+                      setSigFile(f);
+                      e.target.value = "";
+                    }}
+                  />
+                  {sigFile ? (
+                    <div className="flex items-center justify-between rounded-[0.33em] border border-gray-200 px-3 py-2">
+                      <span className="text-xs text-gray-700 truncate">{sigFile.name}</span>
+                      <Button variant="ghost" size="xs" className="ml-2 flex-shrink-0" onClick={() => setSigFile(null)}>
+                        Remove
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button variant="outline" className="w-full" onClick={() => fileRef.current?.click()}>
+                      <Upload className="h-4 w-4" /> Choose image (PNG or JPEG)
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {error && <FormError>{error}</FormError>}
+          </div>
+        )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            onClick={() => selectedTemplate && request.mutate(selectedTemplate)}
-            disabled={!selectedTemplate || request.isPending}
-          >
-            {request.isPending && <Loader2 className="animate-spin" />}
-            {request.isPending ? "Requesting…" : "Request MOA"}
-          </Button>
+          {step === 1 ? (
+            <>
+              <Button variant="outline" onClick={onClose}>Cancel</Button>
+              <Button onClick={() => setStep(2)} disabled={!selectedTemplate}>Next</Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" onClick={() => { setStep(1); setError(null); }}>Back</Button>
+              <Button onClick={() => request.mutate()} disabled={!step2Ready || request.isPending}>
+                {request.isPending && <Loader2 className="animate-spin" />}
+                {request.isPending ? "Requesting…" : "Request MOA"}
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
