@@ -44,6 +44,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Building2,
+  CircleAlert,
+  CircleCheck,
   Eye,
   FileText,
   Info,
@@ -283,7 +285,7 @@ export default function CompanyProfilePage() {
     <PageContainer className="max-w-2xl space-y-6">
       <PageHeader
         title={company.display_name}
-        description="Manage your company profile and required documents."
+        description="Both the company profile and required documents are needed before you can request MOAs."
       />
 
       {incomplete && (
@@ -361,64 +363,52 @@ export default function CompanyProfilePage() {
               {docCount}/{DOC_TYPES.length}
             </Badge>
           )}
-          <AccordionContent className="space-y-2.5 px-5 pb-5">
-            <p className="text-muted-foreground text-xs">
-              All four are required before you can request MOAs.
-            </p>
+          <AccordionContent className="space-y-1 pb-5">
             {DOC_TYPES.map(({ value, label }) => {
               const existing = latestDoc(value);
               return (
-                <div
-                  key={value}
-                  className="flex items-center justify-between gap-3 rounded-[0.33em] border border-gray-200 p-3"
+                <div 
+                  className="flex flex-row items-center hover:bg-gray-50 hover:cursor-pointer px-5 duration-200" 
+                  onClick={() => existing && preview(existing)}
                 >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
+                  {existing ? <CircleCheck className="text-supportive"/> : <CircleAlert className="text-warning" />}
+                  <div
+                    key={value}
+                    className="flex flex-1 items-center justify-between gap-3 rounded-[0.16em] p-3"
+                  >
+                    <div className="min-w-0">
                       <p className="text-sm font-medium text-gray-800">{label}</p>
-                      {existing ? (
-                        <Badge type="supportive" strength="medium">
-                          Uploaded
-                        </Badge>
-                      ) : (
-                        <Badge type="default" strength="light">
-                          Missing
-                        </Badge>
+                      {existing && (
+                        <p className="text-muted-foreground mt-0.5 truncate text-xs">
+                          {existing.filename}
+                        </p>
                       )}
                     </div>
-                    {existing && (
-                      <p className="text-muted-foreground mt-0.5 truncate text-xs">
-                        {existing.filename}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex flex-shrink-0 items-center gap-2">
-                    {existing && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => preview(existing)}
+                    <div className="flex flex-shrink-0 items-center gap-2">
+                      <label 
+                        className="cursor-pointer"
+                        onMouseEnter={(e) => e.stopPropagation()}
+                        onMouseOver={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        <Eye /> Preview
-                      </Button>
-                    )}
-                    <label className="cursor-pointer">
-                      <span
-                        className="border-input hover:bg-accent inline-flex h-8 items-center justify-center rounded-[0.33em] border bg-background px-3 text-sm font-medium text-gray-700"
-                        role="button"
-                      >
-                        {existing ? "Replace" : "Upload"}
-                      </span>
-                      <input
-                        type="file"
-                        accept="application/pdf"
-                        className="hidden"
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (f) attemptUploadDoc(f, value);
-                          e.target.value = "";
-                        }}
-                      />
-                    </label>
+                        <span
+                          className="border-input hover:bg-accent inline-flex h-8 items-center justify-center rounded-[0.33em] border bg-background px-3 text-sm font-medium text-gray-700"
+                          role="button"
+                        >
+                          {existing ? "Replace" : "Upload"}
+                        </span>
+                        <input
+                          type="file"
+                          accept="application/pdf"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) attemptUploadDoc(f, value);
+                            e.target.value = "";
+                          }}
+                        />
+                      </label>
+                    </div>
                   </div>
                 </div>
               );
