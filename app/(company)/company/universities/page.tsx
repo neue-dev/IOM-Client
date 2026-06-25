@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/dialog";
 import { resolveFile } from "@/app/lib/resolve-file";
 import { cn } from "@/lib/utils";
-import { Building2, Check, Eye, Loader2, Upload, X } from "lucide-react";
+import { Building2, Check, Eye, Loader2, Upload } from "lucide-react";
 
 interface University {
   id: string;
@@ -66,9 +66,6 @@ function TemplatePreviewSheet({
               <p className="text-muted-foreground truncate text-xs">{template.description}</p>
             )}
           </div>
-          <Button variant="ghost" size="icon" className="ml-4 flex-shrink-0" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
         </div>
         <div className="min-h-0 flex-1">
           {isLoading ? (
