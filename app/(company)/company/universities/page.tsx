@@ -26,6 +26,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { resolveFile } from "@/app/lib/resolve-file";
+import { toast } from "sonner";
+import { toastPresets } from "@/components/sonner-toaster";
 import { cn } from "@/lib/utils";
 import { Building2, Check, Eye, Loader2, Upload } from "lucide-react";
 
@@ -131,6 +133,7 @@ function RequestDialog({
     },
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["company-moas"] });
+      toast("MOA Issued", toastPresets.success);
       onClose();
       router.push(`/moas/${res.moa.id}`);
     },
