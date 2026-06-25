@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/accordion";
 import {
   Dialog,
-  DialogContent,
+  DialogBottomSheet,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -442,26 +442,30 @@ export default function CompanyProfilePage() {
 
       {/* Document preview */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle className="truncate pr-6">{previewName}</DialogTitle>
-          </DialogHeader>
-          {previewLoading ? (
-            <div className="text-muted-foreground flex h-[70vh] items-center justify-center text-sm">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
-            </div>
-          ) : previewUrl ? (
-            <iframe
-              src={previewUrl}
-              className="h-[70vh] w-full rounded-[0.33em] border border-gray-200"
-              title={previewName}
-            />
-          ) : (
-            <div className="text-muted-foreground flex h-[40vh] items-center justify-center text-sm">
-              Couldn&apos;t load that document.
-            </div>
-          )}
-        </DialogContent>
+        <DialogBottomSheet className="flex h-[88vh] flex-col p-0">
+          <div className="flex items-center border-b border-gray-100 px-5 py-3.5 pr-14">
+            <DialogTitle className="truncate text-sm font-medium text-gray-900">
+              {previewName}
+            </DialogTitle>
+          </div>
+          <div className="min-h-0 flex-1 overflow-hidden">
+            {previewLoading ? (
+              <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
+              </div>
+            ) : previewUrl ? (
+              <iframe
+                src={previewUrl}
+                className="h-full w-full border-none"
+                title={previewName}
+              />
+            ) : (
+              <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
+                Couldn&apos;t load that document.
+              </div>
+            )}
+          </div>
+        </DialogBottomSheet>
       </Dialog>
 
       {/* Re-verification warning (only when currently verified) */}
