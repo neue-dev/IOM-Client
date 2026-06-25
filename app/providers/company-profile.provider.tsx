@@ -68,9 +68,16 @@ export function CompanyProfileProvider({ children }: { children: React.ReactNode
     pathname.startsWith("/company/register") ||
     pathname === "/login" ||
     pathname.startsWith("/register");
+  const onProfilePage = pathname.startsWith("/company/profile");
   const loginRedirect = pathname.startsWith("/company/") ? "/company/login" : "/login";
   if (isError && !onAuthPage) {
     router.replace(loginRedirect);
+  }
+
+  // Profile-completeness gate: redirect to profile if not yet filled in.
+  const { data: verification } = useCompanyVerification(!onAuthPage && !isError && !isLoading);
+  if (!onAuthPage && !onProfilePage && !isError && !isLoading && verification?.status === "incomplete") {
+    router.replace("/company/profile");
   }
 
   return (

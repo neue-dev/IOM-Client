@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { preconfiguredAxios, type ApiError } from "@/app/api/preconfig.axios";
 import { AuthShell, FormError } from "@/components/auth-shell";
@@ -23,6 +23,7 @@ type Step = "details" | "otp";
 
 export default function CompanyRegisterPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [step, setStep] = useState<Step>("details");
   const [form, setForm] = useState({
     tin: "",
@@ -68,7 +69,10 @@ export default function CompanyRegisterPage() {
         repEmail: form.repEmail,
         code,
       }),
-    onSuccess: () => router.replace("/dashboard"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["company-me"] });
+      router.replace("/company/dashboard");
+    },
     onError: (e: Error) => setError(e.message),
   });
 

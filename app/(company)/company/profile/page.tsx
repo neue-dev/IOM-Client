@@ -101,6 +101,7 @@ export default function CompanyProfilePage() {
 
   const { data: verification } = useCompanyVerification(!!company);
   const verified = verification?.status === "verified";
+  const incomplete = verification?.status === "incomplete";
   // When set, a re-verification confirm dialog is shown; running it performs the edit.
   const [pendingConfirm, setPendingConfirm] = useState<(() => void) | null>(null);
 
@@ -284,6 +285,12 @@ export default function CompanyProfilePage() {
         title={company.display_name}
         description="Manage your company profile and required documents."
       />
+
+      {incomplete && (
+        <div className="rounded-[0.33em] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          You need to complete your profile before you can start requesting MOAs on the site.
+        </div>
+      )}
 
       <Accordion
         type="multiple"

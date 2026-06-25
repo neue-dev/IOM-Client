@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -256,6 +256,7 @@ const pastColumns: ColumnDef<HistoryEntry>[] = [
 export default function AdminCompanyReviewPage() {
   const { companyId } = useParams<{ companyId: string }>();
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [showReject, setShowReject] = useState(false);
   const [reason, setReason] = useState("");
   const [reviewValues, setReviewValues] = useState<Record<string, string>>({});
@@ -349,6 +350,10 @@ export default function AdminCompanyReviewPage() {
         </Card>
       </PageContainer>
     );
+  }
+
+  if (!openEntry) {
+    return router.push('/reviews')
   }
 
   const { company } = data;

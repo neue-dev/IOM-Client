@@ -18,14 +18,16 @@ export function CompanyHeader() {
   const pathname = usePathname() ?? "";
   const { company } = useCompanyProfile();
   const { data: verification } = useCompanyVerification(!!company);
-  const verified = verification?.status === "verified";
+  const status = verification?.status;
+  const verified = status === "verified";
+  const incomplete = status === "incomplete";
 
   // Hide the app chrome on the unauthenticated pages.
   if (AUTH_SUFFIXES.some((s) => pathname.endsWith(s))) return null;
 
-  // The request surface is hidden globally until the company is verified.
+  // Active MOAs and the request surface are hidden until the company has a complete profile.
   const nav: NavItem[] = [
-    { href: "/dashboard", label: "Active MOAs" },
+    ...(!incomplete ? [{ href: "/dashboard", label: "Active MOAs" }] : []),
     ...(verified ? [{ href: "/universities", label: "Request MOA" }] : []),
     { href: "/profile", label: "Profile" },
   ];
