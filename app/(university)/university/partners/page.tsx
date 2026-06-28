@@ -187,6 +187,7 @@ interface CompanyInvite {
   template_id: string | null;
   personal_message: string | null;
   created_at: string;
+  registered_company: { display_name: string; registered_name: string | null } | null;
 }
 
 interface AvailableTemplate {
@@ -594,25 +595,37 @@ export default function PartnersPage() {
                   <h3 className="text-sm font-semibold text-gray-900">Company invites</h3>
                 </div>
                 <div className="divide-y divide-gray-100 overflow-hidden rounded-[0.33em] border border-gray-200">
-                  {(invitesData?.invites ?? []).map((invite) => (
-                    <div key={invite.id} className="flex items-center gap-3 px-4 py-3">
-                      <div className="min-w-0 flex-1">
-                        {invite.company_name && (
-                          <p className="truncate text-sm font-medium text-gray-900">
-                            {invite.company_name}
+                  {(invitesData?.invites ?? []).map((invite) => {
+                    const registeredName =
+                      invite.status === "accepted" && invite.registered_company
+                        ? invite.registered_company.registered_name ||
+                          invite.registered_company.display_name
+                        : null;
+                    const displayName = registeredName
+                      ? invite.company_name && invite.company_name !== registeredName
+                        ? `${registeredName} (${invite.company_name})`
+                        : registeredName
+                      : invite.company_name ?? null;
+                    return (
+                      <div key={invite.id} className="flex items-center gap-3 px-4 py-3">
+                        <div className="min-w-0 flex-1">
+                          {displayName && (
+                            <p className="truncate text-sm font-medium text-gray-900">
+                              {displayName}
+                            </p>
+                          )}
+                          <p className={displayName ? "text-muted-foreground truncate text-xs" : "truncate text-sm font-medium text-gray-900"}>
+                            {invite.invited_email}
                           </p>
-                        )}
-                        <p className={invite.company_name ? "text-muted-foreground truncate text-xs" : "truncate text-sm font-medium text-gray-900"}>
-                          {invite.invited_email}
-                        </p>
-                        <p className="text-muted-foreground text-xs">
-                          Sent {formatDateWithoutTime(invite.created_at)} · Expires{" "}
-                          {formatDateWithoutTime(invite.expires_at)}
-                        </p>
+                          <p className="text-muted-foreground text-xs">
+                            Sent {formatDateWithoutTime(invite.created_at)} · Expires{" "}
+                            {formatDateWithoutTime(invite.expires_at)}
+                          </p>
+                        </div>
+                        <InviteStatusBadge status={invite.status} />
                       </div>
-                      <InviteStatusBadge status={invite.status} />
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
