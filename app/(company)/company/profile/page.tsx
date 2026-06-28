@@ -10,6 +10,7 @@ import {
 } from "@/app/providers/company-profile.provider";
 import { preconfiguredAxios } from "@/app/api/preconfig.axios";
 import { resolveFile } from "@/app/lib/resolve-file";
+import { cn } from "@/lib/utils";
 import { PageContainer, PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -100,6 +101,7 @@ function ProfileContent() {
   const [previewName, setPreviewName] = useState("");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [uploadingType, setUploadingType] = useState<string | null>(null);
 
   const { data: docsData, refetch: refetchDocs } = useQuery({
     queryKey: ["company-docs"],
@@ -155,11 +157,15 @@ function ProfileContent() {
       return preconfiguredAxios.post("/api/company/documents", fd);
     },
     onSuccess: () => {
+      setUploadingType(null);
       refetchDocs();
       queryClient.invalidateQueries({ queryKey: ["company-verification"] });
       toast.success("Document uploaded");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      setUploadingType(null);
+      toast.error(e.message);
+    },
   });
 
   if (isLoading || !company) return null;
@@ -202,6 +208,7 @@ function ProfileContent() {
   }
 
   function attemptUploadDoc(file: File, type: string) {
+    setUploadingType(type);
     if (verified) {
       setPendingConfirm(() => () => uploadDoc.mutate({ file, type }));
     } else {
@@ -428,22 +435,27 @@ function ProfileContent() {
                       )}
                     </div>
                     <div className="flex flex-shrink-0 items-center gap-2">
-                      <label 
-                        className="cursor-pointer"
+                      <label
+                        className={uploadDoc.isPending ? "pointer-events-none" : "cursor-pointer"}
                         onMouseEnter={(e) => e.stopPropagation()}
                         onMouseOver={(e) => e.stopPropagation()}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <span
-                          className="border-input hover:bg-accent inline-flex h-8 items-center justify-center rounded-[0.33em] border bg-background px-3 text-sm font-medium text-gray-700"
+                          className={cn(
+                            "border-input inline-flex h-8 items-center justify-center gap-1.5 rounded-[0.33em] border bg-background px-3 text-sm font-medium text-gray-700",
+                            uploadDoc.isPending ? "opacity-50" : "hover:bg-accent"
+                          )}
                           role="button"
                         >
-                          {existing ? "Replace" : "Upload"}
+                          {uploadingType === value && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                          {uploadingType === value ? "Uploading…" : existing ? "Replace" : "Upload"}
                         </span>
                         <input
                           type="file"
                           accept="application/pdf"
                           className="hidden"
+                          disabled={uploadDoc.isPending}
                           onChange={(e) => {
                             const f = e.target.files?.[0];
                             if (f) attemptUploadDoc(f, value);
@@ -514,7 +526,7 @@ function ProfileContent() {
       {/* Re-verification warning (only when currently verified) */}
       <AlertDialog
         open={!!pendingConfirm}
-        onOpenChange={(o) => !o && setPendingConfirm(null)}
+        onOpenChange={(o) => { if (!o) { setPendingConfirm(null); setUploadingType(null); } }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>

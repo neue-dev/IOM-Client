@@ -12,8 +12,9 @@ import { Autocomplete } from "@/components/ui/autocomplete";
 import { Loader2 } from "lucide-react";
 
 interface CompanyListItem {
-  tin: string;
+  id: string;
   display_name: string;
+  censored_tin: string;
 }
 
 function LoginPageContent() {
@@ -22,7 +23,7 @@ function LoginPageContent() {
   const searchParams = useSearchParams();
   const inviteToken = searchParams.get("invite_token") ?? "";
 
-  const [selectedTin, setSelectedTin] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
@@ -35,13 +36,13 @@ function LoginPageContent() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const options = companyList.map((c) => ({ id: c.tin, name: c.display_name }));
-  const selectedCompany = companyList.find((c) => c.tin === selectedTin) ?? null;
+  const options = companyList.map((c) => ({ id: c.id, name: c.display_name }));
+  const selectedCompany = companyList.find((c) => c.id === selectedId) ?? null;
 
   const login = useMutation({
     mutationFn: () =>
       preconfiguredAxios.post("/api/auth/company/login", {
-        tin: selectedTin,
+        companyId: selectedId,
         password,
       }),
     onSuccess: async () => {
@@ -117,15 +118,15 @@ function LoginPageContent() {
           <div>
             <Autocomplete
               options={options}
-              value={selectedTin}
-              onChange={(tin) => setSelectedTin(tin as string | null)}
+              value={selectedId}
+              onChange={(id) => setSelectedId(id as string | null)}
               placeholder="Search for your company…"
               inputClassName="rounded-b-none"
             />
             <div className="flex items-center gap-2 rounded-b-[0.33em] border border-t-0 border-gray-200 bg-gray-50 px-2.5 py-1.5 text-sm">
               <span className="text-muted-foreground text-xs font-medium">TIN</span>
               <span className="font-mono text-gray-800">
-                {selectedCompany?.tin ?? <span className="text-muted-foreground">—</span>}
+                {selectedCompany?.censored_tin ?? <span className="text-muted-foreground">—</span>}
               </span>
             </div>
           </div>
@@ -156,7 +157,7 @@ function LoginPageContent() {
           type="submit"
           size="lg"
           className="w-full"
-          disabled={login.isPending || !selectedTin || !password}
+          disabled={login.isPending || !selectedId || !password}
         >
           {login.isPending && <Loader2 className="animate-spin" />}
           {login.isPending ? "Signing in…" : "Sign in"}
