@@ -32,11 +32,12 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
+import { Card } from "@/components/ui/card";
 import { MoaStatusBadge } from "@/components/status-badge";
 import { formatDateWithoutTime, cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { toastPresets } from "@/components/sonner-toaster";
-import { ArrowLeft, Eye, Loader2, Mail, Plus, ShieldCheck } from "lucide-react";
+import { ArrowLeft, CircleAlert, CircleCheck, Loader2, Mail, Plus, ShieldCheck } from "lucide-react";
 
 interface Partner {
   company: {
@@ -81,6 +82,8 @@ const DOC_LABELS: Record<string, string> = {
   sec_dti_registration: "SEC/DTI Registration",
 };
 
+const DOC_TYPES_LIST = Object.entries(DOC_LABELS);
+
 function VerifiedDocumentDetails({ details }: { details: DocReviewDetails }) {
   const entries = Object.entries(details).filter(([, v]) => v.value);
   if (entries.length === 0) return null;
@@ -104,56 +107,61 @@ function VerifiedDocumentDetails({ details }: { details: DocReviewDetails }) {
 
 function DocumentsSection({ documents }: { documents: CompanyDoc[] }) {
   const [previewDoc, setPreviewDoc] = useState<CompanyDoc | null>(null);
-  if (documents.length === 0) return null;
-  const isImage = (filename: string) => /\.(png|jpe?g|gif|webp)$/i.test(filename);
   return (
     <>
-      <div className="divide-y divide-gray-100 rounded-[0.33em] border border-gray-200">
-        {documents.map((doc) => (
-          <button
-            key={doc.type}
-            className="flex w-full cursor-pointer items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-gray-50 disabled:cursor-default disabled:opacity-50"
-            onClick={() => setPreviewDoc(doc)}
-            disabled={!doc.url}
-          >
-            <Eye className="text-muted-foreground h-3.5 w-3.5 flex-shrink-0" />
-            <span className="text-sm font-medium text-gray-900">
-              View {DOC_LABELS[doc.type] ?? doc.type.replace(/_/g, " ")}
-            </span>
-            {!doc.url && (
-              <span className="text-muted-foreground ml-auto text-xs">Unavailable</span>
-            )}
-          </button>
-        ))}
-      </div>
+      <Card className="gap-4 py-5">
+        <p className="px-5 text-sm font-semibold text-gray-900">Documents</p>
+        <div className="space-y-1">
+          {DOC_TYPES_LIST.map(([type, label]) => {
+            const doc = documents.find((d) => d.type === type);
+            return (
+              <div
+                key={type}
+                className="flex flex-row items-center px-5 duration-200 hover:cursor-pointer hover:bg-gray-50"
+                onClick={() => doc?.url && setPreviewDoc(doc)}
+              >
+                {doc
+                  ? <CircleCheck className="text-supportive flex-shrink-0" />
+                  : <CircleAlert className="text-warning flex-shrink-0" />
+                }
+                <div className="flex flex-1 items-center gap-3 rounded-[0.16em] p-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-800">{label}</p>
+                    {doc && (
+                      <p className="text-muted-foreground mt-0.5 truncate text-xs">{doc.filename}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
 
-      <Dialog open={!!previewDoc} onOpenChange={(o) => !o && setPreviewDoc(null)}>
-        <DialogBottomSheet className="flex h-[88vh] flex-col p-0">
-          <div className="flex items-center border-b border-gray-100 px-5 py-3.5 pr-14">
-            <DialogTitle className="text-sm font-medium text-gray-900">
-              {previewDoc
-                ? (DOC_LABELS[previewDoc.type] ?? previewDoc.type.replace(/_/g, " "))
-                : ""}
-            </DialogTitle>
-          </div>
-          <div className="min-h-0 flex-1 overflow-hidden">
-            {previewDoc?.url &&
-              (isImage(previewDoc.filename) ? (
-                <img
-                  src={previewDoc.url}
-                  alt={DOC_LABELS[previewDoc.type] ?? previewDoc.type}
-                  className="h-full w-full object-contain"
-                />
-              ) : (
+      {previewDoc && (
+        <Dialog open onOpenChange={(o) => !o && setPreviewDoc(null)}>
+          <DialogBottomSheet className="flex h-[88vh] flex-col p-0">
+            <div className="flex items-center border-b border-gray-100 px-5 py-3.5 pr-14">
+              <DialogTitle className="text-sm font-medium text-gray-900">
+                {DOC_LABELS[previewDoc.type] ?? previewDoc.type.replace(/_/g, " ")}
+              </DialogTitle>
+            </div>
+            <div className="min-h-0 flex-1 overflow-hidden">
+              {previewDoc.url ? (
                 <iframe
                   src={previewDoc.url}
                   className="h-full w-full border-none"
-                  title={DOC_LABELS[previewDoc.type] ?? previewDoc.type}
+                  title={previewDoc.filename}
                 />
-              ))}
-          </div>
-        </DialogBottomSheet>
-      </Dialog>
+              ) : (
+                <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
+                  Couldn&apos;t load that document.
+                </div>
+              )}
+            </div>
+          </DialogBottomSheet>
+        </Dialog>
+      )}
     </>
   );
 }
