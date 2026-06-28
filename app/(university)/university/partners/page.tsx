@@ -489,16 +489,36 @@ export default function PartnersPage() {
   );
 
 
+  // Capture hash on first render, then navigate once partner data is available.
+  const [hashId, setHashId] = useState<string | null>(null);
+  useEffect(() => {
+    const h = window.location.hash.slice(1);
+    if (h) setHashId(h);
+  }, []);
+  useEffect(() => {
+    if (!hashId || partnersData === undefined || blacklistData === undefined) return;
+    const exists = combined.some((e) => e.company.id === hashId);
+    if (exists) {
+      setCurrentCompanyId(hashId);
+      setPhase("detail");
+    } else {
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+    setHashId(null);
+  }, [hashId, partnersData, blacklistData, combined]);
+
   const navigateToDetail = (companyId: string) => {
     clearTimeout(timerRef.current);
     setCurrentCompanyId(companyId);
     setPhase("to-detail");
+    window.history.replaceState(null, "", "#" + companyId);
     timerRef.current = setTimeout(() => setPhase("detail"), ANIM_DURATION + 10);
   };
 
   const navigateToList = () => {
     clearTimeout(timerRef.current);
     setPhase("to-list");
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
     timerRef.current = setTimeout(() => {
       setPhase("list");
       setCurrentCompanyId(null);
