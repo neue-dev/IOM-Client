@@ -27,12 +27,6 @@ interface Template {
   name: string;
   description: string | null;
   term_months: number;
-  page_count: number;
-  field_schema: unknown;
-}
-
-function fieldCount(t: Template) {
-  return Array.isArray(t.field_schema) ? t.field_schema.length : 0;
 }
 
 function ActionsCell({ template }: { template: Template }) {
@@ -107,27 +101,6 @@ const columns: ColumnDef<Template>[] = [
     cell: ({ row }) => (
       <Badge type="default" strength="medium">{row.original.term_months} mo</Badge>
     ),
-  },
-  {
-    id: "pages",
-    header: "Pages",
-    accessorFn: (row) => row.page_count,
-    cell: ({ row }) => (
-      <span className="text-muted-foreground">{row.original.page_count}</span>
-    ),
-  },
-  {
-    id: "fields",
-    header: "Fields",
-    accessorFn: (row) => fieldCount(row),
-    cell: ({ row }) => {
-      const count = fieldCount(row.original);
-      return (
-        <Badge type={count === 0 ? "warning" : "default"} strength="medium">
-          {count}
-        </Badge>
-      );
-    },
   },
   {
     id: "actions",
