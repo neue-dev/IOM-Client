@@ -27,6 +27,9 @@ const EVENT_LABELS: Record<string, string> = {
   moa_revoked: "MOA revoked",
   company_blacklisted: "Company blacklisted",
   company_unblacklisted: "Company removed from blacklist",
+  company_invite_sent: "Company invite sent",
+  company_invite_registered: "Company registered via invite",
+  company_invite_accepted: "Company queued MOA via invite",
 };
 
 const EVENT_TYPES: Record<string, BadgeProps["type"]> = {
@@ -37,6 +40,9 @@ const EVENT_TYPES: Record<string, BadgeProps["type"]> = {
   moa_revoked: "destructive",
   company_blacklisted: "destructive",
   company_unblacklisted: "default",
+  company_invite_sent: "primary",
+  company_invite_registered: "warning",
+  company_invite_accepted: "supportive",
 };
 
 const columns: ColumnDef<AuditEvent>[] = [
