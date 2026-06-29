@@ -195,13 +195,6 @@ function QueueMoaContent() {
           description={university ? `With ${university.registered_name}` : undefined}
         />
 
-        {!verified && (
-          <div className="border-primary/30 bg-primary/5 rounded-[0.33em] border px-4 py-3 text-sm text-gray-700">
-            Your company is not yet verified. This MOA request will be issued automatically
-            once the platform approves your company.
-          </div>
-        )}
-
         {step === 1 && (
           <div className="space-y-3">
             {tLoading ? (

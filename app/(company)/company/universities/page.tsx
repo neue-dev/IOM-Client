@@ -1,9 +1,9 @@
 "use client";
-import { useRef, useMemo, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import { Suspense, useRef, useMemo, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import type { ColumnDef } from "@tanstack/react-table";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   useCompanyProfile,
   useCompanyVerification,
@@ -47,6 +47,12 @@ interface Template {
   term_months: number;
 }
 
+interface DialogState {
+  universityId: string;
+  defaultTemplateId?: string | null;
+  inviteId?: string | null;
+}
+
 function TemplatePreviewSheet({
   template,
   onClose,
@@ -86,16 +92,22 @@ function TemplatePreviewSheet({
 }
 
 function RequestDialog({
-  university,
+  universityId,
+  defaultTemplateId = null,
+  inviteId = null,
+  verified = true,
   onClose,
 }: {
-  university: University;
+  universityId: string;
+  defaultTemplateId?: string | null;
+  inviteId?: string | null;
+  verified?: boolean;
   onClose: () => void;
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [step, setStep] = useState<1 | 2>(1);
-  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(defaultTemplateId);
   const [previewTemplate, setPreviewTemplate] = useState<Template | null>(null);
   const [repName, setRepName] = useState("");
   const [repTitle, setRepTitle] = useState("");
@@ -106,17 +118,17 @@ function RequestDialog({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["university-templates", university.id],
+    queryKey: ["university-templates", universityId],
     queryFn: () =>
       preconfiguredAxios
-        .get(`/api/company/universities/${university.id}/templates`)
-        .then((r) => r.data as { templates: Template[] }),
+        .get(`/api/company/universities/${universityId}/templates`)
+        .then((r) => r.data as { templates: Template[]; university: { registered_name: string } }),
   });
 
   const request = useMutation({
     mutationFn: () => {
       const fd = new FormData();
-      fd.append("universityId", university.id);
+      fd.append("universityId", universityId);
       fd.append("templateId", selectedTemplate!);
       fd.append("repName", repName);
       fd.append("repTitle", repTitle);
@@ -125,15 +137,24 @@ function RequestDialog({
       } else {
         fd.append("repSignatureText", sigText);
       }
+      if (inviteId) fd.append("invite_id", inviteId);
+      const endpoint = verified ? "/api/company/moas" : "/api/company/queued-moas";
       return preconfiguredAxios
-        .post("/api/company/moas", fd)
-        .then((r) => r.data as { moa: { id: string } });
+        .post(endpoint, fd)
+        .then((r) => r.data as { moa?: { id: string }; queued?: { id: string } });
     },
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["company-moas"] });
-      toast("MOA Issued", toastPresets.success);
-      onClose();
-      router.push(`/moas/${res.moa.id}`);
+      queryClient.invalidateQueries({ queryKey: ["company-pending-invites"] });
+      if (verified && res.moa) {
+        toast("MOA Issued", toastPresets.success);
+        onClose();
+        router.push(`/company/moas/${res.moa.id}`);
+      } else {
+        toast("MOA request submitted — it will be issued automatically once your company is verified.", toastPresets.success);
+        onClose();
+        router.push("/company/dashboard");
+      }
     },
     onError: (e: Error) => {
       const err = e as ApiError;
@@ -153,6 +174,7 @@ function RequestDialog({
   });
 
   const templates = data?.templates ?? [];
+  const universityName = data?.university?.registered_name ?? "";
   const sigReady = sigMode === "upload" ? !!sigFile : !!sigText.trim();
   const step2Ready = !!repName.trim() && !!repTitle.trim() && sigReady;
 
@@ -162,7 +184,11 @@ function RequestDialog({
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Request MOA</DialogTitle>
-            <DialogDescription>{university.registered_name}</DialogDescription>
+            {universityName ? (
+              <DialogDescription>{universityName}</DialogDescription>
+            ) : isLoading ? (
+              <Skeleton className="h-4 w-32" />
+            ) : null}
           </DialogHeader>
 
           {step === 1 && (
@@ -208,7 +234,7 @@ function RequestDialog({
                       </span>
                     </Button>
                     <div
-                      className="flex flex-row items-center text-muted-foreground bg-gray-50 p-2 px-4 gap-1 hover:cursor-pointer hover:bg-gray-200 duration-200 text-sm"
+                      className="flex cursor-pointer flex-row items-center gap-1 bg-gray-50 p-2 px-4 text-sm text-muted-foreground duration-200 hover:bg-gray-200"
                       onClick={() => setPreviewTemplate(t)}
                     >
                       Preview
@@ -276,7 +302,7 @@ function RequestDialog({
                     />
                     {sigFile ? (
                       <div className="flex items-center justify-between rounded-[0.33em] border border-gray-200 px-3 py-2">
-                        <span className="text-xs text-gray-700 truncate">{sigFile.name}</span>
+                        <span className="truncate text-xs text-gray-700">{sigFile.name}</span>
                         <Button variant="ghost" size="xs" className="ml-2 flex-shrink-0" onClick={() => setSigFile(null)}>
                           Remove
                         </Button>
@@ -298,7 +324,7 @@ function RequestDialog({
             {step === 1 ? (
               <>
                 <Button variant="outline" onClick={onClose}>Cancel</Button>
-                <Button onClick={() => setStep(2)} disabled={!selectedTemplate}>Next</Button>
+                <Button onClick={() => setStep(2)} disabled={!selectedTemplate || isLoading}>Next</Button>
               </>
             ) : (
               <>
@@ -322,12 +348,30 @@ function RequestDialog({
   );
 }
 
-export default function UniversityDirectoryPage() {
-  const { company, isLoading } = useCompanyProfile();
-  const [selected, setSelected] = useState<University | null>(null);
+function UniversityDirectoryContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const openUniversityId = searchParams.get("open_university_id");
+  const inviteTemplateId = searchParams.get("template_id");
+  const inviteId = searchParams.get("invite_id");
 
+  const { company, isLoading } = useCompanyProfile();
   const { data: verification, isLoading: vLoading } = useCompanyVerification(!!company);
   const verified = verification?.status === "verified";
+
+  const [dialogState, setDialogState] = useState<DialogState | null>(null);
+
+  const effectiveDialog: DialogState | null = openUniversityId
+    ? { universityId: openUniversityId, defaultTemplateId: inviteTemplateId, inviteId }
+    : dialogState;
+
+  function closeDialog() {
+    if (openUniversityId) {
+      router.replace("/company/dashboard");
+    } else {
+      setDialogState(null);
+    }
+  }
 
   const { data, isLoading: uniLoading } = useQuery({
     queryKey: ["company-universities"],
@@ -362,7 +406,7 @@ export default function UniversityDirectoryPage() {
         cell: ({ row }) => (
           <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
             {row.original.requestable ? (
-              <Button size="sm" onClick={() => setSelected(row.original)}>
+              <Button size="sm" onClick={() => setDialogState({ universityId: row.original.id })}>
                 Request MOA
               </Button>
             ) : (
@@ -375,12 +419,25 @@ export default function UniversityDirectoryPage() {
     [],
   );
 
+  const inviteDialog = effectiveDialog ? (
+    <RequestDialog
+      universityId={effectiveDialog.universityId}
+      defaultTemplateId={effectiveDialog.defaultTemplateId}
+      inviteId={effectiveDialog.inviteId}
+      verified={verified}
+      onClose={closeDialog}
+    />
+  ) : null;
+
   if (isLoading || vLoading) {
     return (
-      <PageContainer className="space-y-6">
-        <Skeleton className="h-8 w-40" />
-        <Skeleton className="h-20 w-full" />
-      </PageContainer>
+      <>
+        <PageContainer className="space-y-6">
+          <Skeleton className="h-8 w-40" />
+          <Skeleton className="h-20 w-full" />
+        </PageContainer>
+        {inviteDialog}
+      </>
     );
   }
   if (!company) return null;
@@ -388,26 +445,29 @@ export default function UniversityDirectoryPage() {
   if (!verified) {
     const status = verification?.status;
     return (
-      <PageContainer className="space-y-6">
-        <PageHeader
-          title="Request MOA"
-          description="This is a list of universities you can request a MOA with."
-        />
-        <div className="border-warning/30 bg-warning/10 rounded-[0.33em] border p-4 text-sm text-gray-700">
-          {status === "rejected"
-            ? verification?.rejectionReason ||
-              "Your company could not be verified. Please review your profile and documents."
-            : status === "incomplete"
-              ? "Complete your profile and upload all required documents so the platform team can verify your company."
-              : status === "expired"
-                ? "Your company verification has expired. Please re-upload your documents to request re-review."
-                : "Your company is pending verification by the platform team. You can request MOAs once it's approved."}{" "}
-          <Link href="/profile" className="text-primary underline">
-            Go to your profile
-          </Link>
-          .
-        </div>
-      </PageContainer>
+      <>
+        <PageContainer className="space-y-6">
+          <PageHeader
+            title="Request MOA"
+            description="This is a list of universities you can request a MOA with."
+          />
+          <div className="border-warning/30 bg-warning/10 rounded-[0.33em] border p-4 text-sm text-gray-700">
+            {status === "rejected"
+              ? verification?.rejectionReason ||
+                "Your company could not be verified. Please review your profile and documents."
+              : status === "incomplete"
+                ? "Complete your profile and upload all required documents so the platform team can verify your company."
+                : status === "expired"
+                  ? "Your company verification has expired. Please re-upload your documents to request re-review."
+                  : "Your company is pending verification by the platform team. You can request MOAs once it's approved."}{" "}
+            <Link href="/profile" className="text-primary underline">
+              Go to your profile
+            </Link>
+            .
+          </div>
+        </PageContainer>
+        {inviteDialog}
+      </>
     );
   }
 
@@ -435,9 +495,29 @@ export default function UniversityDirectoryPage() {
         />
       )}
 
-      {selected && (
-        <RequestDialog university={selected} onClose={() => setSelected(null)} />
+      {dialogState && (
+        <RequestDialog
+          universityId={dialogState.universityId}
+          verified={verified}
+          onClose={() => setDialogState(null)}
+        />
       )}
+      {inviteDialog}
     </PageContainer>
+  );
+}
+
+export default function UniversityDirectoryPage() {
+  return (
+    <Suspense
+      fallback={
+        <PageContainer className="space-y-6">
+          <Skeleton className="h-8 w-40" />
+          <Skeleton className="h-20 w-full" />
+        </PageContainer>
+      }
+    >
+      <UniversityDirectoryContent />
+    </Suspense>
   );
 }

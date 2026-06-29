@@ -1,8 +1,8 @@
 "use client";
 import { Suspense, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { preconfiguredAxios } from "@/app/api/preconfig.axios";
 import { useResolvedFile } from "@/app/lib/resolve-file";
 import { Button } from "@/components/ui/button";
@@ -68,8 +68,28 @@ function TemplatePreviewSheet({
 
 function InvitePageContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const token = searchParams.get("token") ?? "";
   const [showPreview, setShowPreview] = useState(false);
+  const [loginError, setLoginError] = useState("");
+
+  const loginViaInvite = useMutation({
+    mutationFn: () =>
+      preconfiguredAxios
+        .post("/api/auth/company/login-invite", { token })
+        .then(
+          (r) =>
+            r.data as { university_id: string; template_id: string | null; invite_id: string },
+        ),
+    onSuccess: (res) => {
+      const params = new URLSearchParams();
+      params.set("open_university_id", res.university_id);
+      if (res.template_id) params.set("template_id", res.template_id);
+      if (res.invite_id) params.set("invite_id", res.invite_id);
+      router.replace(`/company/universities?${params}`);
+    },
+    onError: (e: Error) => setLoginError(e.message),
+  });
 
   const { data, isLoading, error } = useQuery<InviteData>({
     queryKey: ["invite-peek", token],
@@ -180,10 +200,23 @@ function InvitePageContent() {
               ) : email_status === "registered_verified" ? (
                 <>
                   <p className="text-sm text-gray-700">
-                    Your company is already registered and verified. Sign in to request the MOA now.
+                    Your company is already registered and verified.
                   </p>
-                  <Button size="lg" className="w-full" asChild>
-                    <Link href={loginHref}>Sign in to request MOA</Link>
+                  {loginError && (
+                    <p className="text-destructive rounded-[0.33em] bg-red-50 px-3 py-2 text-sm">
+                      {loginError}
+                    </p>
+                  )}
+                  <Button
+                    size="lg"
+                    className="w-full"
+                    onClick={() => loginViaInvite.mutate()}
+                    disabled={loginViaInvite.isPending}
+                  >
+                    {loginViaInvite.isPending ? (
+                      <Loader2 className="animate-spin" />
+                    ) : null}
+                    {loginViaInvite.isPending ? "Signing in…" : "Sign MOA"}
                   </Button>
                 </>
               ) : (
@@ -201,9 +234,6 @@ function InvitePageContent() {
           </div>
         </div>
 
-        <p className="text-center text-xs text-white/70 drop-shadow">
-          Institutional MOA Platform
-        </p>
       </div>
 
       {template && showPreview && (

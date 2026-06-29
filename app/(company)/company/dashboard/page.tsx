@@ -27,6 +27,9 @@ const ANIM_DURATION = 200;
 interface QueuedMoa {
   id: string;
   status: "pending" | "fulfilled" | "failed";
+  failure_reason: string | null;
+  university: { id: string; registered_name: string; logo_url: string | null } | null;
+  template: { id: string; name: string; description: string | null } | null;
 }
 
 interface PendingInvite {
@@ -406,9 +409,9 @@ export default function CompanyDashboardPage() {
             </PageHeader>
 
             {pendingInvites.map((invite) => {
-              const params = new URLSearchParams({ invite_id: invite.id });
+              const params = new URLSearchParams({ open_university_id: invite.university!.id, invite_id: invite.id });
               if (invite.template) params.set("template_id", invite.template.id);
-              const href = `/company/universities/${invite.university!.id}/queue-moa?${params}`;
+              const href = `/company/universities?${params}`;
               return (
                 <Card
                   key={invite.id}
@@ -431,18 +434,25 @@ export default function CompanyDashboardPage() {
             })}
 
             {pendingQueued.length > 0 && (
-              <Card className="flex-row items-start gap-3 border-primary/30 bg-primary/5 px-5 py-4">
-                <Clock className="text-primary mt-0.5 h-5 w-5 flex-shrink-0" />
-                <div className="space-y-0.5">
-                  <p className="text-sm font-medium text-gray-900">
-                    {pendingQueued.length === 1 ? "MOA request queued" : `${pendingQueued.length} MOA requests queued`}
-                  </p>
-                  <p className="text-muted-foreground text-sm">
-                    {pendingQueued.length === 1 ? "It" : "They"} will be issued automatically once the
-                    platform verifies your company.
-                  </p>
-                </div>
-              </Card>
+              <div className="space-y-3">
+                <h2 className="text-sm font-semibold text-gray-900">Pending MOAs</h2>
+                <p className="text-muted-foreground -mt-1 text-xs">
+                  These will be issued automatically once your company is verified.
+                </p>
+                {pendingQueued.map((q) => (
+                  <Card key={q.id} className="flex-row items-center gap-3 border-primary/20 bg-primary/5 px-5 py-3.5">
+                    <Clock className="text-primary h-4 w-4 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-gray-900">
+                        {q.university?.registered_name ?? "Unknown university"}
+                      </p>
+                      {q.template && (
+                        <p className="text-muted-foreground truncate text-xs">{q.template.name}</p>
+                      )}
+                    </div>
+                  </Card>
+                ))}
+              </div>
             )}
 
             {failedQueued.length > 0 && (
