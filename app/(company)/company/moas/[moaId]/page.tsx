@@ -33,6 +33,7 @@ export default function CompanyMoaDetailPage() {
         .get(`/api/company/moas/${moaId}`)
         .then((r) => r.data as CompanyMoaDetail),
     enabled: !!moaId,
+    refetchInterval: 25 * 60 * 1000,
   });
 
   if (isLoading) {

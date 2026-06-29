@@ -63,6 +63,7 @@ export default function UniversityMoaDetailPage() {
         .get(`/api/university/moas/${moaId}`)
         .then((r) => r.data as MoaDetail),
     enabled: !!moaId,
+    refetchInterval: 25 * 60 * 1000,
   });
 
   if (isLoading) {

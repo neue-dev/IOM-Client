@@ -405,6 +405,7 @@ export default function PartnersPage() {
         .get(`/api/university/partners/${currentCompanyId}/moas`)
         .then((r) => r.data as { company: Partner["company"] & { document_review_details?: DocReviewDetails }; moas: PartnerMoaEntry[]; companyDocuments: CompanyDoc[] }),
     enabled: !!currentCompanyId,
+    refetchInterval: 25 * 60 * 1000,
   });
 
   const refresh = () => {

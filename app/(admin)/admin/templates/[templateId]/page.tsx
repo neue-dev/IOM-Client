@@ -2,7 +2,7 @@
 import { use } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { preconfiguredAxios } from "@/app/api/preconfig.axios";
-import { resolveFile } from "@/app/lib/resolve-file";
+import { useResolvedFile } from "@/app/lib/resolve-file";
 import { TemplateEditor } from "@/components/templates/template-editor";
 import { PageContainer } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -36,11 +36,10 @@ export default function EditTemplatePage({
 
   const tmpl = templates?.find((t) => t.id === templateId);
 
-  const { data: pdfUrl, isLoading: urlLoading } = useQuery({
-    queryKey: ["template-pdf-url", templateId],
-    queryFn: () => resolveFile("template_pdf", templateId),
-    enabled: !!tmpl,
-  });
+  const { url: pdfUrl, loading: urlLoading } = useResolvedFile(
+    "template_pdf",
+    tmpl ? templateId : null,
+  );
 
   if (isLoading || (tmpl && urlLoading)) {
     return (

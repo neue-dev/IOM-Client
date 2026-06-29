@@ -268,6 +268,7 @@ export default function AdminCompanyReviewPage() {
         .get(`/api/admin/companies/${companyId}/review`)
         .then((r) => r.data as ReviewDetail),
     enabled: !!companyId,
+    refetchInterval: 25 * 60 * 1000,
   });
 
   const invalidate = () => {

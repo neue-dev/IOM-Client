@@ -20,7 +20,7 @@ import {
   DialogBottomSheet,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { resolveFile } from "@/app/lib/resolve-file";
+import { useResolvedFile } from "@/app/lib/resolve-file";
 import { toast } from "sonner";
 import { toastPresets } from "@/components/sonner-toaster";
 import { cn } from "@/lib/utils";
@@ -45,10 +45,7 @@ function TemplatePreviewSheet({
   template: Template;
   onClose: () => void;
 }) {
-  const { data: pdfUrl, isLoading } = useQuery({
-    queryKey: ["template-preview-url", template.id],
-    queryFn: () => resolveFile("template_pdf", template.id),
-  });
+  const { url: pdfUrl, loading: isLoading } = useResolvedFile("template_pdf", template.id);
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>

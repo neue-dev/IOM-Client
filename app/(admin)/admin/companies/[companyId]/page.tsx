@@ -120,6 +120,7 @@ export default function AdminCompanyProfilePage() {
       preconfiguredAxios
         .get(`/api/admin/companies/${companyId}`)
         .then((r) => r.data as CompanyData),
+    refetchInterval: 25 * 60 * 1000,
   });
 
   const deactivate = useMutation({

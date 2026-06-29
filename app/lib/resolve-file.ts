@@ -1,18 +1,81 @@
 "use client";
-import { useMutation } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { preconfiguredAxios } from "@/app/api/preconfig.axios";
 
+const TTL_MS = 28 * 60 * 1000; // 28 min — server signs for 30, refresh 2 min early
+
+type CacheEntry = { url: string; expiresAt: number };
+const cache = new Map<string, CacheEntry>();
+const inflight = new Map<string, Promise<string | null>>();
+
+const key = (kind: string, id: string) => `${kind}:${id}`;
+
 export async function resolveFile(kind: string, id: string): Promise<string | null> {
-  try {
-    const res = await preconfiguredAxios.post("/api/files/resolve", { kind, id });
-    return res.data?.url ?? null;
-  } catch {
-    return null;
-  }
+  const k = key(kind, id);
+
+  const cached = cache.get(k);
+  if (cached && cached.expiresAt > Date.now()) return cached.url;
+
+  const existing = inflight.get(k);
+  if (existing) return existing;
+
+  const promise = preconfiguredAxios
+    .post("/api/files/resolve", { kind, id })
+    .then((res) => {
+      const url: string | null = res.data?.url ?? null;
+      if (url) cache.set(k, { url, expiresAt: Date.now() + TTL_MS });
+      inflight.delete(k);
+      return url;
+    })
+    .catch(() => {
+      inflight.delete(k);
+      return null;
+    });
+
+  inflight.set(k, promise);
+  return promise;
 }
 
-export function useResolveFile() {
-  return useMutation({
-    mutationFn: ({ kind, id }: { kind: string; id: string }) => resolveFile(kind, id),
-  });
+export function useResolvedFile(kind: string, id: string | null | undefined) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(!!id);
+
+  useEffect(() => {
+    if (!id) {
+      setUrl(null);
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    let refreshTimer: ReturnType<typeof setTimeout>;
+
+    const fetch = async () => {
+      setLoading(true);
+      const resolved = await resolveFile(kind, id);
+      if (cancelled) return;
+      setUrl(resolved);
+      setLoading(false);
+
+      // Schedule a proactive refresh 1 minute before the cached URL expires.
+      const entry = cache.get(key(kind, id));
+      if (entry) {
+        const delay = entry.expiresAt - Date.now() - 60_000;
+        if (delay > 0) {
+          refreshTimer = setTimeout(() => {
+            cache.delete(key(kind, id));
+            fetch();
+          }, delay);
+        }
+      }
+    };
+
+    fetch();
+    return () => {
+      cancelled = true;
+      clearTimeout(refreshTimer);
+    };
+  }, [kind, id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return { url, loading };
 }
