@@ -1,0 +1,78 @@
+# This is meant to run on the deployment fork
+
+name: Sync Dev Fork with Upstream
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - name: Notify Discord of Initiation
+        run: |
+          curl -H "Content-Type: application/json" -d '{"content":"**DEV** IOM CLIENT Initiating..."}' ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+      - name: Add upstream and fetch
+        run: |
+          git remote add upstream https://github.com/BetterInternship/IOM-Client.git
+          git fetch upstream
+          git reset --hard upstream/develop
+
+      - name: Push changes to fork
+        run: |
+          git push origin develop --force
+
+      - name: Checkout fork again, after pushing
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - name: Deploy to Vercel
+        id: vercel
+        run: |
+          URL=$(npx vercel --prod --token="${{ secrets.VERCEL_TOKEN }}" --name=better-internship-iom-client-dev --confirm)
+          echo "url=$URL" >> $GITHUB_OUTPUT
+
+      - name: Notify Discord of Success
+        if: ${{ success() }}
+        run: |
+          SHORT_SHA=$(git rev-parse --short upstream/develop)
+          COMMIT_URL="https://github.com/${{ github.repository }}/commit/${SHORT_SHA}"
+          ROLE_ID="1430152257072271376"
+          TIMESTAMP=$(date +%s)
+          MESSAGE="✅ **DEV** IOM Client: [${SHORT_SHA}](${COMMIT_URL}) <t:${TIMESTAMP}:R> <@&${ROLE_ID}>"
+
+          curl -H "Content-Type: application/json" \
+            -d '{
+              "content": "'"$MESSAGE"'",
+              "allowed_mentions": { "roles": ["'"$ROLE_ID"'"] }
+            }' \
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+      - name: Notify Discord of Failure
+        if: ${{ failure() }}
+        run: |
+          SHORT_SHA=$(git rev-parse --short upstream/develop)
+          COMMIT_URL="https://github.com/${{ github.repository }}/commit/${SHORT_SHA}"
+          ROLE_ID="1430152257072271376"
+          TIMESTAMP=$(date +%s)
+          MESSAGE="❌ **DEV** IOM Client: [${SHORT_SHA}](${COMMIT_URL}) <t:${TIMESTAMP}:R> <@&${ROLE_ID}>"
+
+          curl -H "Content-Type: application/json" \
+            -d '{
+              "content": "'"$MESSAGE"'",
+              "allowed_mentions": { "roles": ["'"$ROLE_ID"'"] }
+            }' \
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
