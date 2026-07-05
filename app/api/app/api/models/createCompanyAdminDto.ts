@@ -9,7 +9,7 @@ import type { CreateCompanyAdminDtoCompanyType } from "./createCompanyAdminDtoCo
 
 export interface CreateCompanyAdminDto {
   registered_name: string;
-  tin: string;
+  tin?: string;
   company_type?: CreateCompanyAdminDtoCompanyType;
   registered_address?: string;
 }
