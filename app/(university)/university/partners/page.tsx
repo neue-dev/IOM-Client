@@ -7,6 +7,7 @@ import { useUniversityProfile } from "@/app/providers/university-profile.provide
 import { preconfiguredAxios } from "@/app/api/preconfig.axios";
 import { PageContainer, PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DataTable } from "@/components/ui/data-table";
@@ -31,6 +32,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Card } from "@/components/ui/card";
 import { MoaStatusBadge } from "@/components/status-badge";
+import { LegacyCompaniesPanel } from "@/components/legacy-companies/legacy-companies-panel";
 import { formatDateWithoutTime, cn } from "@/lib/utils";
 import { ArrowLeft, CircleAlert, CircleCheck, Loader2, ShieldCheck } from "lucide-react";
 
@@ -180,6 +182,7 @@ export default function PartnersPage() {
   const { account, isLoading: profileLoading } = useUniversityProfile();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState("iom-partners");
 
   const [phase, setPhase] = useState<Phase>("list");
   const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null);
@@ -352,11 +355,18 @@ export default function PartnersPage() {
 
   return (
     <PageContainer>
-      {/* overflow-hidden clips the sliding panels; relative enables absolute children */}
-      <div className="relative overflow-hidden">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="iom-partners">IOM Partners</TabsTrigger>
+          <TabsTrigger value="legacy-companies">Legacy Companies</TabsTrigger>
+        </TabsList>
 
-        {/* ── List panel ───────────────────────────────────────────────────── */}
-        {showList && (
+        <TabsContent value="iom-partners" className="mt-4">
+          {/* overflow-hidden clips the sliding panels; relative enables absolute children */}
+          <div className="relative overflow-hidden">
+
+            {/* ── List panel ───────────────────────────────────────────────────── */}
+            {showList && (
           <div
             className={cn(
               "space-y-6",
@@ -505,95 +515,108 @@ export default function PartnersPage() {
             ) : (
               <p className="text-muted-foreground text-sm">No MOA history.</p>
             )}
-          </div>
+        </div>
         )}
       </div>
 
-      {/* ── Blacklist dialog ─────────────────────────────────────────────── */}
-      <Dialog
-        open={!!blacklistTarget}
-        onOpenChange={(o) => {
-          if (!o) {
-            setBlacklistTarget(null);
-            setReason("");
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Blacklist company</DialogTitle>
-            <DialogDescription>{blacklistTarget?.company.registered_name}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="border-destructive/30 bg-destructive/5 text-destructive space-y-1 rounded-[0.33em] border p-3 text-sm">
-              <p>
-                This immediately <strong>revokes all active MOAs</strong> with this company and
-                blocks new requests.
-              </p>
-              <p className="text-destructive/80 text-xs">
-                Revoked MOAs cannot be restored. The company is not notified. This action is logged
-                under your name.
-              </p>
+        {/* ── Blacklist dialog ─────────────────────────────────────────────── */}
+        <Dialog
+          open={!!blacklistTarget}
+          onOpenChange={(o) => {
+            if (!o) {
+              setBlacklistTarget(null);
+              setReason("");
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Blacklist company</DialogTitle>
+              <DialogDescription>{blacklistTarget?.company.registered_name}</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="border-destructive/30 bg-destructive/5 text-destructive space-y-1 rounded-[0.33em] border p-3 text-sm">
+                <p>
+                  This immediately <strong>revokes all active MOAs</strong> with this company and
+                  blocks new requests.
+                </p>
+                <p className="text-destructive/80 text-xs">
+                  Revoked MOAs cannot be restored. The company is not notified. This action is logged
+                  under your name.
+                </p>
+              </div>
+              <Textarea
+                rows={2}
+                placeholder="Internal reason (optional — never shown to the company)"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+              />
             </div>
-            <Textarea
-              rows={2}
-              placeholder="Internal reason (optional — never shown to the company)"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setBlacklistTarget(null);
-                setReason("");
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              scheme="destructive"
-              disabled={blacklistMutation.isPending}
-              onClick={() =>
-                blacklistTarget &&
-                blacklistMutation.mutate({ companyId: blacklistTarget.company.id, reason })
-              }
-            >
-              {blacklistMutation.isPending && <Loader2 className="animate-spin" />}
-              {blacklistMutation.isPending ? "Blacklisting…" : "Blacklist company"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setBlacklistTarget(null);
+                  setReason("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                scheme="destructive"
+                disabled={blacklistMutation.isPending}
+                onClick={() =>
+                  blacklistTarget &&
+                  blacklistMutation.mutate({ companyId: blacklistTarget.company.id, reason })
+                }
+              >
+                {blacklistMutation.isPending && <Loader2 className="animate-spin" />}
+                {blacklistMutation.isPending ? "Blacklisting…" : "Blacklist company"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      {/* ── Un-blacklist dialog ──────────────────────────────────────────── */}
-      <AlertDialog
-        open={!!unblacklistTarget}
-        onOpenChange={(o) => !o && setUnblacklistTarget(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              Remove {unblacklistTarget?.company.registered_name} from the blacklist?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              This re-enables future requests from this company. Previously revoked MOAs will not be
-              restored.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() =>
-                unblacklistTarget && unblacklistMutation.mutate(unblacklistTarget.company.id)
-              }
-            >
-              Remove
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        {/* ── Un-blacklist dialog ──────────────────────────────────────────── */}
+        <AlertDialog
+          open={!!unblacklistTarget}
+          onOpenChange={(o) => !o && setUnblacklistTarget(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                Remove {unblacklistTarget?.company.registered_name} from the blacklist?
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                This re-enables future requests from this company. Previously revoked MOAs will not be
+                restored.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() =>
+                  unblacklistTarget && unblacklistMutation.mutate(unblacklistTarget.company.id)
+                }
+              >
+                Remove
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </TabsContent>
+
+      <TabsContent value="legacy-companies" className="mt-4">
+        <LegacyCompaniesPanel
+          listEndpoint="/api/university/legacy-companies"
+          uploadEndpoint="/api/university/legacy-companies"
+          detailEndpoint={(id) => `/api/university/legacy-companies/${id}`}
+          addDocumentsEndpoint={(id) => `/api/university/legacy-companies/${id}/documents`}
+          canUpload={true}
+          queryKeyPrefix="university-legacy-companies"
+        />
+      </TabsContent>
+    </Tabs>
     </PageContainer>
   );
 }

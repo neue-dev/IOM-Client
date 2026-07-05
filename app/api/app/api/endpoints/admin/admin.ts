@@ -26,6 +26,7 @@ import type {
 import type {
   ApproveCompanyReviewDto,
   CreateCompanyAdminDto,
+  CreateLegacyMoaDto,
   CreateTemplateDto,
   CreateUniversityDto,
   PatchCompanyAdminDto,
@@ -2779,6 +2780,905 @@ export function useAdminControllerGetUniversityMoaDetailSuspense<
   return query;
 }
 
+export const adminControllerListUniversityLegacyCompanies = (
+  universityId: string | undefined | null,
+  signal?: AbortSignal,
+) => {
+  return preconfiguredAxiosFunction<void>({
+    url: `/api/admin/universities/${universityId}/legacy-companies`,
+    method: "GET",
+    signal,
+  });
+};
+
+export const getAdminControllerListUniversityLegacyCompaniesQueryKey = (
+  universityId?: string | undefined | null,
+) => {
+  return [`/api/admin/universities/${universityId}/legacy-companies`] as const;
+};
+
+export const getAdminControllerListUniversityLegacyCompaniesQueryOptions = <
+  TData = Awaited<
+    ReturnType<typeof adminControllerListUniversityLegacyCompanies>
+  >,
+  TError = unknown,
+>(
+  universityId: string | undefined | null,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof adminControllerListUniversityLegacyCompanies>
+        >,
+        TError,
+        TData
+      >
+    >;
+  },
+) => {
+  const { query: queryOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAdminControllerListUniversityLegacyCompaniesQueryKey(universityId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof adminControllerListUniversityLegacyCompanies>>
+  > = ({ signal }) =>
+    adminControllerListUniversityLegacyCompanies(universityId, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!universityId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof adminControllerListUniversityLegacyCompanies>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AdminControllerListUniversityLegacyCompaniesQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof adminControllerListUniversityLegacyCompanies>>
+  >;
+export type AdminControllerListUniversityLegacyCompaniesQueryError = unknown;
+
+export function useAdminControllerListUniversityLegacyCompanies<
+  TData = Awaited<
+    ReturnType<typeof adminControllerListUniversityLegacyCompanies>
+  >,
+  TError = unknown,
+>(
+  universityId: string | undefined | null,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof adminControllerListUniversityLegacyCompanies>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof adminControllerListUniversityLegacyCompanies>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof adminControllerListUniversityLegacyCompanies>
+          >
+        >,
+        "initialData"
+      >;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAdminControllerListUniversityLegacyCompanies<
+  TData = Awaited<
+    ReturnType<typeof adminControllerListUniversityLegacyCompanies>
+  >,
+  TError = unknown,
+>(
+  universityId: string | undefined | null,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof adminControllerListUniversityLegacyCompanies>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof adminControllerListUniversityLegacyCompanies>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof adminControllerListUniversityLegacyCompanies>
+          >
+        >,
+        "initialData"
+      >;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAdminControllerListUniversityLegacyCompanies<
+  TData = Awaited<
+    ReturnType<typeof adminControllerListUniversityLegacyCompanies>
+  >,
+  TError = unknown,
+>(
+  universityId: string | undefined | null,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof adminControllerListUniversityLegacyCompanies>
+        >,
+        TError,
+        TData
+      >
+    >;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+
+export function useAdminControllerListUniversityLegacyCompanies<
+  TData = Awaited<
+    ReturnType<typeof adminControllerListUniversityLegacyCompanies>
+  >,
+  TError = unknown,
+>(
+  universityId: string | undefined | null,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof adminControllerListUniversityLegacyCompanies>
+        >,
+        TError,
+        TData
+      >
+    >;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAdminControllerListUniversityLegacyCompaniesQueryOptions(
+      universityId,
+      options,
+    );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAdminControllerListUniversityLegacyCompaniesSuspenseQueryOptions =
+  <
+    TData = Awaited<
+      ReturnType<typeof adminControllerListUniversityLegacyCompanies>
+    >,
+    TError = unknown,
+  >(
+    universityId: string | undefined | null,
+    options?: {
+      query?: Partial<
+        UseSuspenseQueryOptions<
+          Awaited<
+            ReturnType<typeof adminControllerListUniversityLegacyCompanies>
+          >,
+          TError,
+          TData
+        >
+      >;
+    },
+  ) => {
+    const { query: queryOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getAdminControllerListUniversityLegacyCompaniesQueryKey(universityId);
+
+    const queryFn: QueryFunction<
+      Awaited<ReturnType<typeof adminControllerListUniversityLegacyCompanies>>
+    > = ({ signal }) =>
+      adminControllerListUniversityLegacyCompanies(universityId, signal);
+
+    return { queryKey, queryFn, ...queryOptions } as UseSuspenseQueryOptions<
+      Awaited<ReturnType<typeof adminControllerListUniversityLegacyCompanies>>,
+      TError,
+      TData
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+  };
+
+export type AdminControllerListUniversityLegacyCompaniesSuspenseQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof adminControllerListUniversityLegacyCompanies>>
+  >;
+export type AdminControllerListUniversityLegacyCompaniesSuspenseQueryError =
+  unknown;
+
+export function useAdminControllerListUniversityLegacyCompaniesSuspense<
+  TData = Awaited<
+    ReturnType<typeof adminControllerListUniversityLegacyCompanies>
+  >,
+  TError = unknown,
+>(
+  universityId: string | undefined | null,
+  options: {
+    query: Partial<
+      UseSuspenseQueryOptions<
+        Awaited<
+          ReturnType<typeof adminControllerListUniversityLegacyCompanies>
+        >,
+        TError,
+        TData
+      >
+    >;
+  },
+  queryClient?: QueryClient,
+): UseSuspenseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAdminControllerListUniversityLegacyCompaniesSuspense<
+  TData = Awaited<
+    ReturnType<typeof adminControllerListUniversityLegacyCompanies>
+  >,
+  TError = unknown,
+>(
+  universityId: string | undefined | null,
+  options?: {
+    query?: Partial<
+      UseSuspenseQueryOptions<
+        Awaited<
+          ReturnType<typeof adminControllerListUniversityLegacyCompanies>
+        >,
+        TError,
+        TData
+      >
+    >;
+  },
+  queryClient?: QueryClient,
+): UseSuspenseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAdminControllerListUniversityLegacyCompaniesSuspense<
+  TData = Awaited<
+    ReturnType<typeof adminControllerListUniversityLegacyCompanies>
+  >,
+  TError = unknown,
+>(
+  universityId: string | undefined | null,
+  options?: {
+    query?: Partial<
+      UseSuspenseQueryOptions<
+        Awaited<
+          ReturnType<typeof adminControllerListUniversityLegacyCompanies>
+        >,
+        TError,
+        TData
+      >
+    >;
+  },
+  queryClient?: QueryClient,
+): UseSuspenseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+
+export function useAdminControllerListUniversityLegacyCompaniesSuspense<
+  TData = Awaited<
+    ReturnType<typeof adminControllerListUniversityLegacyCompanies>
+  >,
+  TError = unknown,
+>(
+  universityId: string | undefined | null,
+  options?: {
+    query?: Partial<
+      UseSuspenseQueryOptions<
+        Awaited<
+          ReturnType<typeof adminControllerListUniversityLegacyCompanies>
+        >,
+        TError,
+        TData
+      >
+    >;
+  },
+  queryClient?: QueryClient,
+): UseSuspenseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAdminControllerListUniversityLegacyCompaniesSuspenseQueryOptions(
+      universityId,
+      options,
+    );
+
+  const query = useSuspenseQuery(
+    queryOptions,
+    queryClient,
+  ) as UseSuspenseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const adminControllerCreateUniversityLegacyCompany = (
+  universityId: string | undefined | null,
+  createLegacyMoaDto: CreateLegacyMoaDto,
+  signal?: AbortSignal,
+) => {
+  const formData = new FormData();
+  formData.append(`company_name`, createLegacyMoaDto.company_name);
+  formData.append(`effective_date`, createLegacyMoaDto.effective_date);
+  formData.append(`expiry_date`, createLegacyMoaDto.expiry_date);
+  if (createLegacyMoaDto.tin !== undefined) {
+    formData.append(`tin`, createLegacyMoaDto.tin);
+  }
+  if (createLegacyMoaDto.company_type !== undefined) {
+    formData.append(`company_type`, createLegacyMoaDto.company_type);
+  }
+  if (createLegacyMoaDto.registered_address !== undefined) {
+    formData.append(
+      `registered_address`,
+      createLegacyMoaDto.registered_address,
+    );
+  }
+  if (createLegacyMoaDto.contact_person !== undefined) {
+    formData.append(`contact_person`, createLegacyMoaDto.contact_person);
+  }
+  if (createLegacyMoaDto.contact_email !== undefined) {
+    formData.append(`contact_email`, createLegacyMoaDto.contact_email);
+  }
+  if (createLegacyMoaDto.contact_phone !== undefined) {
+    formData.append(`contact_phone`, createLegacyMoaDto.contact_phone);
+  }
+  if (createLegacyMoaDto.notes !== undefined) {
+    formData.append(`notes`, createLegacyMoaDto.notes);
+  }
+
+  return preconfiguredAxiosFunction<void>({
+    url: `/api/admin/universities/${universityId}/legacy-companies`,
+    method: "POST",
+    headers: { "Content-Type": "multipart/form-data" },
+    data: formData,
+    signal,
+  });
+};
+
+export const getAdminControllerCreateUniversityLegacyCompanyMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminControllerCreateUniversityLegacyCompany>>,
+    TError,
+    { universityId: string | undefined | null; data: CreateLegacyMoaDto },
+    TContext
+  >;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof adminControllerCreateUniversityLegacyCompany>>,
+  TError,
+  { universityId: string | undefined | null; data: CreateLegacyMoaDto },
+  TContext
+> => {
+  const mutationKey = ["adminControllerCreateUniversityLegacyCompany"];
+  const { mutation: mutationOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey } };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof adminControllerCreateUniversityLegacyCompany>>,
+    { universityId: string | undefined | null; data: CreateLegacyMoaDto }
+  > = (props) => {
+    const { universityId, data } = props ?? {};
+
+    return adminControllerCreateUniversityLegacyCompany(universityId, data);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AdminControllerCreateUniversityLegacyCompanyMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof adminControllerCreateUniversityLegacyCompany>>
+  >;
+export type AdminControllerCreateUniversityLegacyCompanyMutationBody =
+  CreateLegacyMoaDto;
+export type AdminControllerCreateUniversityLegacyCompanyMutationError = unknown;
+
+export const useAdminControllerCreateUniversityLegacyCompany = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof adminControllerCreateUniversityLegacyCompany>>,
+      TError,
+      { universityId: string | undefined | null; data: CreateLegacyMoaDto },
+      TContext
+    >;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof adminControllerCreateUniversityLegacyCompany>>,
+  TError,
+  { universityId: string | undefined | null; data: CreateLegacyMoaDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAdminControllerCreateUniversityLegacyCompanyMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+export const adminControllerGetUniversityLegacyCompany = (
+  universityId: string | undefined | null,
+  legacyCompanyId: string | undefined | null,
+  signal?: AbortSignal,
+) => {
+  return preconfiguredAxiosFunction<void>({
+    url: `/api/admin/universities/${universityId}/legacy-companies/${legacyCompanyId}`,
+    method: "GET",
+    signal,
+  });
+};
+
+export const getAdminControllerGetUniversityLegacyCompanyQueryKey = (
+  universityId?: string | undefined | null,
+  legacyCompanyId?: string | undefined | null,
+) => {
+  return [
+    `/api/admin/universities/${universityId}/legacy-companies/${legacyCompanyId}`,
+  ] as const;
+};
+
+export const getAdminControllerGetUniversityLegacyCompanyQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>,
+  TError = unknown,
+>(
+  universityId: string | undefined | null,
+  legacyCompanyId: string | undefined | null,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>,
+        TError,
+        TData
+      >
+    >;
+  },
+) => {
+  const { query: queryOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAdminControllerGetUniversityLegacyCompanyQueryKey(
+      universityId,
+      legacyCompanyId,
+    );
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>
+  > = ({ signal }) =>
+    adminControllerGetUniversityLegacyCompany(
+      universityId,
+      legacyCompanyId,
+      signal,
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(universityId && legacyCompanyId),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AdminControllerGetUniversityLegacyCompanyQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>
+>;
+export type AdminControllerGetUniversityLegacyCompanyQueryError = unknown;
+
+export function useAdminControllerGetUniversityLegacyCompany<
+  TData = Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>,
+  TError = unknown,
+>(
+  universityId: string | undefined | null,
+  legacyCompanyId: string | undefined | null,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>,
+          TError,
+          Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>
+        >,
+        "initialData"
+      >;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAdminControllerGetUniversityLegacyCompany<
+  TData = Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>,
+  TError = unknown,
+>(
+  universityId: string | undefined | null,
+  legacyCompanyId: string | undefined | null,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>,
+          TError,
+          Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>
+        >,
+        "initialData"
+      >;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAdminControllerGetUniversityLegacyCompany<
+  TData = Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>,
+  TError = unknown,
+>(
+  universityId: string | undefined | null,
+  legacyCompanyId: string | undefined | null,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>,
+        TError,
+        TData
+      >
+    >;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+
+export function useAdminControllerGetUniversityLegacyCompany<
+  TData = Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>,
+  TError = unknown,
+>(
+  universityId: string | undefined | null,
+  legacyCompanyId: string | undefined | null,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>,
+        TError,
+        TData
+      >
+    >;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAdminControllerGetUniversityLegacyCompanyQueryOptions(
+    universityId,
+    legacyCompanyId,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAdminControllerGetUniversityLegacyCompanySuspenseQueryOptions =
+  <
+    TData = Awaited<
+      ReturnType<typeof adminControllerGetUniversityLegacyCompany>
+    >,
+    TError = unknown,
+  >(
+    universityId: string | undefined | null,
+    legacyCompanyId: string | undefined | null,
+    options?: {
+      query?: Partial<
+        UseSuspenseQueryOptions<
+          Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>,
+          TError,
+          TData
+        >
+      >;
+    },
+  ) => {
+    const { query: queryOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getAdminControllerGetUniversityLegacyCompanyQueryKey(
+        universityId,
+        legacyCompanyId,
+      );
+
+    const queryFn: QueryFunction<
+      Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>
+    > = ({ signal }) =>
+      adminControllerGetUniversityLegacyCompany(
+        universityId,
+        legacyCompanyId,
+        signal,
+      );
+
+    return { queryKey, queryFn, ...queryOptions } as UseSuspenseQueryOptions<
+      Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>,
+      TError,
+      TData
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+  };
+
+export type AdminControllerGetUniversityLegacyCompanySuspenseQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>
+  >;
+export type AdminControllerGetUniversityLegacyCompanySuspenseQueryError =
+  unknown;
+
+export function useAdminControllerGetUniversityLegacyCompanySuspense<
+  TData = Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>,
+  TError = unknown,
+>(
+  universityId: string | undefined | null,
+  legacyCompanyId: string | undefined | null,
+  options: {
+    query: Partial<
+      UseSuspenseQueryOptions<
+        Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>,
+        TError,
+        TData
+      >
+    >;
+  },
+  queryClient?: QueryClient,
+): UseSuspenseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAdminControllerGetUniversityLegacyCompanySuspense<
+  TData = Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>,
+  TError = unknown,
+>(
+  universityId: string | undefined | null,
+  legacyCompanyId: string | undefined | null,
+  options?: {
+    query?: Partial<
+      UseSuspenseQueryOptions<
+        Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>,
+        TError,
+        TData
+      >
+    >;
+  },
+  queryClient?: QueryClient,
+): UseSuspenseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAdminControllerGetUniversityLegacyCompanySuspense<
+  TData = Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>,
+  TError = unknown,
+>(
+  universityId: string | undefined | null,
+  legacyCompanyId: string | undefined | null,
+  options?: {
+    query?: Partial<
+      UseSuspenseQueryOptions<
+        Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>,
+        TError,
+        TData
+      >
+    >;
+  },
+  queryClient?: QueryClient,
+): UseSuspenseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+
+export function useAdminControllerGetUniversityLegacyCompanySuspense<
+  TData = Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>,
+  TError = unknown,
+>(
+  universityId: string | undefined | null,
+  legacyCompanyId: string | undefined | null,
+  options?: {
+    query?: Partial<
+      UseSuspenseQueryOptions<
+        Awaited<ReturnType<typeof adminControllerGetUniversityLegacyCompany>>,
+        TError,
+        TData
+      >
+    >;
+  },
+  queryClient?: QueryClient,
+): UseSuspenseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAdminControllerGetUniversityLegacyCompanySuspenseQueryOptions(
+      universityId,
+      legacyCompanyId,
+      options,
+    );
+
+  const query = useSuspenseQuery(
+    queryOptions,
+    queryClient,
+  ) as UseSuspenseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const adminControllerAppendUniversityLegacyCompanyDocuments = (
+  universityId: string | undefined | null,
+  legacyCompanyId: string | undefined | null,
+  signal?: AbortSignal,
+) => {
+  return preconfiguredAxiosFunction<void>({
+    url: `/api/admin/universities/${universityId}/legacy-companies/${legacyCompanyId}/documents`,
+    method: "POST",
+    signal,
+  });
+};
+
+export const getAdminControllerAppendUniversityLegacyCompanyDocumentsMutationOptions =
+  <TError = unknown, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof adminControllerAppendUniversityLegacyCompanyDocuments>
+      >,
+      TError,
+      {
+        universityId: string | undefined | null;
+        legacyCompanyId: string | undefined | null;
+      },
+      TContext
+    >;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<typeof adminControllerAppendUniversityLegacyCompanyDocuments>
+    >,
+    TError,
+    {
+      universityId: string | undefined | null;
+      legacyCompanyId: string | undefined | null;
+    },
+    TContext
+  > => {
+    const mutationKey = [
+      "adminControllerAppendUniversityLegacyCompanyDocuments",
+    ];
+    const { mutation: mutationOptions } = options
+      ? options.mutation &&
+        "mutationKey" in options.mutation &&
+        options.mutation.mutationKey
+        ? options
+        : { ...options, mutation: { ...options.mutation, mutationKey } }
+      : { mutation: { mutationKey } };
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<typeof adminControllerAppendUniversityLegacyCompanyDocuments>
+      >,
+      {
+        universityId: string | undefined | null;
+        legacyCompanyId: string | undefined | null;
+      }
+    > = (props) => {
+      const { universityId, legacyCompanyId } = props ?? {};
+
+      return adminControllerAppendUniversityLegacyCompanyDocuments(
+        universityId,
+        legacyCompanyId,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type AdminControllerAppendUniversityLegacyCompanyDocumentsMutationResult =
+  NonNullable<
+    Awaited<
+      ReturnType<typeof adminControllerAppendUniversityLegacyCompanyDocuments>
+    >
+  >;
+
+export type AdminControllerAppendUniversityLegacyCompanyDocumentsMutationError =
+  unknown;
+
+export const useAdminControllerAppendUniversityLegacyCompanyDocuments = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof adminControllerAppendUniversityLegacyCompanyDocuments>
+      >,
+      TError,
+      {
+        universityId: string | undefined | null;
+        legacyCompanyId: string | undefined | null;
+      },
+      TContext
+    >;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<
+    ReturnType<typeof adminControllerAppendUniversityLegacyCompanyDocuments>
+  >,
+  TError,
+  {
+    universityId: string | undefined | null;
+    legacyCompanyId: string | undefined | null;
+  },
+  TContext
+> => {
+  const mutationOptions =
+    getAdminControllerAppendUniversityLegacyCompanyDocumentsMutationOptions(
+      options,
+    );
+
+  return useMutation(mutationOptions, queryClient);
+};
 export const adminControllerVerifyTin = (
   verifyTinDto: VerifyTinDto,
   signal?: AbortSignal,

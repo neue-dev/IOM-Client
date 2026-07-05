@@ -43,3 +43,4 @@ export * from "./universityLoginDto";
 export * from "./universityResetDto";
 export * from "./updateStaffAccountDto";
 export * from "./verifyTinDto";
+export * from "./createLegacyMoaDto";
