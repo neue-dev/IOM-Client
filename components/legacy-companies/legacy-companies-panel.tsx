@@ -27,9 +27,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { formatDateWithoutTime, cn } from "@/lib/utils";
 import {
   ArrowLeft,
+  ChevronDown,
   CircleCheck,
   Eye,
   Loader2,
@@ -213,25 +220,35 @@ export function LegacyCompaniesPanel({
           }}
           toolbarActions={
             canUpload ? (
-              <div className="flex items-center gap-2">
-                <Button onClick={() => setUploadOpen(true)}>
+              <div className="flex">
+                <Button
+                  onClick={() => setUploadOpen(true)}
+                  className={(bulkCsvEndpoint || bulkZipEndpoint) ? "rounded-r-none" : undefined}
+                >
                   <Plus /> Upload Legacy MOA
                 </Button>
-                {bulkCsvEndpoint && (
-                  <Button
-                    variant="outline"
-                    onClick={() => setCsvUploadOpen(true)}
-                  >
-                    <Upload /> Bulk Upload CSV
-                  </Button>
-                )}
-                {bulkZipEndpoint && (
-                  <Button
-                    variant="outline"
-                    onClick={() => setZipUploadOpen(true)}
-                  >
-                    <Upload /> Bulk Upload ZIP
-                  </Button>
+                {(bulkCsvEndpoint || bulkZipEndpoint) && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button className="rounded-l-none border-l-0 px-2">
+                        <ChevronDown className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {bulkCsvEndpoint && (
+                        <DropdownMenuItem onSelect={() => setCsvUploadOpen(true)}>
+                          <Upload className="h-4 w-4" />
+                          Bulk upload via CSV
+                        </DropdownMenuItem>
+                      )}
+                      {bulkZipEndpoint && (
+                        <DropdownMenuItem onSelect={() => setZipUploadOpen(true)}>
+                          <Upload className="h-4 w-4" />
+                          Bulk upload via ZIP
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
               </div>
             ) : undefined
