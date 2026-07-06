@@ -93,12 +93,10 @@ export function isFilledValue(value: unknown) {
 }
 
 const DOCUMENT_TYPE_OPTIONS = [
-  "business_permit",
-  "sec_dti_registration",
-  "mayor_permit",
-  "corporate_secretary_certificate",
-  "board_resolution",
-  "other",
+  { value: "business_permit", label: "Business Permit" },
+  { value: "sec_dti_registration", label: "SEC/DTI Registration" },
+  { value: "mayor_permit", label: "Mayor's Permit" },
+  { value: "other", label: "Other" },
 ];
 
 export function isLegacyMoaExpired(expiryDate: string) {
@@ -228,7 +226,7 @@ function DetailView({
   const queryClient = useQueryClient();
   const [previewDoc, setPreviewDoc] = useState<{ url: string; title: string } | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [companyDocInputs, setCompanyDocInputs] = useState<{ id: string; file: File; filename: string; expiryDate: string; type: string }[]>([]);
+  const [companyDocInputs, setCompanyDocInputs] = useState<{ id: string; file: File; type: string }[]>([]);
 
   const { data, isLoading } = useQuery({
     queryKey: [queryKeyPrefix, "detail", legacyCompanyId],
@@ -241,19 +239,13 @@ function DetailView({
   const company = data?.legacyCompany;
 
   const docUploadMutation = useMutation({
-    mutationFn: (inputs: { id: string; file: File; filename: string; expiryDate: string; type: string }[]) => {
+    mutationFn: (inputs: { id: string; file: File; type: string }[]) => {
       const formData = new FormData();
-      const documentNames: string[] = [];
-      const documentExpiryDates: (string | null)[] = [];
       const documentTypes: string[] = [];
-      inputs.forEach(({ file, filename, expiryDate, type }) => {
+      inputs.forEach(({ file, type }) => {
         formData.append("companyDocuments", file);
-        documentNames.push(filename);
-        documentExpiryDates.push(expiryDate || null);
         documentTypes.push(type || "other");
       });
-      formData.append("documentNames", JSON.stringify(documentNames));
-      formData.append("documentExpiryDates", JSON.stringify(documentExpiryDates));
       formData.append("documentTypes", JSON.stringify(documentTypes));
       return preconfiguredAxios.post(addDocumentsEndpoint(legacyCompanyId), formData);
     },
@@ -490,8 +482,6 @@ function DetailView({
                 const newInputs = Array.from(files).map((f) => ({
                   id: crypto.randomUUID(),
                   file: f,
-                  filename: f.name,
-                  expiryDate: "",
                   type: "other",
                 }));
                 setCompanyDocInputs((prev) => [...prev, ...newInputs]);
@@ -514,54 +504,27 @@ function DetailView({
                         <X className="h-3 w-3" />
                       </Button>
                     </div>
-                    <div className="space-y-2">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Type</Label>
-                        <Select
-                          value={input.type}
-                          onValueChange={(val) =>
-                            setCompanyDocInputs((prev) =>
-                              prev.map((i) => (i.id === input.id ? { ...i, type: val } : i)),
-                            )
-                          }
-                        >
-                          <SelectTrigger className="h-7 text-xs">
-                            <SelectValue placeholder="Select type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {DOCUMENT_TYPE_OPTIONS.map((opt) => (
-                              <SelectItem key={opt} value={opt} className="text-xs">
-                                {opt === "other" ? "Other" : formatLegacyLabel(opt)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Name</Label>
-                        <Input
-                          className="h-7 text-xs"
-                          value={input.filename}
-                          onChange={(e) =>
-                            setCompanyDocInputs((prev) =>
-                              prev.map((i) => (i.id === input.id ? { ...i, filename: e.target.value } : i)),
-                            )
-                          }
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Expiry Date</Label>
-                        <Input
-                          type="date"
-                          className="h-7 text-xs"
-                          value={input.expiryDate}
-                          onChange={(e) =>
-                            setCompanyDocInputs((prev) =>
-                              prev.map((i) => (i.id === input.id ? { ...i, expiryDate: e.target.value } : i)),
-                            )
-                          }
-                        />
-                      </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Type</Label>
+                      <Select
+                        value={input.type}
+                        onValueChange={(val) =>
+                          setCompanyDocInputs((prev) =>
+                            prev.map((i) => (i.id === input.id ? { ...i, type: val } : i)),
+                          )
+                        }
+                      >
+                        <SelectTrigger className="h-7 text-xs">
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {DOCUMENT_TYPE_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 ))}
@@ -622,7 +585,7 @@ function UploadDialog({
   const [contactPerson, setContactPerson] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
-  const [companyDocInputs, setCompanyDocInputs] = useState<{ id: string; file: File; filename: string; expiryDate: string; type: string }[]>([]);
+  const [companyDocInputs, setCompanyDocInputs] = useState<{ id: string; file: File; type: string }[]>([]);
 
   const updateMoa = (id: string, patch: Partial<MoaRecordInput>) => {
     setMoas((prev) => prev.map((m) => (m.id === id ? { ...m, ...patch } : m)));
@@ -670,17 +633,11 @@ function UploadDialog({
       if (contactEmail) formData.append("contact_email", contactEmail);
       if (contactPhone) formData.append("contact_phone", contactPhone);
       if (companyDocInputs.length > 0) {
-        const documentNames: string[] = [];
-        const documentExpiryDates: (string | null)[] = [];
         const documentTypes: string[] = [];
-        companyDocInputs.forEach(({ file, filename, expiryDate, type }) => {
+        companyDocInputs.forEach(({ file, type }) => {
           formData.append("companyDocuments", file);
-          documentNames.push(filename);
-          documentExpiryDates.push(expiryDate || null);
           documentTypes.push(type || "other");
         });
-        formData.append("documentNames", JSON.stringify(documentNames));
-        formData.append("documentExpiryDates", JSON.stringify(documentExpiryDates));
         formData.append("documentTypes", JSON.stringify(documentTypes));
       }
       return preconfiguredAxios.post(uploadEndpoint, formData);
@@ -760,15 +717,6 @@ function UploadDialog({
                   </div>
                 </div>
                 <div className="mt-2 space-y-1.5">
-                  <Label className="text-xs">Name</Label>
-                  <Input
-                    className="h-8 text-xs"
-                    value={moa.name}
-                    onChange={(e) => updateMoa(moa.id, { name: e.target.value })}
-                    placeholder={moa.file?.name ?? "MOA Agreement"}
-                  />
-                </div>
-                <div className="mt-2 space-y-1.5">
                   <Label className="text-xs">MOA Document (PDF, optional, max 2.5MB)</Label>
                   <Input
                     type="file"
@@ -776,10 +724,7 @@ function UploadDialog({
                     accept=".pdf,application/pdf"
                     onChange={(e) => {
                       const file = e.target.files?.[0] ?? null;
-                      updateMoa(moa.id, {
-                        file,
-                        name: moa.name || file?.name || "",
-                      });
+                      updateMoa(moa.id, { file, name: file?.name || "" });
                     }}
                   />
                 </div>
@@ -836,8 +781,6 @@ function UploadDialog({
                 const newInputs = Array.from(files).map((f) => ({
                   id: crypto.randomUUID(),
                   file: f,
-                  filename: f.name,
-                  expiryDate: "",
                   type: "other",
                 }));
                 setCompanyDocInputs((prev) => [...prev, ...newInputs]);
@@ -876,40 +819,14 @@ function UploadDialog({
                           </SelectTrigger>
                           <SelectContent>
                             {DOCUMENT_TYPE_OPTIONS.map((opt) => (
-                              <SelectItem key={opt} value={opt} className="text-xs">
-                                {opt === "other" ? "Other" : formatLegacyLabel(opt)}
+                              <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                                {opt.label}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <Label className="text-xs">Name</Label>
-                          <Input
-                            className="h-7 text-xs"
-                            value={input.filename}
-                            onChange={(e) =>
-                              setCompanyDocInputs((prev) =>
-                                prev.map((i) => (i.id === input.id ? { ...i, filename: e.target.value } : i)),
-                              )
-                            }
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs">Expiry Date</Label>
-                          <Input
-                            type="date"
-                            className="h-7 text-xs"
-                            value={input.expiryDate}
-                            onChange={(e) =>
-                              setCompanyDocInputs((prev) =>
-                                prev.map((i) => (i.id === input.id ? { ...i, expiryDate: e.target.value } : i))
-                              )
-                            }
-                          />
-                        </div>
-                      </div>
+
                     </div>
                   </div>
                 ))}
