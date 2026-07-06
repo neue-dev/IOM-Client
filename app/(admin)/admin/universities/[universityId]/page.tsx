@@ -583,6 +583,7 @@ export default function AdminUniversityPartnersPage() {
             listEndpoint={`/api/admin/universities/${universityId}/legacy-companies`}
             uploadEndpoint={`/api/admin/universities/${universityId}/legacy-companies`}
             bulkCsvEndpoint={`/api/admin/universities/${universityId}/legacy-companies/bulk/csv`}
+            bulkZipEndpoint={`/api/admin/universities/${universityId}/legacy-companies/bulk/zip`}
             detailEndpoint={(id) => `/api/admin/universities/${universityId}/legacy-companies/${id}`}
             addDocumentsEndpoint={(id) => `/api/admin/universities/${universityId}/legacy-companies/${id}/documents`}
             canUpload={true}

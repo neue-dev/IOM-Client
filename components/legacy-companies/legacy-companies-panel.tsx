@@ -70,6 +70,7 @@ type LegacyCompaniesPanelProps = {
   detailEndpoint: (legacyCompanyId: string) => string;
   addDocumentsEndpoint: (legacyCompanyId: string) => string;
   bulkCsvEndpoint?: string;
+  bulkZipEndpoint?: string;
   canUpload: boolean;
   queryKeyPrefix: string;
   selectedId?: string | null;
@@ -111,6 +112,7 @@ export function LegacyCompaniesPanel({
   detailEndpoint,
   addDocumentsEndpoint,
   bulkCsvEndpoint,
+  bulkZipEndpoint,
   canUpload,
   queryKeyPrefix,
   selectedId: controlledSelectedId,
@@ -120,6 +122,7 @@ export function LegacyCompaniesPanel({
   const [internalSelectedId, setInternalSelectedId] = useState<string | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [csvUploadOpen, setCsvUploadOpen] = useState(false);
+  const [zipUploadOpen, setZipUploadOpen] = useState(false);
   const selectedId = controlledSelectedId !== undefined ? controlledSelectedId : internalSelectedId;
   const setSelectedId = (id: string | null) => {
     if (onSelectedIdChange) onSelectedIdChange(id);
@@ -200,6 +203,11 @@ export function LegacyCompaniesPanel({
                   <Upload /> Bulk Upload CSV
                 </Button>
               )}
+              {bulkZipEndpoint && (
+                <Button variant="outline" onClick={() => setZipUploadOpen(true)}>
+                  <Upload /> Bulk Upload ZIP
+                </Button>
+              )}
             </div>
           ) : undefined}
         />
@@ -218,6 +226,14 @@ export function LegacyCompaniesPanel({
           csvEndpoint={bulkCsvEndpoint}
           queryKeyPrefix={queryKeyPrefix}
           onClose={() => setCsvUploadOpen(false)}
+        />
+      )}
+
+      {zipUploadOpen && bulkZipEndpoint && (
+        <ZipUploadDialog
+          zipEndpoint={bulkZipEndpoint}
+          queryKeyPrefix={queryKeyPrefix}
+          onClose={() => setZipUploadOpen(false)}
         />
       )}
     </div>
@@ -1082,6 +1098,250 @@ function CsvUploadDialog({ csvEndpoint, queryKeyPrefix, onClose }: CsvUploadDial
           </div>
         )}
 
+        </div>
+
+        <DialogFooter>
+          {result ? (
+            <Button onClick={onClose}>Done</Button>
+          ) : (
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface ZipUploadDialogProps {
+  zipEndpoint: string;
+  queryKeyPrefix: string;
+  onClose: () => void;
+}
+
+function ZipUploadDialog({ zipEndpoint, queryKeyPrefix, onClose }: ZipUploadDialogProps) {
+  const queryClient = useQueryClient();
+  const [file, setFile] = useState<File | null>(null);
+  const [result, setResult] = useState<{
+    summary: { createdCompanies: number; appendedMoas: number; invalid: number; failed: number };
+    results: BulkCsvRowResult[];
+  } | null>(null);
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      if (!file) return;
+      const formData = new FormData();
+      formData.append("file", file);
+      const r = await preconfiguredAxios.post(zipEndpoint, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return r.data as {
+        summary: { createdCompanies: number; appendedMoas: number; invalid: number; failed: number };
+        results: BulkCsvRowResult[];
+      };
+    },
+    onSuccess: (data) => {
+      if (!data) return;
+      setResult(data);
+      if (data.summary.createdCompanies + data.summary.appendedMoas > 0) {
+        queryClient.invalidateQueries({ queryKey: [queryKeyPrefix] });
+      }
+    },
+    onError: () => {
+      toast("ZIP upload failed", toastPresets.destructive);
+    },
+  });
+
+  const csvColumns = [
+    { name: "company_name", required: true, description: "Company/partner name", example: "Acme Corporation" },
+    { name: "effective_date", required: true, description: "MOA start date (YYYY-MM-DD)", example: "2023-01-15" },
+    { name: "expiry_date", required: true, description: "MOA expiry date (YYYY-MM-DD)", example: "2025-01-15" },
+    { name: "moa_file", required: false, description: "Path to MOA PDF inside ZIP", example: "moas/acme-2024.pdf" },
+    { name: "business_permit_file", required: false, description: "Path to business permit PDF inside ZIP", example: "company-documents/acme-permit.pdf" },
+    { name: "mayor_permit_file", required: false, description: "Path to mayor's permit PDF inside ZIP", example: "company-documents/acme-mayor.pdf" },
+    { name: "sec_dti_registration_file", required: false, description: "Path to SEC/DTI registration PDF inside ZIP", example: "company-documents/acme-sec.pdf" },
+    { name: "tin", required: false, description: "Company TIN", example: "123-456-789" },
+    { name: "company_type", required: false, description: "Type/category of company", example: "Corporation" },
+    { name: "registered_address", required: false, description: "Registered company address", example: "Makati City" },
+    { name: "contact_person", required: false, description: "Main contact person", example: "Juan Dela Cruz" },
+    { name: "contact_email", required: false, description: "Contact email address", example: "juan@example.com" },
+    { name: "contact_phone", required: false, description: "Contact phone number", example: "09171234567" },
+  ];
+
+  const sampleRow: Record<string, string> = {
+    company_name: "Acme Corporation",
+    effective_date: "2023-01-15",
+    expiry_date: "2025-01-15",
+    moa_file: "moas/acme-2024.pdf",
+    business_permit_file: "company-documents/acme-permit.pdf",
+    mayor_permit_file: "company-documents/acme-mayor.pdf",
+    sec_dti_registration_file: "",
+    tin: "123-456-789",
+    company_type: "Corporation",
+    registered_address: "Makati City",
+    contact_person: "Juan Dela Cruz",
+    contact_email: "juan@example.com",
+    contact_phone: "09171234567",
+  };
+
+  const downloadTemplate = () => {
+    const headerRow = csvColumns.map((c) => c.name);
+    const sampleRowData = csvColumns.map((c) => sampleRow[c.name]);
+    const csvContent = [headerRow.join(","), sampleRowData.join(",")].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "legacy-moa-template.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="sm:max-w-5xl">
+        <DialogHeader>
+          <DialogTitle>Bulk Upload Legacy MOAs via ZIP</DialogTitle>
+          <DialogDescription>
+            Upload a ZIP file containing a <code className="text-xs">legacy-import.csv</code> manifest and
+            referenced PDF files. Each CSV row represents one legacy MOA.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="overflow-y-auto max-h-[60vh] -mx-6 px-6 space-y-4">
+          {!result && (
+            <>
+              <p className="text-sm font-medium">Required columns: <span className="font-normal text-muted-foreground">company_name, effective_date, expiry_date</span></p>
+
+              <Card className="p-4 space-y-2 text-sm">
+                <p className="font-medium">ZIP structure</p>
+                <pre className="text-xs bg-muted p-2 rounded-md font-mono">
+{`legacy-import.csv
+moas/acme-2024.pdf
+company-documents/acme-permit.pdf
+company-documents/acme-mayor.pdf`}
+                </pre>
+                <p className="text-muted-foreground">
+                  The <code className="text-xs">legacy-import.csv</code> manifest references files by their
+                  path inside the ZIP (e.g. <code className="text-xs">moas/acme-2024.pdf</code>).
+                </p>
+              </Card>
+
+              <div className="overflow-x-auto rounded-md border">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="px-3 py-2 text-left font-medium">Column</th>
+                      <th className="px-3 py-2 text-left font-medium">Required</th>
+                      <th className="px-3 py-2 text-left font-medium">Description</th>
+                      <th className="px-3 py-2 text-left font-medium">Example</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {csvColumns.map((col) => (
+                      <tr key={col.name} className="border-b last:border-0">
+                        <td className="px-3 py-2 font-mono text-xs">{col.name}</td>
+                        <td className="px-3 py-2">{col.required ? "Yes" : "No"}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{col.description}</td>
+                        <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{col.example}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Template preview</Label>
+                  <Button variant="outline" size="sm" onClick={downloadTemplate}>
+                    Download Template
+                  </Button>
+                </div>
+                <div className="overflow-x-auto rounded-md border">
+                  <table className="w-full text-xs font-mono">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        {csvColumns.map((col) => (
+                          <th key={col.name} className="px-2 py-1.5 text-left font-medium whitespace-nowrap">{col.name}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-b">
+                        {csvColumns.map((col) => (
+                          <td key={col.name} className="px-2 py-1.5 whitespace-nowrap text-muted-foreground">{sampleRow[col.name]}</td>
+                        ))}
+                      </tr>
+                      <tr className="text-muted-foreground">
+                        {csvColumns.map((col) => (
+                          <td key={col.name} className="px-2 py-1.5 whitespace-nowrap">{col.required ? "..." : ""}</td>
+                        ))}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Each row is one MOA. At least company_name, effective_date, and expiry_date are required.
+                  File columns reference paths inside the ZIP. Invalid rows are skipped; valid rows are still uploaded.
+                  Wrap values containing commas in double quotes.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="zip-file">ZIP File</Label>
+                <Input
+                  id="zip-file"
+                  type="file"
+                  accept=".zip,application/zip"
+                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                />
+              </div>
+
+              <Button onClick={() => mutation.mutate()} disabled={!file || mutation.isPending}>
+                {mutation.isPending && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+                Upload
+              </Button>
+            </>
+          )}
+
+          {result && (
+            <div className="space-y-4">
+              <Card className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+                <div>
+                  <p className="text-2xl font-bold text-green-600">{result.summary.createdCompanies}</p>
+                  <p className="text-xs text-muted-foreground">New companies</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-blue-600">{result.summary.appendedMoas}</p>
+                  <p className="text-xs text-muted-foreground">MOAs appended</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-amber-600">{result.summary.invalid}</p>
+                  <p className="text-xs text-muted-foreground">Invalid rows</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-red-600">{result.summary.failed}</p>
+                  <p className="text-xs text-muted-foreground">Failed</p>
+                </div>
+              </Card>
+
+              {result.results.filter((r) => r.status !== "created_company" && r.status !== "appended_moa").length > 0 && (
+                <div>
+                  <p className="font-medium mb-2">Row details</p>
+                  <div className="max-h-60 overflow-y-auto space-y-1">
+                    {result.results.map((r) => (
+                      <div key={r.row} className={`text-sm p-2 rounded ${r.status === "invalid" || r.status === "failed" ? "bg-red-50" : "bg-green-50"}`}>
+                        <span className="font-medium">Row {r.row}:</span>{" "}
+                        <span className={r.status === "created_company" || r.status === "appended_moa" ? "text-green-700" : "text-red-700"}>
+                          {r.company_name} — {r.status.replace(/_/g, " ")}
+                        </span>
+                        {r.message && <span className="text-muted-foreground ml-1">({r.message})</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <DialogFooter>
