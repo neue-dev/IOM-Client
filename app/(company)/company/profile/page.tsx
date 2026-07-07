@@ -1,6 +1,6 @@
 "use client";
 import { Suspense, useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -8,7 +8,14 @@ import {
   useCompanyProfile,
   useCompanyVerification,
 } from "@/app/providers/company-profile.provider";
-import { preconfiguredAxios } from "@/app/api/preconfig.axios";
+import {
+  getCompanyControllerGetVerificationQueryKey,
+  getCompanyControllerMeQueryKey,
+  type PatchCompanyProfileDtoCompanyType,
+  useCompanyControllerGetDocuments,
+  useCompanyControllerPatchProfile,
+  useCompanyControllerUploadDocument,
+} from "@/app/api";
 import { resolveFile } from "@/app/lib/resolve-file";
 import { cn } from "@/lib/utils";
 import { PageContainer, PageHeader } from "@/components/page-header";
@@ -103,11 +110,8 @@ function ProfileContent() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [uploadingType, setUploadingType] = useState<string | null>(null);
 
-  const { data: docsData, refetch: refetchDocs } = useQuery({
-    queryKey: ["company-docs"],
-    queryFn: () =>
-      preconfiguredAxios.get("/api/company/documents").then((r) => r.data),
-    enabled: !!company,
+  const { data: docsData, refetch: refetchDocs } = useCompanyControllerGetDocuments({
+    query: { enabled: !!company },
   });
 
   const { data: verification, isLoading: vLoading } = useCompanyVerification(!!company);
@@ -127,44 +131,30 @@ function ProfileContent() {
   // When set, a re-verification confirm dialog is shown; running it performs the edit.
   const [pendingConfirm, setPendingConfirm] = useState<(() => void) | null>(null);
 
-  const save = useMutation({
-    mutationFn: () => {
-      const g = (k: string) => (k in draft ? draft[k] : persisted(k));
-      return preconfiguredAxios.patch("/api/company/profile", {
-        registered_name: g("registered_name"),
-        registered_address: g("registered_address"),
-        company_type: g("company_type") || undefined,
-        description: g("description"),
-        website: g("website"),
-        phone: g("phone"),
-        industry: g("industry"),
-      });
+  const save = useCompanyControllerPatchProfile({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getCompanyControllerMeQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getCompanyControllerGetVerificationQueryKey() });
+        toast.success("Profile saved");
+        cancelEdit();
+      },
+      onError: (e: Error) => toast.error(e.message),
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["company-me"] });
-      queryClient.invalidateQueries({ queryKey: ["company-verification"] });
-      toast.success("Profile saved");
-      cancelEdit();
-    },
-    onError: (e: Error) => toast.error(e.message),
   });
 
-  const uploadDoc = useMutation({
-    mutationFn: ({ file, type }: { file: File; type: string }) => {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("type", type);
-      return preconfiguredAxios.post("/api/company/documents", fd);
-    },
-    onSuccess: () => {
-      setUploadingType(null);
-      refetchDocs();
-      queryClient.invalidateQueries({ queryKey: ["company-verification"] });
-      toast.success("Document uploaded");
-    },
-    onError: (e: Error) => {
-      setUploadingType(null);
-      toast.error(e.message);
+  const uploadDoc = useCompanyControllerUploadDocument({
+    mutation: {
+      onSuccess: () => {
+        setUploadingType(null);
+        refetchDocs();
+        queryClient.invalidateQueries({ queryKey: getCompanyControllerGetVerificationQueryKey() });
+        toast.success("Document uploaded");
+      },
+      onError: (e: Error) => {
+        setUploadingType(null);
+        toast.error(e.message);
+      },
     },
   });
 
@@ -200,19 +190,30 @@ function ProfileContent() {
   function attemptSave(sectionKey: SectionKey) {
     const matKeys = MATERIAL_KEYS_BY_SECTION[sectionKey] ?? [];
     const changedMaterial = matKeys.some((k) => k in draft && draft[k] !== persisted(k));
+    const g = (k: string) => (k in draft ? draft[k] : persisted(k));
+    const data = {
+      registered_name: g("registered_name"),
+      registered_address: g("registered_address"),
+      company_type: (g("company_type") || undefined) as PatchCompanyProfileDtoCompanyType | undefined,
+      description: g("description"),
+      website: g("website"),
+      phone: g("phone"),
+      industry: g("industry"),
+    };
+    const doSave = () => save.mutate({ data });
     if (verified && changedMaterial) {
-      setPendingConfirm(() => () => save.mutate());
+      setPendingConfirm(() => doSave);
     } else {
-      save.mutate();
+      doSave();
     }
   }
 
   function attemptUploadDoc(file: File, type: string) {
     setUploadingType(type);
     if (verified) {
-      setPendingConfirm(() => () => uploadDoc.mutate({ file, type }));
+      setPendingConfirm(() => () => uploadDoc.mutate({ data: { file, type } }));
     } else {
-      uploadDoc.mutate({ file, type });
+      uploadDoc.mutate({ data: { file, type } });
     }
   }
 

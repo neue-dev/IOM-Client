@@ -24,16 +24,42 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  BaseResponse,
   BlacklistCompanyDto,
   CreateCompanyInviteDto,
-  CreateLegacyMoaDto,
   CreateStaffAccountDto,
   ErrorResponse,
   PatchUniversityProfileDto,
   ToggleTemplateOfferDto,
+  UniversityAccountsResponse,
+  UniversityAuditLogResponse,
+  UniversityBlacklistResponse,
+  UniversityBulkResultResponse,
+  UniversityControllerAppendLegacyCompanyDocumentsBody,
+  UniversityControllerBulkCreateLegacyCompaniesFromCsvBody,
+  UniversityControllerBulkCreateLegacyCompaniesFromZipBody,
+  UniversityControllerCreateLegacyCompanyBody,
+  UniversityControllerGetAuditLogParams,
+  UniversityControllerUploadLogoBody,
+  UniversityControllerUploadSignatureBody,
+  UniversityCreateStaffResponse,
   UniversityGetProfileResponse,
+  UniversityInvitesResponse,
+  UniversityLegacyCompaniesResponse,
+  UniversityLegacyCompanyDetailResponse,
   UniversityMeResponse,
+  UniversityMoaDetailResponse,
+  UniversityPartnerLegacyCompanyResponse,
+  UniversityPartnerMoasResponse,
+  UniversityPartnersResponse,
   UniversityPatchProfileResponse,
+  UniversityRegisteredCompaniesResponse,
+  UniversitySendInviteResponse,
+  UniversityTemplatesResponse,
+  UniversityToggleOfferResponse,
+  UniversityUpdateStaffResponse,
+  UniversityUploadLogoResponse,
+  UniversityUploadSignatureResponse,
   UpdateStaffAccountDto,
 } from "../../models";
 
@@ -635,28 +661,36 @@ export const useUniversityControllerPatchProfile = <
 
   return useMutation(mutationOptions, queryClient);
 };
-export const universityControllerUploadLogo = (signal?: AbortSignal) => {
-  return preconfiguredAxiosFunction<void>({
+export const universityControllerUploadLogo = (
+  universityControllerUploadLogoBody: UniversityControllerUploadLogoBody,
+  signal?: AbortSignal,
+) => {
+  const formData = new FormData();
+  formData.append(`file`, universityControllerUploadLogoBody.file);
+
+  return preconfiguredAxiosFunction<UniversityUploadLogoResponse>({
     url: `/api/university/profile/logo`,
     method: "POST",
+    headers: { "Content-Type": "multipart/form-data" },
+    data: formData,
     signal,
   });
 };
 
 export const getUniversityControllerUploadLogoMutationOptions = <
-  TError = unknown,
+  TError = ErrorResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof universityControllerUploadLogo>>,
     TError,
-    void,
+    { data: UniversityControllerUploadLogoBody },
     TContext
   >;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof universityControllerUploadLogo>>,
   TError,
-  void,
+  { data: UniversityControllerUploadLogoBody },
   TContext
 > => {
   const mutationKey = ["universityControllerUploadLogo"];
@@ -670,9 +704,11 @@ export const getUniversityControllerUploadLogoMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof universityControllerUploadLogo>>,
-    void
-  > = () => {
-    return universityControllerUploadLogo();
+    { data: UniversityControllerUploadLogoBody }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return universityControllerUploadLogo(data);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -681,18 +717,19 @@ export const getUniversityControllerUploadLogoMutationOptions = <
 export type UniversityControllerUploadLogoMutationResult = NonNullable<
   Awaited<ReturnType<typeof universityControllerUploadLogo>>
 >;
-
-export type UniversityControllerUploadLogoMutationError = unknown;
+export type UniversityControllerUploadLogoMutationBody =
+  UniversityControllerUploadLogoBody;
+export type UniversityControllerUploadLogoMutationError = ErrorResponse;
 
 export const useUniversityControllerUploadLogo = <
-  TError = unknown,
+  TError = ErrorResponse,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof universityControllerUploadLogo>>,
       TError,
-      void,
+      { data: UniversityControllerUploadLogoBody },
       TContext
     >;
   },
@@ -700,7 +737,7 @@ export const useUniversityControllerUploadLogo = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof universityControllerUploadLogo>>,
   TError,
-  void,
+  { data: UniversityControllerUploadLogoBody },
   TContext
 > => {
   const mutationOptions =
@@ -708,28 +745,36 @@ export const useUniversityControllerUploadLogo = <
 
   return useMutation(mutationOptions, queryClient);
 };
-export const universityControllerUploadSignature = (signal?: AbortSignal) => {
-  return preconfiguredAxiosFunction<void>({
+export const universityControllerUploadSignature = (
+  universityControllerUploadSignatureBody: UniversityControllerUploadSignatureBody,
+  signal?: AbortSignal,
+) => {
+  const formData = new FormData();
+  formData.append(`file`, universityControllerUploadSignatureBody.file);
+
+  return preconfiguredAxiosFunction<UniversityUploadSignatureResponse>({
     url: `/api/university/profile/signature`,
     method: "POST",
+    headers: { "Content-Type": "multipart/form-data" },
+    data: formData,
     signal,
   });
 };
 
 export const getUniversityControllerUploadSignatureMutationOptions = <
-  TError = unknown,
+  TError = ErrorResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof universityControllerUploadSignature>>,
     TError,
-    void,
+    { data: UniversityControllerUploadSignatureBody },
     TContext
   >;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof universityControllerUploadSignature>>,
   TError,
-  void,
+  { data: UniversityControllerUploadSignatureBody },
   TContext
 > => {
   const mutationKey = ["universityControllerUploadSignature"];
@@ -743,9 +788,11 @@ export const getUniversityControllerUploadSignatureMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof universityControllerUploadSignature>>,
-    void
-  > = () => {
-    return universityControllerUploadSignature();
+    { data: UniversityControllerUploadSignatureBody }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return universityControllerUploadSignature(data);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -754,18 +801,19 @@ export const getUniversityControllerUploadSignatureMutationOptions = <
 export type UniversityControllerUploadSignatureMutationResult = NonNullable<
   Awaited<ReturnType<typeof universityControllerUploadSignature>>
 >;
-
-export type UniversityControllerUploadSignatureMutationError = unknown;
+export type UniversityControllerUploadSignatureMutationBody =
+  UniversityControllerUploadSignatureBody;
+export type UniversityControllerUploadSignatureMutationError = ErrorResponse;
 
 export const useUniversityControllerUploadSignature = <
-  TError = unknown,
+  TError = ErrorResponse,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof universityControllerUploadSignature>>,
       TError,
-      void,
+      { data: UniversityControllerUploadSignatureBody },
       TContext
     >;
   },
@@ -773,7 +821,7 @@ export const useUniversityControllerUploadSignature = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof universityControllerUploadSignature>>,
   TError,
-  void,
+  { data: UniversityControllerUploadSignatureBody },
   TContext
 > => {
   const mutationOptions =
@@ -785,7 +833,7 @@ export const universityControllerGetMoaDetail = (
   moaId: string | undefined | null,
   signal?: AbortSignal,
 ) => {
-  return preconfiguredAxiosFunction<void>({
+  return preconfiguredAxiosFunction<UniversityMoaDetailResponse>({
     url: `/api/university/moas/${moaId}`,
     method: "GET",
     signal,
@@ -800,7 +848,7 @@ export const getUniversityControllerGetMoaDetailQueryKey = (
 
 export const getUniversityControllerGetMoaDetailQueryOptions = <
   TData = Awaited<ReturnType<typeof universityControllerGetMoaDetail>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   moaId: string | undefined | null,
   options?: {
@@ -838,11 +886,11 @@ export const getUniversityControllerGetMoaDetailQueryOptions = <
 export type UniversityControllerGetMoaDetailQueryResult = NonNullable<
   Awaited<ReturnType<typeof universityControllerGetMoaDetail>>
 >;
-export type UniversityControllerGetMoaDetailQueryError = unknown;
+export type UniversityControllerGetMoaDetailQueryError = ErrorResponse;
 
 export function useUniversityControllerGetMoaDetail<
   TData = Awaited<ReturnType<typeof universityControllerGetMoaDetail>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   moaId: string | undefined | null,
   options: {
@@ -868,7 +916,7 @@ export function useUniversityControllerGetMoaDetail<
 };
 export function useUniversityControllerGetMoaDetail<
   TData = Awaited<ReturnType<typeof universityControllerGetMoaDetail>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   moaId: string | undefined | null,
   options?: {
@@ -894,7 +942,7 @@ export function useUniversityControllerGetMoaDetail<
 };
 export function useUniversityControllerGetMoaDetail<
   TData = Awaited<ReturnType<typeof universityControllerGetMoaDetail>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   moaId: string | undefined | null,
   options?: {
@@ -913,7 +961,7 @@ export function useUniversityControllerGetMoaDetail<
 
 export function useUniversityControllerGetMoaDetail<
   TData = Awaited<ReturnType<typeof universityControllerGetMoaDetail>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   moaId: string | undefined | null,
   options?: {
@@ -946,7 +994,7 @@ export function useUniversityControllerGetMoaDetail<
 
 export const getUniversityControllerGetMoaDetailSuspenseQueryOptions = <
   TData = Awaited<ReturnType<typeof universityControllerGetMoaDetail>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   moaId: string | undefined | null,
   options?: {
@@ -979,11 +1027,11 @@ export const getUniversityControllerGetMoaDetailSuspenseQueryOptions = <
 export type UniversityControllerGetMoaDetailSuspenseQueryResult = NonNullable<
   Awaited<ReturnType<typeof universityControllerGetMoaDetail>>
 >;
-export type UniversityControllerGetMoaDetailSuspenseQueryError = unknown;
+export type UniversityControllerGetMoaDetailSuspenseQueryError = ErrorResponse;
 
 export function useUniversityControllerGetMoaDetailSuspense<
   TData = Awaited<ReturnType<typeof universityControllerGetMoaDetail>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   moaId: string | undefined | null,
   options: {
@@ -1001,7 +1049,7 @@ export function useUniversityControllerGetMoaDetailSuspense<
 };
 export function useUniversityControllerGetMoaDetailSuspense<
   TData = Awaited<ReturnType<typeof universityControllerGetMoaDetail>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   moaId: string | undefined | null,
   options?: {
@@ -1019,7 +1067,7 @@ export function useUniversityControllerGetMoaDetailSuspense<
 };
 export function useUniversityControllerGetMoaDetailSuspense<
   TData = Awaited<ReturnType<typeof universityControllerGetMoaDetail>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   moaId: string | undefined | null,
   options?: {
@@ -1038,7 +1086,7 @@ export function useUniversityControllerGetMoaDetailSuspense<
 
 export function useUniversityControllerGetMoaDetailSuspense<
   TData = Awaited<ReturnType<typeof universityControllerGetMoaDetail>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   moaId: string | undefined | null,
   options?: {
@@ -1075,7 +1123,7 @@ export const universityControllerGetPartnerMoas = (
   companyId: string | undefined | null,
   signal?: AbortSignal,
 ) => {
-  return preconfiguredAxiosFunction<void>({
+  return preconfiguredAxiosFunction<UniversityPartnerMoasResponse>({
     url: `/api/university/partners/${companyId}/moas`,
     method: "GET",
     signal,
@@ -1090,7 +1138,7 @@ export const getUniversityControllerGetPartnerMoasQueryKey = (
 
 export const getUniversityControllerGetPartnerMoasQueryOptions = <
   TData = Awaited<ReturnType<typeof universityControllerGetPartnerMoas>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   companyId: string | undefined | null,
   options?: {
@@ -1128,11 +1176,11 @@ export const getUniversityControllerGetPartnerMoasQueryOptions = <
 export type UniversityControllerGetPartnerMoasQueryResult = NonNullable<
   Awaited<ReturnType<typeof universityControllerGetPartnerMoas>>
 >;
-export type UniversityControllerGetPartnerMoasQueryError = unknown;
+export type UniversityControllerGetPartnerMoasQueryError = ErrorResponse;
 
 export function useUniversityControllerGetPartnerMoas<
   TData = Awaited<ReturnType<typeof universityControllerGetPartnerMoas>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   companyId: string | undefined | null,
   options: {
@@ -1158,7 +1206,7 @@ export function useUniversityControllerGetPartnerMoas<
 };
 export function useUniversityControllerGetPartnerMoas<
   TData = Awaited<ReturnType<typeof universityControllerGetPartnerMoas>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   companyId: string | undefined | null,
   options?: {
@@ -1184,7 +1232,7 @@ export function useUniversityControllerGetPartnerMoas<
 };
 export function useUniversityControllerGetPartnerMoas<
   TData = Awaited<ReturnType<typeof universityControllerGetPartnerMoas>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   companyId: string | undefined | null,
   options?: {
@@ -1203,7 +1251,7 @@ export function useUniversityControllerGetPartnerMoas<
 
 export function useUniversityControllerGetPartnerMoas<
   TData = Awaited<ReturnType<typeof universityControllerGetPartnerMoas>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   companyId: string | undefined | null,
   options?: {
@@ -1236,7 +1284,7 @@ export function useUniversityControllerGetPartnerMoas<
 
 export const getUniversityControllerGetPartnerMoasSuspenseQueryOptions = <
   TData = Awaited<ReturnType<typeof universityControllerGetPartnerMoas>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   companyId: string | undefined | null,
   options?: {
@@ -1269,11 +1317,12 @@ export const getUniversityControllerGetPartnerMoasSuspenseQueryOptions = <
 export type UniversityControllerGetPartnerMoasSuspenseQueryResult = NonNullable<
   Awaited<ReturnType<typeof universityControllerGetPartnerMoas>>
 >;
-export type UniversityControllerGetPartnerMoasSuspenseQueryError = unknown;
+export type UniversityControllerGetPartnerMoasSuspenseQueryError =
+  ErrorResponse;
 
 export function useUniversityControllerGetPartnerMoasSuspense<
   TData = Awaited<ReturnType<typeof universityControllerGetPartnerMoas>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   companyId: string | undefined | null,
   options: {
@@ -1291,7 +1340,7 @@ export function useUniversityControllerGetPartnerMoasSuspense<
 };
 export function useUniversityControllerGetPartnerMoasSuspense<
   TData = Awaited<ReturnType<typeof universityControllerGetPartnerMoas>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   companyId: string | undefined | null,
   options?: {
@@ -1309,7 +1358,7 @@ export function useUniversityControllerGetPartnerMoasSuspense<
 };
 export function useUniversityControllerGetPartnerMoasSuspense<
   TData = Awaited<ReturnType<typeof universityControllerGetPartnerMoas>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   companyId: string | undefined | null,
   options?: {
@@ -1328,7 +1377,7 @@ export function useUniversityControllerGetPartnerMoasSuspense<
 
 export function useUniversityControllerGetPartnerMoasSuspense<
   TData = Awaited<ReturnType<typeof universityControllerGetPartnerMoas>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   companyId: string | undefined | null,
   options?: {
@@ -1363,7 +1412,7 @@ export function useUniversityControllerGetPartnerMoasSuspense<
 }
 
 export const universityControllerListPartners = (signal?: AbortSignal) => {
-  return preconfiguredAxiosFunction<void>({
+  return preconfiguredAxiosFunction<UniversityPartnersResponse>({
     url: `/api/university/partners`,
     method: "GET",
     signal,
@@ -1376,7 +1425,7 @@ export const getUniversityControllerListPartnersQueryKey = () => {
 
 export const getUniversityControllerListPartnersQueryOptions = <
   TData = Awaited<ReturnType<typeof universityControllerListPartners>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -1405,11 +1454,11 @@ export const getUniversityControllerListPartnersQueryOptions = <
 export type UniversityControllerListPartnersQueryResult = NonNullable<
   Awaited<ReturnType<typeof universityControllerListPartners>>
 >;
-export type UniversityControllerListPartnersQueryError = unknown;
+export type UniversityControllerListPartnersQueryError = ErrorResponse;
 
 export function useUniversityControllerListPartners<
   TData = Awaited<ReturnType<typeof universityControllerListPartners>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options: {
     query: Partial<
@@ -1434,7 +1483,7 @@ export function useUniversityControllerListPartners<
 };
 export function useUniversityControllerListPartners<
   TData = Awaited<ReturnType<typeof universityControllerListPartners>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -1459,7 +1508,7 @@ export function useUniversityControllerListPartners<
 };
 export function useUniversityControllerListPartners<
   TData = Awaited<ReturnType<typeof universityControllerListPartners>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -1477,7 +1526,7 @@ export function useUniversityControllerListPartners<
 
 export function useUniversityControllerListPartners<
   TData = Awaited<ReturnType<typeof universityControllerListPartners>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -1506,7 +1555,7 @@ export function useUniversityControllerListPartners<
 
 export const getUniversityControllerListPartnersSuspenseQueryOptions = <
   TData = Awaited<ReturnType<typeof universityControllerListPartners>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(options?: {
   query?: Partial<
     UseSuspenseQueryOptions<
@@ -1535,11 +1584,11 @@ export const getUniversityControllerListPartnersSuspenseQueryOptions = <
 export type UniversityControllerListPartnersSuspenseQueryResult = NonNullable<
   Awaited<ReturnType<typeof universityControllerListPartners>>
 >;
-export type UniversityControllerListPartnersSuspenseQueryError = unknown;
+export type UniversityControllerListPartnersSuspenseQueryError = ErrorResponse;
 
 export function useUniversityControllerListPartnersSuspense<
   TData = Awaited<ReturnType<typeof universityControllerListPartners>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options: {
     query: Partial<
@@ -1556,7 +1605,7 @@ export function useUniversityControllerListPartnersSuspense<
 };
 export function useUniversityControllerListPartnersSuspense<
   TData = Awaited<ReturnType<typeof universityControllerListPartners>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -1573,7 +1622,7 @@ export function useUniversityControllerListPartnersSuspense<
 };
 export function useUniversityControllerListPartnersSuspense<
   TData = Awaited<ReturnType<typeof universityControllerListPartners>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -1591,7 +1640,7 @@ export function useUniversityControllerListPartnersSuspense<
 
 export function useUniversityControllerListPartnersSuspense<
   TData = Awaited<ReturnType<typeof universityControllerListPartners>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -1624,7 +1673,7 @@ export function useUniversityControllerListPartnersSuspense<
 export const universityControllerListLegacyCompanies = (
   signal?: AbortSignal,
 ) => {
-  return preconfiguredAxiosFunction<void>({
+  return preconfiguredAxiosFunction<UniversityLegacyCompaniesResponse>({
     url: `/api/university/legacy-companies`,
     method: "GET",
     signal,
@@ -1637,7 +1686,7 @@ export const getUniversityControllerListLegacyCompaniesQueryKey = () => {
 
 export const getUniversityControllerListLegacyCompaniesQueryOptions = <
   TData = Awaited<ReturnType<typeof universityControllerListLegacyCompanies>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -1667,11 +1716,11 @@ export const getUniversityControllerListLegacyCompaniesQueryOptions = <
 export type UniversityControllerListLegacyCompaniesQueryResult = NonNullable<
   Awaited<ReturnType<typeof universityControllerListLegacyCompanies>>
 >;
-export type UniversityControllerListLegacyCompaniesQueryError = unknown;
+export type UniversityControllerListLegacyCompaniesQueryError = ErrorResponse;
 
 export function useUniversityControllerListLegacyCompanies<
   TData = Awaited<ReturnType<typeof universityControllerListLegacyCompanies>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options: {
     query: Partial<
@@ -1696,7 +1745,7 @@ export function useUniversityControllerListLegacyCompanies<
 };
 export function useUniversityControllerListLegacyCompanies<
   TData = Awaited<ReturnType<typeof universityControllerListLegacyCompanies>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -1721,7 +1770,7 @@ export function useUniversityControllerListLegacyCompanies<
 };
 export function useUniversityControllerListLegacyCompanies<
   TData = Awaited<ReturnType<typeof universityControllerListLegacyCompanies>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -1739,7 +1788,7 @@ export function useUniversityControllerListLegacyCompanies<
 
 export function useUniversityControllerListLegacyCompanies<
   TData = Awaited<ReturnType<typeof universityControllerListLegacyCompanies>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -1769,7 +1818,7 @@ export function useUniversityControllerListLegacyCompanies<
 
 export const getUniversityControllerListLegacyCompaniesSuspenseQueryOptions = <
   TData = Awaited<ReturnType<typeof universityControllerListLegacyCompanies>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(options?: {
   query?: Partial<
     UseSuspenseQueryOptions<
@@ -1800,11 +1849,12 @@ export type UniversityControllerListLegacyCompaniesSuspenseQueryResult =
   NonNullable<
     Awaited<ReturnType<typeof universityControllerListLegacyCompanies>>
   >;
-export type UniversityControllerListLegacyCompaniesSuspenseQueryError = unknown;
+export type UniversityControllerListLegacyCompaniesSuspenseQueryError =
+  ErrorResponse;
 
 export function useUniversityControllerListLegacyCompaniesSuspense<
   TData = Awaited<ReturnType<typeof universityControllerListLegacyCompanies>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options: {
     query: Partial<
@@ -1821,7 +1871,7 @@ export function useUniversityControllerListLegacyCompaniesSuspense<
 };
 export function useUniversityControllerListLegacyCompaniesSuspense<
   TData = Awaited<ReturnType<typeof universityControllerListLegacyCompanies>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -1838,7 +1888,7 @@ export function useUniversityControllerListLegacyCompaniesSuspense<
 };
 export function useUniversityControllerListLegacyCompaniesSuspense<
   TData = Awaited<ReturnType<typeof universityControllerListLegacyCompanies>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -1856,7 +1906,7 @@ export function useUniversityControllerListLegacyCompaniesSuspense<
 
 export function useUniversityControllerListLegacyCompaniesSuspense<
   TData = Awaited<ReturnType<typeof universityControllerListLegacyCompanies>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -1887,47 +1937,87 @@ export function useUniversityControllerListLegacyCompaniesSuspense<
 }
 
 export const universityControllerCreateLegacyCompany = (
-  createLegacyMoaDto: CreateLegacyMoaDto,
+  universityControllerCreateLegacyCompanyBody: UniversityControllerCreateLegacyCompanyBody,
   signal?: AbortSignal,
 ) => {
   const formData = new FormData();
-  formData.append(`company_name`, createLegacyMoaDto.company_name);
-  formData.append(`moas`, createLegacyMoaDto.moas);
-  if (createLegacyMoaDto.tin !== undefined) {
-    formData.append(`tin`, createLegacyMoaDto.tin);
+  formData.append(
+    `company_name`,
+    universityControllerCreateLegacyCompanyBody.company_name,
+  );
+  formData.append(`moas`, universityControllerCreateLegacyCompanyBody.moas);
+  if (universityControllerCreateLegacyCompanyBody.tin !== undefined) {
+    formData.append(`tin`, universityControllerCreateLegacyCompanyBody.tin);
   }
-  if (createLegacyMoaDto.company_type !== undefined) {
-    formData.append(`company_type`, createLegacyMoaDto.company_type);
+  if (universityControllerCreateLegacyCompanyBody.company_type !== undefined) {
+    formData.append(
+      `company_type`,
+      universityControllerCreateLegacyCompanyBody.company_type,
+    );
   }
-  if (createLegacyMoaDto.registered_address !== undefined) {
+  if (
+    universityControllerCreateLegacyCompanyBody.registered_address !== undefined
+  ) {
     formData.append(
       `registered_address`,
-      createLegacyMoaDto.registered_address,
+      universityControllerCreateLegacyCompanyBody.registered_address,
     );
   }
-  if (createLegacyMoaDto.contact_person !== undefined) {
-    formData.append(`contact_person`, createLegacyMoaDto.contact_person);
+  if (
+    universityControllerCreateLegacyCompanyBody.contact_person !== undefined
+  ) {
+    formData.append(
+      `contact_person`,
+      universityControllerCreateLegacyCompanyBody.contact_person,
+    );
   }
-  if (createLegacyMoaDto.contact_email !== undefined) {
-    formData.append(`contact_email`, createLegacyMoaDto.contact_email);
+  if (universityControllerCreateLegacyCompanyBody.contact_email !== undefined) {
+    formData.append(
+      `contact_email`,
+      universityControllerCreateLegacyCompanyBody.contact_email,
+    );
   }
-  if (createLegacyMoaDto.contact_phone !== undefined) {
-    formData.append(`contact_phone`, createLegacyMoaDto.contact_phone);
+  if (universityControllerCreateLegacyCompanyBody.contact_phone !== undefined) {
+    formData.append(
+      `contact_phone`,
+      universityControllerCreateLegacyCompanyBody.contact_phone,
+    );
   }
-  if (createLegacyMoaDto.documentNames !== undefined) {
-    formData.append(`documentNames`, createLegacyMoaDto.documentNames);
+  if (universityControllerCreateLegacyCompanyBody.documentNames !== undefined) {
+    formData.append(
+      `documentNames`,
+      universityControllerCreateLegacyCompanyBody.documentNames,
+    );
   }
-  if (createLegacyMoaDto.documentExpiryDates !== undefined) {
+  if (
+    universityControllerCreateLegacyCompanyBody.documentExpiryDates !==
+    undefined
+  ) {
     formData.append(
       `documentExpiryDates`,
-      createLegacyMoaDto.documentExpiryDates,
+      universityControllerCreateLegacyCompanyBody.documentExpiryDates,
     );
   }
-  if (createLegacyMoaDto.documentTypes !== undefined) {
-    formData.append(`documentTypes`, createLegacyMoaDto.documentTypes);
+  if (universityControllerCreateLegacyCompanyBody.documentTypes !== undefined) {
+    formData.append(
+      `documentTypes`,
+      universityControllerCreateLegacyCompanyBody.documentTypes,
+    );
+  }
+  if (universityControllerCreateLegacyCompanyBody.moaDocuments !== undefined) {
+    universityControllerCreateLegacyCompanyBody.moaDocuments.forEach((value) =>
+      formData.append(`moaDocuments`, value),
+    );
+  }
+  if (
+    universityControllerCreateLegacyCompanyBody.companyDocuments !== undefined
+  ) {
+    universityControllerCreateLegacyCompanyBody.companyDocuments.forEach(
+      (value) => formData.append(`companyDocuments`, value),
+    );
   }
 
-  return preconfiguredAxiosFunction<void>({
+  return preconfiguredAxiosFunction<UniversityLegacyCompanyDetailResponse>({
     url: `/api/university/legacy-companies`,
     method: "POST",
     headers: { "Content-Type": "multipart/form-data" },
@@ -1937,19 +2027,19 @@ export const universityControllerCreateLegacyCompany = (
 };
 
 export const getUniversityControllerCreateLegacyCompanyMutationOptions = <
-  TError = unknown,
+  TError = ErrorResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof universityControllerCreateLegacyCompany>>,
     TError,
-    { data: CreateLegacyMoaDto },
+    { data: UniversityControllerCreateLegacyCompanyBody },
     TContext
   >;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof universityControllerCreateLegacyCompany>>,
   TError,
-  { data: CreateLegacyMoaDto },
+  { data: UniversityControllerCreateLegacyCompanyBody },
   TContext
 > => {
   const mutationKey = ["universityControllerCreateLegacyCompany"];
@@ -1963,7 +2053,7 @@ export const getUniversityControllerCreateLegacyCompanyMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof universityControllerCreateLegacyCompany>>,
-    { data: CreateLegacyMoaDto }
+    { data: UniversityControllerCreateLegacyCompanyBody }
   > = (props) => {
     const { data } = props ?? {};
 
@@ -1977,18 +2067,19 @@ export type UniversityControllerCreateLegacyCompanyMutationResult = NonNullable<
   Awaited<ReturnType<typeof universityControllerCreateLegacyCompany>>
 >;
 export type UniversityControllerCreateLegacyCompanyMutationBody =
-  CreateLegacyMoaDto;
-export type UniversityControllerCreateLegacyCompanyMutationError = unknown;
+  UniversityControllerCreateLegacyCompanyBody;
+export type UniversityControllerCreateLegacyCompanyMutationError =
+  ErrorResponse;
 
 export const useUniversityControllerCreateLegacyCompany = <
-  TError = unknown,
+  TError = ErrorResponse,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof universityControllerCreateLegacyCompany>>,
       TError,
-      { data: CreateLegacyMoaDto },
+      { data: UniversityControllerCreateLegacyCompanyBody },
       TContext
     >;
   },
@@ -1996,7 +2087,7 @@ export const useUniversityControllerCreateLegacyCompany = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof universityControllerCreateLegacyCompany>>,
   TError,
-  { data: CreateLegacyMoaDto },
+  { data: UniversityControllerCreateLegacyCompanyBody },
   TContext
 > => {
   const mutationOptions =
@@ -2008,7 +2099,7 @@ export const universityControllerGetLegacyCompany = (
   legacyCompanyId: string | undefined | null,
   signal?: AbortSignal,
 ) => {
-  return preconfiguredAxiosFunction<void>({
+  return preconfiguredAxiosFunction<UniversityLegacyCompanyDetailResponse>({
     url: `/api/university/legacy-companies/${legacyCompanyId}`,
     method: "GET",
     signal,
@@ -2023,7 +2114,7 @@ export const getUniversityControllerGetLegacyCompanyQueryKey = (
 
 export const getUniversityControllerGetLegacyCompanyQueryOptions = <
   TData = Awaited<ReturnType<typeof universityControllerGetLegacyCompany>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   legacyCompanyId: string | undefined | null,
   options?: {
@@ -2062,11 +2153,11 @@ export const getUniversityControllerGetLegacyCompanyQueryOptions = <
 export type UniversityControllerGetLegacyCompanyQueryResult = NonNullable<
   Awaited<ReturnType<typeof universityControllerGetLegacyCompany>>
 >;
-export type UniversityControllerGetLegacyCompanyQueryError = unknown;
+export type UniversityControllerGetLegacyCompanyQueryError = ErrorResponse;
 
 export function useUniversityControllerGetLegacyCompany<
   TData = Awaited<ReturnType<typeof universityControllerGetLegacyCompany>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   legacyCompanyId: string | undefined | null,
   options: {
@@ -2092,7 +2183,7 @@ export function useUniversityControllerGetLegacyCompany<
 };
 export function useUniversityControllerGetLegacyCompany<
   TData = Awaited<ReturnType<typeof universityControllerGetLegacyCompany>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   legacyCompanyId: string | undefined | null,
   options?: {
@@ -2118,7 +2209,7 @@ export function useUniversityControllerGetLegacyCompany<
 };
 export function useUniversityControllerGetLegacyCompany<
   TData = Awaited<ReturnType<typeof universityControllerGetLegacyCompany>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   legacyCompanyId: string | undefined | null,
   options?: {
@@ -2137,7 +2228,7 @@ export function useUniversityControllerGetLegacyCompany<
 
 export function useUniversityControllerGetLegacyCompany<
   TData = Awaited<ReturnType<typeof universityControllerGetLegacyCompany>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   legacyCompanyId: string | undefined | null,
   options?: {
@@ -2170,7 +2261,7 @@ export function useUniversityControllerGetLegacyCompany<
 
 export const getUniversityControllerGetLegacyCompanySuspenseQueryOptions = <
   TData = Awaited<ReturnType<typeof universityControllerGetLegacyCompany>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   legacyCompanyId: string | undefined | null,
   options?: {
@@ -2203,11 +2294,12 @@ export const getUniversityControllerGetLegacyCompanySuspenseQueryOptions = <
 
 export type UniversityControllerGetLegacyCompanySuspenseQueryResult =
   NonNullable<Awaited<ReturnType<typeof universityControllerGetLegacyCompany>>>;
-export type UniversityControllerGetLegacyCompanySuspenseQueryError = unknown;
+export type UniversityControllerGetLegacyCompanySuspenseQueryError =
+  ErrorResponse;
 
 export function useUniversityControllerGetLegacyCompanySuspense<
   TData = Awaited<ReturnType<typeof universityControllerGetLegacyCompany>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   legacyCompanyId: string | undefined | null,
   options: {
@@ -2225,7 +2317,7 @@ export function useUniversityControllerGetLegacyCompanySuspense<
 };
 export function useUniversityControllerGetLegacyCompanySuspense<
   TData = Awaited<ReturnType<typeof universityControllerGetLegacyCompany>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   legacyCompanyId: string | undefined | null,
   options?: {
@@ -2243,7 +2335,7 @@ export function useUniversityControllerGetLegacyCompanySuspense<
 };
 export function useUniversityControllerGetLegacyCompanySuspense<
   TData = Awaited<ReturnType<typeof universityControllerGetLegacyCompany>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   legacyCompanyId: string | undefined | null,
   options?: {
@@ -2262,7 +2354,7 @@ export function useUniversityControllerGetLegacyCompanySuspense<
 
 export function useUniversityControllerGetLegacyCompanySuspense<
   TData = Awaited<ReturnType<typeof universityControllerGetLegacyCompany>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   legacyCompanyId: string | undefined | null,
   options?: {
@@ -2298,23 +2390,61 @@ export function useUniversityControllerGetLegacyCompanySuspense<
 
 export const universityControllerAppendLegacyCompanyDocuments = (
   legacyCompanyId: string | undefined | null,
+  universityControllerAppendLegacyCompanyDocumentsBody: UniversityControllerAppendLegacyCompanyDocumentsBody,
   signal?: AbortSignal,
 ) => {
-  return preconfiguredAxiosFunction<void>({
+  const formData = new FormData();
+  universityControllerAppendLegacyCompanyDocumentsBody.companyDocuments.forEach(
+    (value) => formData.append(`companyDocuments`, value),
+  );
+  if (
+    universityControllerAppendLegacyCompanyDocumentsBody.documentNames !==
+    undefined
+  ) {
+    formData.append(
+      `documentNames`,
+      universityControllerAppendLegacyCompanyDocumentsBody.documentNames,
+    );
+  }
+  if (
+    universityControllerAppendLegacyCompanyDocumentsBody.documentExpiryDates !==
+    undefined
+  ) {
+    formData.append(
+      `documentExpiryDates`,
+      universityControllerAppendLegacyCompanyDocumentsBody.documentExpiryDates,
+    );
+  }
+  if (
+    universityControllerAppendLegacyCompanyDocumentsBody.documentTypes !==
+    undefined
+  ) {
+    formData.append(
+      `documentTypes`,
+      universityControllerAppendLegacyCompanyDocumentsBody.documentTypes,
+    );
+  }
+
+  return preconfiguredAxiosFunction<UniversityLegacyCompanyDetailResponse>({
     url: `/api/university/legacy-companies/${legacyCompanyId}/documents`,
     method: "POST",
+    headers: { "Content-Type": "multipart/form-data" },
+    data: formData,
     signal,
   });
 };
 
 export const getUniversityControllerAppendLegacyCompanyDocumentsMutationOptions =
-  <TError = unknown, TContext = unknown>(options?: {
+  <TError = ErrorResponse, TContext = unknown>(options?: {
     mutation?: UseMutationOptions<
       Awaited<
         ReturnType<typeof universityControllerAppendLegacyCompanyDocuments>
       >,
       TError,
-      { legacyCompanyId: string | undefined | null },
+      {
+        legacyCompanyId: string | undefined | null;
+        data: UniversityControllerAppendLegacyCompanyDocumentsBody;
+      },
       TContext
     >;
   }): UseMutationOptions<
@@ -2322,7 +2452,10 @@ export const getUniversityControllerAppendLegacyCompanyDocumentsMutationOptions 
       ReturnType<typeof universityControllerAppendLegacyCompanyDocuments>
     >,
     TError,
-    { legacyCompanyId: string | undefined | null },
+    {
+      legacyCompanyId: string | undefined | null;
+      data: UniversityControllerAppendLegacyCompanyDocumentsBody;
+    },
     TContext
   > => {
     const mutationKey = ["universityControllerAppendLegacyCompanyDocuments"];
@@ -2338,11 +2471,17 @@ export const getUniversityControllerAppendLegacyCompanyDocumentsMutationOptions 
       Awaited<
         ReturnType<typeof universityControllerAppendLegacyCompanyDocuments>
       >,
-      { legacyCompanyId: string | undefined | null }
+      {
+        legacyCompanyId: string | undefined | null;
+        data: UniversityControllerAppendLegacyCompanyDocumentsBody;
+      }
     > = (props) => {
-      const { legacyCompanyId } = props ?? {};
+      const { legacyCompanyId, data } = props ?? {};
 
-      return universityControllerAppendLegacyCompanyDocuments(legacyCompanyId);
+      return universityControllerAppendLegacyCompanyDocuments(
+        legacyCompanyId,
+        data,
+      );
     };
 
     return { mutationFn, ...mutationOptions };
@@ -2352,12 +2491,13 @@ export type UniversityControllerAppendLegacyCompanyDocumentsMutationResult =
   NonNullable<
     Awaited<ReturnType<typeof universityControllerAppendLegacyCompanyDocuments>>
   >;
-
+export type UniversityControllerAppendLegacyCompanyDocumentsMutationBody =
+  UniversityControllerAppendLegacyCompanyDocumentsBody;
 export type UniversityControllerAppendLegacyCompanyDocumentsMutationError =
-  unknown;
+  ErrorResponse;
 
 export const useUniversityControllerAppendLegacyCompanyDocuments = <
-  TError = unknown,
+  TError = ErrorResponse,
   TContext = unknown,
 >(
   options?: {
@@ -2366,7 +2506,10 @@ export const useUniversityControllerAppendLegacyCompanyDocuments = <
         ReturnType<typeof universityControllerAppendLegacyCompanyDocuments>
       >,
       TError,
-      { legacyCompanyId: string | undefined | null },
+      {
+        legacyCompanyId: string | undefined | null;
+        data: UniversityControllerAppendLegacyCompanyDocumentsBody;
+      },
       TContext
     >;
   },
@@ -2374,7 +2517,10 @@ export const useUniversityControllerAppendLegacyCompanyDocuments = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof universityControllerAppendLegacyCompanyDocuments>>,
   TError,
-  { legacyCompanyId: string | undefined | null },
+  {
+    legacyCompanyId: string | undefined | null;
+    data: UniversityControllerAppendLegacyCompanyDocumentsBody;
+  },
   TContext
 > => {
   const mutationOptions =
@@ -2383,23 +2529,32 @@ export const useUniversityControllerAppendLegacyCompanyDocuments = <
   return useMutation(mutationOptions, queryClient);
 };
 export const universityControllerBulkCreateLegacyCompaniesFromCsv = (
+  universityControllerBulkCreateLegacyCompaniesFromCsvBody: UniversityControllerBulkCreateLegacyCompaniesFromCsvBody,
   signal?: AbortSignal,
 ) => {
-  return preconfiguredAxiosFunction<void>({
+  const formData = new FormData();
+  formData.append(
+    `file`,
+    universityControllerBulkCreateLegacyCompaniesFromCsvBody.file,
+  );
+
+  return preconfiguredAxiosFunction<UniversityBulkResultResponse>({
     url: `/api/university/legacy-companies/bulk/csv`,
     method: "POST",
+    headers: { "Content-Type": "multipart/form-data" },
+    data: formData,
     signal,
   });
 };
 
 export const getUniversityControllerBulkCreateLegacyCompaniesFromCsvMutationOptions =
-  <TError = unknown, TContext = unknown>(options?: {
+  <TError = ErrorResponse, TContext = unknown>(options?: {
     mutation?: UseMutationOptions<
       Awaited<
         ReturnType<typeof universityControllerBulkCreateLegacyCompaniesFromCsv>
       >,
       TError,
-      void,
+      { data: UniversityControllerBulkCreateLegacyCompaniesFromCsvBody },
       TContext
     >;
   }): UseMutationOptions<
@@ -2407,7 +2562,7 @@ export const getUniversityControllerBulkCreateLegacyCompaniesFromCsvMutationOpti
       ReturnType<typeof universityControllerBulkCreateLegacyCompaniesFromCsv>
     >,
     TError,
-    void,
+    { data: UniversityControllerBulkCreateLegacyCompaniesFromCsvBody },
     TContext
   > => {
     const mutationKey = [
@@ -2425,9 +2580,11 @@ export const getUniversityControllerBulkCreateLegacyCompaniesFromCsvMutationOpti
       Awaited<
         ReturnType<typeof universityControllerBulkCreateLegacyCompaniesFromCsv>
       >,
-      void
-    > = () => {
-      return universityControllerBulkCreateLegacyCompaniesFromCsv();
+      { data: UniversityControllerBulkCreateLegacyCompaniesFromCsvBody }
+    > = (props) => {
+      const { data } = props ?? {};
+
+      return universityControllerBulkCreateLegacyCompaniesFromCsv(data);
     };
 
     return { mutationFn, ...mutationOptions };
@@ -2439,12 +2596,13 @@ export type UniversityControllerBulkCreateLegacyCompaniesFromCsvMutationResult =
       ReturnType<typeof universityControllerBulkCreateLegacyCompaniesFromCsv>
     >
   >;
-
+export type UniversityControllerBulkCreateLegacyCompaniesFromCsvMutationBody =
+  UniversityControllerBulkCreateLegacyCompaniesFromCsvBody;
 export type UniversityControllerBulkCreateLegacyCompaniesFromCsvMutationError =
-  unknown;
+  ErrorResponse;
 
 export const useUniversityControllerBulkCreateLegacyCompaniesFromCsv = <
-  TError = unknown,
+  TError = ErrorResponse,
   TContext = unknown,
 >(
   options?: {
@@ -2453,7 +2611,7 @@ export const useUniversityControllerBulkCreateLegacyCompaniesFromCsv = <
         ReturnType<typeof universityControllerBulkCreateLegacyCompaniesFromCsv>
       >,
       TError,
-      void,
+      { data: UniversityControllerBulkCreateLegacyCompaniesFromCsvBody },
       TContext
     >;
   },
@@ -2463,7 +2621,7 @@ export const useUniversityControllerBulkCreateLegacyCompaniesFromCsv = <
     ReturnType<typeof universityControllerBulkCreateLegacyCompaniesFromCsv>
   >,
   TError,
-  void,
+  { data: UniversityControllerBulkCreateLegacyCompaniesFromCsvBody },
   TContext
 > => {
   const mutationOptions =
@@ -2474,23 +2632,32 @@ export const useUniversityControllerBulkCreateLegacyCompaniesFromCsv = <
   return useMutation(mutationOptions, queryClient);
 };
 export const universityControllerBulkCreateLegacyCompaniesFromZip = (
+  universityControllerBulkCreateLegacyCompaniesFromZipBody: UniversityControllerBulkCreateLegacyCompaniesFromZipBody,
   signal?: AbortSignal,
 ) => {
-  return preconfiguredAxiosFunction<void>({
+  const formData = new FormData();
+  formData.append(
+    `file`,
+    universityControllerBulkCreateLegacyCompaniesFromZipBody.file,
+  );
+
+  return preconfiguredAxiosFunction<UniversityBulkResultResponse>({
     url: `/api/university/legacy-companies/bulk/zip`,
     method: "POST",
+    headers: { "Content-Type": "multipart/form-data" },
+    data: formData,
     signal,
   });
 };
 
 export const getUniversityControllerBulkCreateLegacyCompaniesFromZipMutationOptions =
-  <TError = unknown, TContext = unknown>(options?: {
+  <TError = ErrorResponse, TContext = unknown>(options?: {
     mutation?: UseMutationOptions<
       Awaited<
         ReturnType<typeof universityControllerBulkCreateLegacyCompaniesFromZip>
       >,
       TError,
-      void,
+      { data: UniversityControllerBulkCreateLegacyCompaniesFromZipBody },
       TContext
     >;
   }): UseMutationOptions<
@@ -2498,7 +2665,7 @@ export const getUniversityControllerBulkCreateLegacyCompaniesFromZipMutationOpti
       ReturnType<typeof universityControllerBulkCreateLegacyCompaniesFromZip>
     >,
     TError,
-    void,
+    { data: UniversityControllerBulkCreateLegacyCompaniesFromZipBody },
     TContext
   > => {
     const mutationKey = [
@@ -2516,9 +2683,11 @@ export const getUniversityControllerBulkCreateLegacyCompaniesFromZipMutationOpti
       Awaited<
         ReturnType<typeof universityControllerBulkCreateLegacyCompaniesFromZip>
       >,
-      void
-    > = () => {
-      return universityControllerBulkCreateLegacyCompaniesFromZip();
+      { data: UniversityControllerBulkCreateLegacyCompaniesFromZipBody }
+    > = (props) => {
+      const { data } = props ?? {};
+
+      return universityControllerBulkCreateLegacyCompaniesFromZip(data);
     };
 
     return { mutationFn, ...mutationOptions };
@@ -2530,12 +2699,13 @@ export type UniversityControllerBulkCreateLegacyCompaniesFromZipMutationResult =
       ReturnType<typeof universityControllerBulkCreateLegacyCompaniesFromZip>
     >
   >;
-
+export type UniversityControllerBulkCreateLegacyCompaniesFromZipMutationBody =
+  UniversityControllerBulkCreateLegacyCompaniesFromZipBody;
 export type UniversityControllerBulkCreateLegacyCompaniesFromZipMutationError =
-  unknown;
+  ErrorResponse;
 
 export const useUniversityControllerBulkCreateLegacyCompaniesFromZip = <
-  TError = unknown,
+  TError = ErrorResponse,
   TContext = unknown,
 >(
   options?: {
@@ -2544,7 +2714,7 @@ export const useUniversityControllerBulkCreateLegacyCompaniesFromZip = <
         ReturnType<typeof universityControllerBulkCreateLegacyCompaniesFromZip>
       >,
       TError,
-      void,
+      { data: UniversityControllerBulkCreateLegacyCompaniesFromZipBody },
       TContext
     >;
   },
@@ -2554,7 +2724,7 @@ export const useUniversityControllerBulkCreateLegacyCompaniesFromZip = <
     ReturnType<typeof universityControllerBulkCreateLegacyCompaniesFromZip>
   >,
   TError,
-  void,
+  { data: UniversityControllerBulkCreateLegacyCompaniesFromZipBody },
   TContext
 > => {
   const mutationOptions =
@@ -2568,7 +2738,7 @@ export const universityControllerGetPartnerLegacyCompany = (
   companyId: string | undefined | null,
   signal?: AbortSignal,
 ) => {
-  return preconfiguredAxiosFunction<void>({
+  return preconfiguredAxiosFunction<UniversityPartnerLegacyCompanyResponse>({
     url: `/api/university/partners/${companyId}/legacy-companies`,
     method: "GET",
     signal,
@@ -2585,7 +2755,7 @@ export const getUniversityControllerGetPartnerLegacyCompanyQueryOptions = <
   TData = Awaited<
     ReturnType<typeof universityControllerGetPartnerLegacyCompany>
   >,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   companyId: string | undefined | null,
   options?: {
@@ -2625,13 +2795,14 @@ export type UniversityControllerGetPartnerLegacyCompanyQueryResult =
   NonNullable<
     Awaited<ReturnType<typeof universityControllerGetPartnerLegacyCompany>>
   >;
-export type UniversityControllerGetPartnerLegacyCompanyQueryError = unknown;
+export type UniversityControllerGetPartnerLegacyCompanyQueryError =
+  ErrorResponse;
 
 export function useUniversityControllerGetPartnerLegacyCompany<
   TData = Awaited<
     ReturnType<typeof universityControllerGetPartnerLegacyCompany>
   >,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   companyId: string | undefined | null,
   options: {
@@ -2663,7 +2834,7 @@ export function useUniversityControllerGetPartnerLegacyCompany<
   TData = Awaited<
     ReturnType<typeof universityControllerGetPartnerLegacyCompany>
   >,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   companyId: string | undefined | null,
   options?: {
@@ -2695,7 +2866,7 @@ export function useUniversityControllerGetPartnerLegacyCompany<
   TData = Awaited<
     ReturnType<typeof universityControllerGetPartnerLegacyCompany>
   >,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   companyId: string | undefined | null,
   options?: {
@@ -2716,7 +2887,7 @@ export function useUniversityControllerGetPartnerLegacyCompany<
   TData = Awaited<
     ReturnType<typeof universityControllerGetPartnerLegacyCompany>
   >,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   companyId: string | undefined | null,
   options?: {
@@ -2753,7 +2924,7 @@ export const getUniversityControllerGetPartnerLegacyCompanySuspenseQueryOptions 
     TData = Awaited<
       ReturnType<typeof universityControllerGetPartnerLegacyCompany>
     >,
-    TError = unknown,
+    TError = ErrorResponse,
   >(
     companyId: string | undefined | null,
     options?: {
@@ -2791,13 +2962,13 @@ export type UniversityControllerGetPartnerLegacyCompanySuspenseQueryResult =
     Awaited<ReturnType<typeof universityControllerGetPartnerLegacyCompany>>
   >;
 export type UniversityControllerGetPartnerLegacyCompanySuspenseQueryError =
-  unknown;
+  ErrorResponse;
 
 export function useUniversityControllerGetPartnerLegacyCompanySuspense<
   TData = Awaited<
     ReturnType<typeof universityControllerGetPartnerLegacyCompany>
   >,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   companyId: string | undefined | null,
   options: {
@@ -2817,7 +2988,7 @@ export function useUniversityControllerGetPartnerLegacyCompanySuspense<
   TData = Awaited<
     ReturnType<typeof universityControllerGetPartnerLegacyCompany>
   >,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   companyId: string | undefined | null,
   options?: {
@@ -2837,7 +3008,7 @@ export function useUniversityControllerGetPartnerLegacyCompanySuspense<
   TData = Awaited<
     ReturnType<typeof universityControllerGetPartnerLegacyCompany>
   >,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   companyId: string | undefined | null,
   options?: {
@@ -2858,7 +3029,7 @@ export function useUniversityControllerGetPartnerLegacyCompanySuspense<
   TData = Awaited<
     ReturnType<typeof universityControllerGetPartnerLegacyCompany>
   >,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   companyId: string | undefined | null,
   options?: {
@@ -2893,7 +3064,7 @@ export function useUniversityControllerGetPartnerLegacyCompanySuspense<
 }
 
 export const universityControllerGetBlacklist = (signal?: AbortSignal) => {
-  return preconfiguredAxiosFunction<void>({
+  return preconfiguredAxiosFunction<UniversityBlacklistResponse>({
     url: `/api/university/blacklist`,
     method: "GET",
     signal,
@@ -2906,7 +3077,7 @@ export const getUniversityControllerGetBlacklistQueryKey = () => {
 
 export const getUniversityControllerGetBlacklistQueryOptions = <
   TData = Awaited<ReturnType<typeof universityControllerGetBlacklist>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -2935,11 +3106,11 @@ export const getUniversityControllerGetBlacklistQueryOptions = <
 export type UniversityControllerGetBlacklistQueryResult = NonNullable<
   Awaited<ReturnType<typeof universityControllerGetBlacklist>>
 >;
-export type UniversityControllerGetBlacklistQueryError = unknown;
+export type UniversityControllerGetBlacklistQueryError = ErrorResponse;
 
 export function useUniversityControllerGetBlacklist<
   TData = Awaited<ReturnType<typeof universityControllerGetBlacklist>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options: {
     query: Partial<
@@ -2964,7 +3135,7 @@ export function useUniversityControllerGetBlacklist<
 };
 export function useUniversityControllerGetBlacklist<
   TData = Awaited<ReturnType<typeof universityControllerGetBlacklist>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -2989,7 +3160,7 @@ export function useUniversityControllerGetBlacklist<
 };
 export function useUniversityControllerGetBlacklist<
   TData = Awaited<ReturnType<typeof universityControllerGetBlacklist>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -3007,7 +3178,7 @@ export function useUniversityControllerGetBlacklist<
 
 export function useUniversityControllerGetBlacklist<
   TData = Awaited<ReturnType<typeof universityControllerGetBlacklist>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -3036,7 +3207,7 @@ export function useUniversityControllerGetBlacklist<
 
 export const getUniversityControllerGetBlacklistSuspenseQueryOptions = <
   TData = Awaited<ReturnType<typeof universityControllerGetBlacklist>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(options?: {
   query?: Partial<
     UseSuspenseQueryOptions<
@@ -3065,11 +3236,11 @@ export const getUniversityControllerGetBlacklistSuspenseQueryOptions = <
 export type UniversityControllerGetBlacklistSuspenseQueryResult = NonNullable<
   Awaited<ReturnType<typeof universityControllerGetBlacklist>>
 >;
-export type UniversityControllerGetBlacklistSuspenseQueryError = unknown;
+export type UniversityControllerGetBlacklistSuspenseQueryError = ErrorResponse;
 
 export function useUniversityControllerGetBlacklistSuspense<
   TData = Awaited<ReturnType<typeof universityControllerGetBlacklist>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options: {
     query: Partial<
@@ -3086,7 +3257,7 @@ export function useUniversityControllerGetBlacklistSuspense<
 };
 export function useUniversityControllerGetBlacklistSuspense<
   TData = Awaited<ReturnType<typeof universityControllerGetBlacklist>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -3103,7 +3274,7 @@ export function useUniversityControllerGetBlacklistSuspense<
 };
 export function useUniversityControllerGetBlacklistSuspense<
   TData = Awaited<ReturnType<typeof universityControllerGetBlacklist>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -3121,7 +3292,7 @@ export function useUniversityControllerGetBlacklistSuspense<
 
 export function useUniversityControllerGetBlacklistSuspense<
   TData = Awaited<ReturnType<typeof universityControllerGetBlacklist>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -3155,7 +3326,7 @@ export const universityControllerBlacklistCompany = (
   blacklistCompanyDto: BlacklistCompanyDto,
   signal?: AbortSignal,
 ) => {
-  return preconfiguredAxiosFunction<void>({
+  return preconfiguredAxiosFunction<BaseResponse>({
     url: `/api/university/blacklist`,
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -3165,7 +3336,7 @@ export const universityControllerBlacklistCompany = (
 };
 
 export const getUniversityControllerBlacklistCompanyMutationOptions = <
-  TError = unknown,
+  TError = ErrorResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -3206,10 +3377,10 @@ export type UniversityControllerBlacklistCompanyMutationResult = NonNullable<
 >;
 export type UniversityControllerBlacklistCompanyMutationBody =
   BlacklistCompanyDto;
-export type UniversityControllerBlacklistCompanyMutationError = unknown;
+export type UniversityControllerBlacklistCompanyMutationError = ErrorResponse;
 
 export const useUniversityControllerBlacklistCompany = <
-  TError = unknown,
+  TError = ErrorResponse,
   TContext = unknown,
 >(
   options?: {
@@ -3235,14 +3406,14 @@ export const useUniversityControllerBlacklistCompany = <
 export const universityControllerUnblacklistCompany = (
   companyId: string | undefined | null,
 ) => {
-  return preconfiguredAxiosFunction<void>({
+  return preconfiguredAxiosFunction<BaseResponse>({
     url: `/api/university/blacklist/${companyId}`,
     method: "DELETE",
   });
 };
 
 export const getUniversityControllerUnblacklistCompanyMutationOptions = <
-  TError = unknown,
+  TError = ErrorResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -3282,10 +3453,10 @@ export type UniversityControllerUnblacklistCompanyMutationResult = NonNullable<
   Awaited<ReturnType<typeof universityControllerUnblacklistCompany>>
 >;
 
-export type UniversityControllerUnblacklistCompanyMutationError = unknown;
+export type UniversityControllerUnblacklistCompanyMutationError = ErrorResponse;
 
 export const useUniversityControllerUnblacklistCompany = <
-  TError = unknown,
+  TError = ErrorResponse,
   TContext = unknown,
 >(
   options?: {
@@ -3311,7 +3482,7 @@ export const useUniversityControllerUnblacklistCompany = <
 export const universityControllerListRegisteredCompanies = (
   signal?: AbortSignal,
 ) => {
-  return preconfiguredAxiosFunction<void>({
+  return preconfiguredAxiosFunction<UniversityRegisteredCompaniesResponse>({
     url: `/api/university/companies`,
     method: "GET",
     signal,
@@ -3326,7 +3497,7 @@ export const getUniversityControllerListRegisteredCompaniesQueryOptions = <
   TData = Awaited<
     ReturnType<typeof universityControllerListRegisteredCompanies>
   >,
-  TError = unknown,
+  TError = ErrorResponse,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -3357,13 +3528,14 @@ export type UniversityControllerListRegisteredCompaniesQueryResult =
   NonNullable<
     Awaited<ReturnType<typeof universityControllerListRegisteredCompanies>>
   >;
-export type UniversityControllerListRegisteredCompaniesQueryError = unknown;
+export type UniversityControllerListRegisteredCompaniesQueryError =
+  ErrorResponse;
 
 export function useUniversityControllerListRegisteredCompanies<
   TData = Awaited<
     ReturnType<typeof universityControllerListRegisteredCompanies>
   >,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options: {
     query: Partial<
@@ -3394,7 +3566,7 @@ export function useUniversityControllerListRegisteredCompanies<
   TData = Awaited<
     ReturnType<typeof universityControllerListRegisteredCompanies>
   >,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -3425,7 +3597,7 @@ export function useUniversityControllerListRegisteredCompanies<
   TData = Awaited<
     ReturnType<typeof universityControllerListRegisteredCompanies>
   >,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -3445,7 +3617,7 @@ export function useUniversityControllerListRegisteredCompanies<
   TData = Awaited<
     ReturnType<typeof universityControllerListRegisteredCompanies>
   >,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -3478,7 +3650,7 @@ export const getUniversityControllerListRegisteredCompaniesSuspenseQueryOptions 
     TData = Awaited<
       ReturnType<typeof universityControllerListRegisteredCompanies>
     >,
-    TError = unknown,
+    TError = ErrorResponse,
   >(options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
@@ -3510,13 +3682,13 @@ export type UniversityControllerListRegisteredCompaniesSuspenseQueryResult =
     Awaited<ReturnType<typeof universityControllerListRegisteredCompanies>>
   >;
 export type UniversityControllerListRegisteredCompaniesSuspenseQueryError =
-  unknown;
+  ErrorResponse;
 
 export function useUniversityControllerListRegisteredCompaniesSuspense<
   TData = Awaited<
     ReturnType<typeof universityControllerListRegisteredCompanies>
   >,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options: {
     query: Partial<
@@ -3535,7 +3707,7 @@ export function useUniversityControllerListRegisteredCompaniesSuspense<
   TData = Awaited<
     ReturnType<typeof universityControllerListRegisteredCompanies>
   >,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -3554,7 +3726,7 @@ export function useUniversityControllerListRegisteredCompaniesSuspense<
   TData = Awaited<
     ReturnType<typeof universityControllerListRegisteredCompanies>
   >,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -3574,7 +3746,7 @@ export function useUniversityControllerListRegisteredCompaniesSuspense<
   TData = Awaited<
     ReturnType<typeof universityControllerListRegisteredCompanies>
   >,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -3608,7 +3780,7 @@ export const universityControllerSendInvite = (
   createCompanyInviteDto: CreateCompanyInviteDto,
   signal?: AbortSignal,
 ) => {
-  return preconfiguredAxiosFunction<void>({
+  return preconfiguredAxiosFunction<UniversitySendInviteResponse>({
     url: `/api/university/invites`,
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -3618,7 +3790,7 @@ export const universityControllerSendInvite = (
 };
 
 export const getUniversityControllerSendInviteMutationOptions = <
-  TError = unknown,
+  TError = ErrorResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -3658,10 +3830,10 @@ export type UniversityControllerSendInviteMutationResult = NonNullable<
   Awaited<ReturnType<typeof universityControllerSendInvite>>
 >;
 export type UniversityControllerSendInviteMutationBody = CreateCompanyInviteDto;
-export type UniversityControllerSendInviteMutationError = unknown;
+export type UniversityControllerSendInviteMutationError = ErrorResponse;
 
 export const useUniversityControllerSendInvite = <
-  TError = unknown,
+  TError = ErrorResponse,
   TContext = unknown,
 >(
   options?: {
@@ -3685,7 +3857,7 @@ export const useUniversityControllerSendInvite = <
   return useMutation(mutationOptions, queryClient);
 };
 export const universityControllerListInvites = (signal?: AbortSignal) => {
-  return preconfiguredAxiosFunction<void>({
+  return preconfiguredAxiosFunction<UniversityInvitesResponse>({
     url: `/api/university/invites`,
     method: "GET",
     signal,
@@ -3698,7 +3870,7 @@ export const getUniversityControllerListInvitesQueryKey = () => {
 
 export const getUniversityControllerListInvitesQueryOptions = <
   TData = Awaited<ReturnType<typeof universityControllerListInvites>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -3727,11 +3899,11 @@ export const getUniversityControllerListInvitesQueryOptions = <
 export type UniversityControllerListInvitesQueryResult = NonNullable<
   Awaited<ReturnType<typeof universityControllerListInvites>>
 >;
-export type UniversityControllerListInvitesQueryError = unknown;
+export type UniversityControllerListInvitesQueryError = ErrorResponse;
 
 export function useUniversityControllerListInvites<
   TData = Awaited<ReturnType<typeof universityControllerListInvites>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options: {
     query: Partial<
@@ -3756,7 +3928,7 @@ export function useUniversityControllerListInvites<
 };
 export function useUniversityControllerListInvites<
   TData = Awaited<ReturnType<typeof universityControllerListInvites>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -3781,7 +3953,7 @@ export function useUniversityControllerListInvites<
 };
 export function useUniversityControllerListInvites<
   TData = Awaited<ReturnType<typeof universityControllerListInvites>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -3799,7 +3971,7 @@ export function useUniversityControllerListInvites<
 
 export function useUniversityControllerListInvites<
   TData = Awaited<ReturnType<typeof universityControllerListInvites>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -3828,7 +4000,7 @@ export function useUniversityControllerListInvites<
 
 export const getUniversityControllerListInvitesSuspenseQueryOptions = <
   TData = Awaited<ReturnType<typeof universityControllerListInvites>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(options?: {
   query?: Partial<
     UseSuspenseQueryOptions<
@@ -3857,11 +4029,11 @@ export const getUniversityControllerListInvitesSuspenseQueryOptions = <
 export type UniversityControllerListInvitesSuspenseQueryResult = NonNullable<
   Awaited<ReturnType<typeof universityControllerListInvites>>
 >;
-export type UniversityControllerListInvitesSuspenseQueryError = unknown;
+export type UniversityControllerListInvitesSuspenseQueryError = ErrorResponse;
 
 export function useUniversityControllerListInvitesSuspense<
   TData = Awaited<ReturnType<typeof universityControllerListInvites>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options: {
     query: Partial<
@@ -3878,7 +4050,7 @@ export function useUniversityControllerListInvitesSuspense<
 };
 export function useUniversityControllerListInvitesSuspense<
   TData = Awaited<ReturnType<typeof universityControllerListInvites>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -3895,7 +4067,7 @@ export function useUniversityControllerListInvitesSuspense<
 };
 export function useUniversityControllerListInvitesSuspense<
   TData = Awaited<ReturnType<typeof universityControllerListInvites>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -3913,7 +4085,7 @@ export function useUniversityControllerListInvitesSuspense<
 
 export function useUniversityControllerListInvitesSuspense<
   TData = Awaited<ReturnType<typeof universityControllerListInvites>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -3943,38 +4115,48 @@ export function useUniversityControllerListInvitesSuspense<
   return query;
 }
 
-export const universityControllerGetAuditLog = (signal?: AbortSignal) => {
-  return preconfiguredAxiosFunction<void>({
+export const universityControllerGetAuditLog = (
+  params?: UniversityControllerGetAuditLogParams,
+  signal?: AbortSignal,
+) => {
+  return preconfiguredAxiosFunction<UniversityAuditLogResponse>({
     url: `/api/university/audit`,
     method: "GET",
+    params,
     signal,
   });
 };
 
-export const getUniversityControllerGetAuditLogQueryKey = () => {
-  return [`/api/university/audit`] as const;
+export const getUniversityControllerGetAuditLogQueryKey = (
+  params?: UniversityControllerGetAuditLogParams,
+) => {
+  return [`/api/university/audit`, ...(params ? [params] : [])] as const;
 };
 
 export const getUniversityControllerGetAuditLogQueryOptions = <
   TData = Awaited<ReturnType<typeof universityControllerGetAuditLog>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof universityControllerGetAuditLog>>,
-      TError,
-      TData
-    >
-  >;
-}) => {
+  TError = ErrorResponse,
+>(
+  params?: UniversityControllerGetAuditLogParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof universityControllerGetAuditLog>>,
+        TError,
+        TData
+      >
+    >;
+  },
+) => {
   const { query: queryOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getUniversityControllerGetAuditLogQueryKey();
+    queryOptions?.queryKey ??
+    getUniversityControllerGetAuditLogQueryKey(params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof universityControllerGetAuditLog>>
-  > = ({ signal }) => universityControllerGetAuditLog(signal);
+  > = ({ signal }) => universityControllerGetAuditLog(params, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof universityControllerGetAuditLog>>,
@@ -3986,12 +4168,13 @@ export const getUniversityControllerGetAuditLogQueryOptions = <
 export type UniversityControllerGetAuditLogQueryResult = NonNullable<
   Awaited<ReturnType<typeof universityControllerGetAuditLog>>
 >;
-export type UniversityControllerGetAuditLogQueryError = unknown;
+export type UniversityControllerGetAuditLogQueryError = ErrorResponse;
 
 export function useUniversityControllerGetAuditLog<
   TData = Awaited<ReturnType<typeof universityControllerGetAuditLog>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
+  params: undefined | UniversityControllerGetAuditLogParams,
   options: {
     query: Partial<
       UseQueryOptions<
@@ -4015,8 +4198,9 @@ export function useUniversityControllerGetAuditLog<
 };
 export function useUniversityControllerGetAuditLog<
   TData = Awaited<ReturnType<typeof universityControllerGetAuditLog>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
+  params?: UniversityControllerGetAuditLogParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -4040,8 +4224,9 @@ export function useUniversityControllerGetAuditLog<
 };
 export function useUniversityControllerGetAuditLog<
   TData = Awaited<ReturnType<typeof universityControllerGetAuditLog>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
+  params?: UniversityControllerGetAuditLogParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -4058,8 +4243,9 @@ export function useUniversityControllerGetAuditLog<
 
 export function useUniversityControllerGetAuditLog<
   TData = Awaited<ReturnType<typeof universityControllerGetAuditLog>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
+  params?: UniversityControllerGetAuditLogParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -4073,7 +4259,10 @@ export function useUniversityControllerGetAuditLog<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions = getUniversityControllerGetAuditLogQueryOptions(options);
+  const queryOptions = getUniversityControllerGetAuditLogQueryOptions(
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
@@ -4087,24 +4276,28 @@ export function useUniversityControllerGetAuditLog<
 
 export const getUniversityControllerGetAuditLogSuspenseQueryOptions = <
   TData = Awaited<ReturnType<typeof universityControllerGetAuditLog>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseSuspenseQueryOptions<
-      Awaited<ReturnType<typeof universityControllerGetAuditLog>>,
-      TError,
-      TData
-    >
-  >;
-}) => {
+  TError = ErrorResponse,
+>(
+  params?: UniversityControllerGetAuditLogParams,
+  options?: {
+    query?: Partial<
+      UseSuspenseQueryOptions<
+        Awaited<ReturnType<typeof universityControllerGetAuditLog>>,
+        TError,
+        TData
+      >
+    >;
+  },
+) => {
   const { query: queryOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getUniversityControllerGetAuditLogQueryKey();
+    queryOptions?.queryKey ??
+    getUniversityControllerGetAuditLogQueryKey(params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof universityControllerGetAuditLog>>
-  > = ({ signal }) => universityControllerGetAuditLog(signal);
+  > = ({ signal }) => universityControllerGetAuditLog(params, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseSuspenseQueryOptions<
     Awaited<ReturnType<typeof universityControllerGetAuditLog>>,
@@ -4116,12 +4309,13 @@ export const getUniversityControllerGetAuditLogSuspenseQueryOptions = <
 export type UniversityControllerGetAuditLogSuspenseQueryResult = NonNullable<
   Awaited<ReturnType<typeof universityControllerGetAuditLog>>
 >;
-export type UniversityControllerGetAuditLogSuspenseQueryError = unknown;
+export type UniversityControllerGetAuditLogSuspenseQueryError = ErrorResponse;
 
 export function useUniversityControllerGetAuditLogSuspense<
   TData = Awaited<ReturnType<typeof universityControllerGetAuditLog>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
+  params: undefined | UniversityControllerGetAuditLogParams,
   options: {
     query: Partial<
       UseSuspenseQueryOptions<
@@ -4137,8 +4331,9 @@ export function useUniversityControllerGetAuditLogSuspense<
 };
 export function useUniversityControllerGetAuditLogSuspense<
   TData = Awaited<ReturnType<typeof universityControllerGetAuditLog>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
+  params?: UniversityControllerGetAuditLogParams,
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
@@ -4154,8 +4349,9 @@ export function useUniversityControllerGetAuditLogSuspense<
 };
 export function useUniversityControllerGetAuditLogSuspense<
   TData = Awaited<ReturnType<typeof universityControllerGetAuditLog>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
+  params?: UniversityControllerGetAuditLogParams,
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
@@ -4172,8 +4368,9 @@ export function useUniversityControllerGetAuditLogSuspense<
 
 export function useUniversityControllerGetAuditLogSuspense<
   TData = Awaited<ReturnType<typeof universityControllerGetAuditLog>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
+  params?: UniversityControllerGetAuditLogParams,
   options?: {
     query?: Partial<
       UseSuspenseQueryOptions<
@@ -4187,8 +4384,10 @@ export function useUniversityControllerGetAuditLogSuspense<
 ): UseSuspenseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions =
-    getUniversityControllerGetAuditLogSuspenseQueryOptions(options);
+  const queryOptions = getUniversityControllerGetAuditLogSuspenseQueryOptions(
+    params,
+    options,
+  );
 
   const query = useSuspenseQuery(
     queryOptions,
@@ -4203,7 +4402,7 @@ export function useUniversityControllerGetAuditLogSuspense<
 }
 
 export const universityControllerListTemplates = (signal?: AbortSignal) => {
-  return preconfiguredAxiosFunction<void>({
+  return preconfiguredAxiosFunction<UniversityTemplatesResponse>({
     url: `/api/university/templates`,
     method: "GET",
     signal,
@@ -4216,7 +4415,7 @@ export const getUniversityControllerListTemplatesQueryKey = () => {
 
 export const getUniversityControllerListTemplatesQueryOptions = <
   TData = Awaited<ReturnType<typeof universityControllerListTemplates>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -4245,11 +4444,11 @@ export const getUniversityControllerListTemplatesQueryOptions = <
 export type UniversityControllerListTemplatesQueryResult = NonNullable<
   Awaited<ReturnType<typeof universityControllerListTemplates>>
 >;
-export type UniversityControllerListTemplatesQueryError = unknown;
+export type UniversityControllerListTemplatesQueryError = ErrorResponse;
 
 export function useUniversityControllerListTemplates<
   TData = Awaited<ReturnType<typeof universityControllerListTemplates>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options: {
     query: Partial<
@@ -4274,7 +4473,7 @@ export function useUniversityControllerListTemplates<
 };
 export function useUniversityControllerListTemplates<
   TData = Awaited<ReturnType<typeof universityControllerListTemplates>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -4299,7 +4498,7 @@ export function useUniversityControllerListTemplates<
 };
 export function useUniversityControllerListTemplates<
   TData = Awaited<ReturnType<typeof universityControllerListTemplates>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -4317,7 +4516,7 @@ export function useUniversityControllerListTemplates<
 
 export function useUniversityControllerListTemplates<
   TData = Awaited<ReturnType<typeof universityControllerListTemplates>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -4347,7 +4546,7 @@ export function useUniversityControllerListTemplates<
 
 export const getUniversityControllerListTemplatesSuspenseQueryOptions = <
   TData = Awaited<ReturnType<typeof universityControllerListTemplates>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(options?: {
   query?: Partial<
     UseSuspenseQueryOptions<
@@ -4376,11 +4575,11 @@ export const getUniversityControllerListTemplatesSuspenseQueryOptions = <
 export type UniversityControllerListTemplatesSuspenseQueryResult = NonNullable<
   Awaited<ReturnType<typeof universityControllerListTemplates>>
 >;
-export type UniversityControllerListTemplatesSuspenseQueryError = unknown;
+export type UniversityControllerListTemplatesSuspenseQueryError = ErrorResponse;
 
 export function useUniversityControllerListTemplatesSuspense<
   TData = Awaited<ReturnType<typeof universityControllerListTemplates>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options: {
     query: Partial<
@@ -4397,7 +4596,7 @@ export function useUniversityControllerListTemplatesSuspense<
 };
 export function useUniversityControllerListTemplatesSuspense<
   TData = Awaited<ReturnType<typeof universityControllerListTemplates>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -4414,7 +4613,7 @@ export function useUniversityControllerListTemplatesSuspense<
 };
 export function useUniversityControllerListTemplatesSuspense<
   TData = Awaited<ReturnType<typeof universityControllerListTemplates>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -4432,7 +4631,7 @@ export function useUniversityControllerListTemplatesSuspense<
 
 export function useUniversityControllerListTemplatesSuspense<
   TData = Awaited<ReturnType<typeof universityControllerListTemplates>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -4466,7 +4665,7 @@ export const universityControllerToggleTemplateOffer = (
   templateId: string | undefined | null,
   toggleTemplateOfferDto: ToggleTemplateOfferDto,
 ) => {
-  return preconfiguredAxiosFunction<void>({
+  return preconfiguredAxiosFunction<UniversityToggleOfferResponse>({
     url: `/api/university/templates/${templateId}`,
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -4475,7 +4674,7 @@ export const universityControllerToggleTemplateOffer = (
 };
 
 export const getUniversityControllerToggleTemplateOfferMutationOptions = <
-  TError = unknown,
+  TError = ErrorResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -4516,10 +4715,11 @@ export type UniversityControllerToggleTemplateOfferMutationResult = NonNullable<
 >;
 export type UniversityControllerToggleTemplateOfferMutationBody =
   ToggleTemplateOfferDto;
-export type UniversityControllerToggleTemplateOfferMutationError = unknown;
+export type UniversityControllerToggleTemplateOfferMutationError =
+  ErrorResponse;
 
 export const useUniversityControllerToggleTemplateOffer = <
-  TError = unknown,
+  TError = ErrorResponse,
   TContext = unknown,
 >(
   options?: {
@@ -4543,7 +4743,7 @@ export const useUniversityControllerToggleTemplateOffer = <
   return useMutation(mutationOptions, queryClient);
 };
 export const universityControllerGetAccounts = (signal?: AbortSignal) => {
-  return preconfiguredAxiosFunction<void>({
+  return preconfiguredAxiosFunction<UniversityAccountsResponse>({
     url: `/api/university/accounts`,
     method: "GET",
     signal,
@@ -4556,7 +4756,7 @@ export const getUniversityControllerGetAccountsQueryKey = () => {
 
 export const getUniversityControllerGetAccountsQueryOptions = <
   TData = Awaited<ReturnType<typeof universityControllerGetAccounts>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -4585,11 +4785,11 @@ export const getUniversityControllerGetAccountsQueryOptions = <
 export type UniversityControllerGetAccountsQueryResult = NonNullable<
   Awaited<ReturnType<typeof universityControllerGetAccounts>>
 >;
-export type UniversityControllerGetAccountsQueryError = unknown;
+export type UniversityControllerGetAccountsQueryError = ErrorResponse;
 
 export function useUniversityControllerGetAccounts<
   TData = Awaited<ReturnType<typeof universityControllerGetAccounts>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options: {
     query: Partial<
@@ -4614,7 +4814,7 @@ export function useUniversityControllerGetAccounts<
 };
 export function useUniversityControllerGetAccounts<
   TData = Awaited<ReturnType<typeof universityControllerGetAccounts>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -4639,7 +4839,7 @@ export function useUniversityControllerGetAccounts<
 };
 export function useUniversityControllerGetAccounts<
   TData = Awaited<ReturnType<typeof universityControllerGetAccounts>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -4657,7 +4857,7 @@ export function useUniversityControllerGetAccounts<
 
 export function useUniversityControllerGetAccounts<
   TData = Awaited<ReturnType<typeof universityControllerGetAccounts>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -4686,7 +4886,7 @@ export function useUniversityControllerGetAccounts<
 
 export const getUniversityControllerGetAccountsSuspenseQueryOptions = <
   TData = Awaited<ReturnType<typeof universityControllerGetAccounts>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(options?: {
   query?: Partial<
     UseSuspenseQueryOptions<
@@ -4715,11 +4915,11 @@ export const getUniversityControllerGetAccountsSuspenseQueryOptions = <
 export type UniversityControllerGetAccountsSuspenseQueryResult = NonNullable<
   Awaited<ReturnType<typeof universityControllerGetAccounts>>
 >;
-export type UniversityControllerGetAccountsSuspenseQueryError = unknown;
+export type UniversityControllerGetAccountsSuspenseQueryError = ErrorResponse;
 
 export function useUniversityControllerGetAccountsSuspense<
   TData = Awaited<ReturnType<typeof universityControllerGetAccounts>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options: {
     query: Partial<
@@ -4736,7 +4936,7 @@ export function useUniversityControllerGetAccountsSuspense<
 };
 export function useUniversityControllerGetAccountsSuspense<
   TData = Awaited<ReturnType<typeof universityControllerGetAccounts>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -4753,7 +4953,7 @@ export function useUniversityControllerGetAccountsSuspense<
 };
 export function useUniversityControllerGetAccountsSuspense<
   TData = Awaited<ReturnType<typeof universityControllerGetAccounts>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -4771,7 +4971,7 @@ export function useUniversityControllerGetAccountsSuspense<
 
 export function useUniversityControllerGetAccountsSuspense<
   TData = Awaited<ReturnType<typeof universityControllerGetAccounts>>,
-  TError = unknown,
+  TError = ErrorResponse,
 >(
   options?: {
     query?: Partial<
@@ -4805,7 +5005,7 @@ export const universityControllerCreateStaff = (
   createStaffAccountDto: CreateStaffAccountDto,
   signal?: AbortSignal,
 ) => {
-  return preconfiguredAxiosFunction<void>({
+  return preconfiguredAxiosFunction<UniversityCreateStaffResponse>({
     url: `/api/university/accounts`,
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -4815,7 +5015,7 @@ export const universityControllerCreateStaff = (
 };
 
 export const getUniversityControllerCreateStaffMutationOptions = <
-  TError = unknown,
+  TError = ErrorResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -4855,10 +5055,10 @@ export type UniversityControllerCreateStaffMutationResult = NonNullable<
   Awaited<ReturnType<typeof universityControllerCreateStaff>>
 >;
 export type UniversityControllerCreateStaffMutationBody = CreateStaffAccountDto;
-export type UniversityControllerCreateStaffMutationError = unknown;
+export type UniversityControllerCreateStaffMutationError = ErrorResponse;
 
 export const useUniversityControllerCreateStaff = <
-  TError = unknown,
+  TError = ErrorResponse,
   TContext = unknown,
 >(
   options?: {
@@ -4885,7 +5085,7 @@ export const universityControllerUpdateStaff = (
   accountId: string | undefined | null,
   updateStaffAccountDto: UpdateStaffAccountDto,
 ) => {
-  return preconfiguredAxiosFunction<void>({
+  return preconfiguredAxiosFunction<UniversityUpdateStaffResponse>({
     url: `/api/university/accounts/${accountId}`,
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -4894,7 +5094,7 @@ export const universityControllerUpdateStaff = (
 };
 
 export const getUniversityControllerUpdateStaffMutationOptions = <
-  TError = unknown,
+  TError = ErrorResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -4934,10 +5134,10 @@ export type UniversityControllerUpdateStaffMutationResult = NonNullable<
   Awaited<ReturnType<typeof universityControllerUpdateStaff>>
 >;
 export type UniversityControllerUpdateStaffMutationBody = UpdateStaffAccountDto;
-export type UniversityControllerUpdateStaffMutationError = unknown;
+export type UniversityControllerUpdateStaffMutationError = ErrorResponse;
 
 export const useUniversityControllerUpdateStaff = <
-  TError = unknown,
+  TError = ErrorResponse,
   TContext = unknown,
 >(
   options?: {
@@ -4963,14 +5163,14 @@ export const useUniversityControllerUpdateStaff = <
 export const universityControllerDeactivateStaff = (
   accountId: string | undefined | null,
 ) => {
-  return preconfiguredAxiosFunction<void>({
+  return preconfiguredAxiosFunction<BaseResponse>({
     url: `/api/university/accounts/${accountId}/deactivate`,
     method: "PATCH",
   });
 };
 
 export const getUniversityControllerDeactivateStaffMutationOptions = <
-  TError = unknown,
+  TError = ErrorResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -5010,10 +5210,10 @@ export type UniversityControllerDeactivateStaffMutationResult = NonNullable<
   Awaited<ReturnType<typeof universityControllerDeactivateStaff>>
 >;
 
-export type UniversityControllerDeactivateStaffMutationError = unknown;
+export type UniversityControllerDeactivateStaffMutationError = ErrorResponse;
 
 export const useUniversityControllerDeactivateStaff = <
-  TError = unknown,
+  TError = ErrorResponse,
   TContext = unknown,
 >(
   options?: {
@@ -5039,14 +5239,14 @@ export const useUniversityControllerDeactivateStaff = <
 export const universityControllerReactivateStaff = (
   accountId: string | undefined | null,
 ) => {
-  return preconfiguredAxiosFunction<void>({
+  return preconfiguredAxiosFunction<BaseResponse>({
     url: `/api/university/accounts/${accountId}/reactivate`,
     method: "PATCH",
   });
 };
 
 export const getUniversityControllerReactivateStaffMutationOptions = <
-  TError = unknown,
+  TError = ErrorResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -5086,10 +5286,10 @@ export type UniversityControllerReactivateStaffMutationResult = NonNullable<
   Awaited<ReturnType<typeof universityControllerReactivateStaff>>
 >;
 
-export type UniversityControllerReactivateStaffMutationError = unknown;
+export type UniversityControllerReactivateStaffMutationError = ErrorResponse;
 
 export const useUniversityControllerReactivateStaff = <
-  TError = unknown,
+  TError = ErrorResponse,
   TContext = unknown,
 >(
   options?: {
@@ -5116,7 +5316,7 @@ export const universityControllerResendInvite = (
   accountId: string | undefined | null,
   signal?: AbortSignal,
 ) => {
-  return preconfiguredAxiosFunction<void>({
+  return preconfiguredAxiosFunction<BaseResponse>({
     url: `/api/university/accounts/${accountId}/resend-invite`,
     method: "POST",
     signal,
@@ -5124,7 +5324,7 @@ export const universityControllerResendInvite = (
 };
 
 export const getUniversityControllerResendInviteMutationOptions = <
-  TError = unknown,
+  TError = ErrorResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -5164,10 +5364,10 @@ export type UniversityControllerResendInviteMutationResult = NonNullable<
   Awaited<ReturnType<typeof universityControllerResendInvite>>
 >;
 
-export type UniversityControllerResendInviteMutationError = unknown;
+export type UniversityControllerResendInviteMutationError = ErrorResponse;
 
 export const useUniversityControllerResendInvite = <
-  TError = unknown,
+  TError = ErrorResponse,
   TContext = unknown,
 >(
   options?: {

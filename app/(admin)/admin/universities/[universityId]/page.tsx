@@ -1,9 +1,13 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { preconfiguredAxios } from "@/app/api/preconfig.axios";
+import {
+  useAdminControllerGetUniversity,
+  useAdminControllerGetUniversityPartners,
+  useAdminControllerGetUniversityPartnerMoas,
+  useAdminControllerGetPartnerLegacyCompany,
+} from "@/app/api";
 import { PageContainer, PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -238,14 +242,13 @@ function LegacyRecordsSection({ universityId, companyId }: { universityId: strin
   const [open, setOpen] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<{ url: string; title: string } | null>(null);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["admin-partner-legacy-company", universityId, companyId],
-    queryFn: () =>
-      preconfiguredAxios
-        .get(`/api/admin/universities/${universityId}/partners/${companyId}/legacy-companies`)
-        .then((r) => r.data as { legacyCompany: LegacyCompanyDetail | null }),
-    enabled: open && !!companyId && !!universityId,
-  });
+  const { data, isLoading } = useAdminControllerGetPartnerLegacyCompany(
+    universityId,
+    companyId,
+    {
+      query: { enabled: open && !!companyId && !!universityId },
+    },
+  );
 
   const company = data?.legacyCompany;
 
@@ -272,7 +275,7 @@ function LegacyRecordsSection({ universityId, companyId }: { universityId: strin
             <p className="text-sm text-muted-foreground">No legacy records matched.</p>
           ) : (
             <ReadOnlyLegacyDetail
-              company={company}
+              company={company as LegacyCompanyDetail}
               onPreviewDoc={(url, title) => setPreviewDoc({ url, title })}
             />
           )}
@@ -308,32 +311,20 @@ export default function AdminUniversityPartnersPage() {
   const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null);
   const [showDetail, setShowDetail] = useState(false);
 
-  const { data: uniData, isLoading: uniLoading } = useQuery({
-    queryKey: ["admin-university", universityId],
-    queryFn: () =>
-      preconfiguredAxios
-        .get(`/api/admin/universities/${universityId}`)
-        .then((r) => r.data.university as University),
-    enabled: !!universityId,
-  });
+  const { data: uniResponse, isLoading: uniLoading } =
+    useAdminControllerGetUniversity(universityId, {
+      query: { enabled: !!universityId },
+    });
 
-  const { data: partnersData, isLoading: partnersLoading } = useQuery({
-    queryKey: ["admin-university-partners", universityId],
-    queryFn: () =>
-      preconfiguredAxios
-        .get(`/api/admin/universities/${universityId}/partners`)
-        .then((r) => r.data as { university: University; partners: Partner[]; blacklist: BlacklistEntry[] }),
-    enabled: !!universityId,
-  });
+  const { data: partnersData, isLoading: partnersLoading } =
+    useAdminControllerGetUniversityPartners(universityId, {
+      query: { enabled: !!universityId },
+    });
 
-  const { data: partnerMoasData, isLoading: moasLoading } = useQuery({
-    queryKey: ["admin-university-partner-moas", universityId, currentCompanyId],
-    queryFn: () =>
-      preconfiguredAxios
-        .get(`/api/admin/universities/${universityId}/partners/${currentCompanyId}/moas`)
-        .then((r) => r.data as PartnerMoasData),
-    enabled: !!currentCompanyId,
-  });
+  const { data: partnerMoasData, isLoading: moasLoading } =
+    useAdminControllerGetUniversityPartnerMoas(universityId, currentCompanyId, {
+      query: { enabled: !!currentCompanyId },
+    });
 
   const combined = useMemo<CombinedEntry[]>(() => {
     if (!partnersData) return [];
@@ -395,7 +386,7 @@ export default function AdminUniversityPartnersPage() {
   const moas = partnerMoasData?.moas ?? [];
   const isPartnerDetail = showDetail;
 
-  if (!uniData && !uniLoading) {
+  if (!uniResponse && !uniLoading) {
     return (
       <PageContainer>
         <p className="text-destructive text-sm">University not found.</p>
@@ -426,7 +417,7 @@ export default function AdminUniversityPartnersPage() {
         </div>
       ) : (
         <h1 className="text-2xl font-semibold tracking-tight text-gray-900 mb-6">
-          {uniData?.registered_name}
+          {String(uniResponse?.university?.registered_name ?? "University")}
         </h1>
       )}
 
@@ -499,7 +490,7 @@ export default function AdminUniversityPartnersPage() {
           )}
 
           {partnerMoasData?.company?.document_review_details && (
-            <VerifiedDocumentDetails details={partnerMoasData.company.document_review_details} />
+            <VerifiedDocumentDetails details={partnerMoasData.company.document_review_details as DocReviewDetails} />
           )}
 
           {partnerMoasData?.companyDocuments && partnerMoasData.companyDocuments.length > 0 && (

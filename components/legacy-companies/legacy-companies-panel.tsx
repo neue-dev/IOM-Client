@@ -2,7 +2,6 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { preconfiguredAxios } from "@/app/api/preconfig.axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -121,6 +120,27 @@ export function isLegacyMoaExpired(expiryDate: string) {
   return expiryDate < today;
 }
 
+function getAPIBase(): string {
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host.startsWith("dev.")) return "https://dev.api.iom.betterinternship.com";
+    if (host.endsWith(".betterinternship.com")) return "https://api.iom.betterinternship.com";
+  }
+  return process.env.NEXT_PUBLIC_IOM_SERVER_URL || "http://localhost:5600";
+}
+
+async function apiFetch<T>(endpoint: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${getAPIBase()}${endpoint}`, {
+    ...init,
+    credentials: "include",
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok || body?.success === false) {
+    throw new Error(body?.message || "Request failed");
+  }
+  return body as T;
+}
+
 export function LegacyCompaniesPanel({
   listEndpoint,
   uploadEndpoint,
@@ -151,10 +171,7 @@ export function LegacyCompaniesPanel({
 
   const { data, isLoading } = useQuery({
     queryKey: [queryKeyPrefix],
-    queryFn: () =>
-      preconfiguredAxios
-        .get(listEndpoint)
-        .then((r) => r.data as { legacyCompanies: LegacyCompanySummary[] }),
+    queryFn: () => apiFetch<{ legacyCompanies: LegacyCompanySummary[] }>(listEndpoint),
   });
 
   const legacyCompanies = data?.legacyCompanies ?? [];
@@ -313,9 +330,7 @@ function DetailView({
   const { data, isLoading } = useQuery({
     queryKey: [queryKeyPrefix, "detail", legacyCompanyId],
     queryFn: () =>
-      preconfiguredAxios
-        .get(detailEndpoint(legacyCompanyId))
-        .then((r) => r.data as { legacyCompany: LegacyCompanyDetail }),
+      apiFetch<{ legacyCompany: LegacyCompanyDetail }>(detailEndpoint(legacyCompanyId)),
   });
 
   const company = data?.legacyCompany;
@@ -329,10 +344,10 @@ function DetailView({
         documentTypes.push(type || "other");
       });
       formData.append("documentTypes", JSON.stringify(documentTypes));
-      return preconfiguredAxios.post(
-        addDocumentsEndpoint(legacyCompanyId),
-        formData,
-      );
+      return apiFetch(addDocumentsEndpoint(legacyCompanyId), {
+        method: "POST",
+        body: formData,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [queryKeyPrefix] });
@@ -804,7 +819,10 @@ function UploadDialog({
         });
         formData.append("documentTypes", JSON.stringify(documentTypes));
       }
-      return preconfiguredAxios.post(uploadEndpoint, formData);
+      return apiFetch(uploadEndpoint, {
+        method: "POST",
+        body: formData,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [queryKeyPrefix] });
@@ -1129,10 +1147,7 @@ function CsvUploadDialog({
       if (!file) return;
       const formData = new FormData();
       formData.append("file", file);
-      const r = await preconfiguredAxios.post(csvEndpoint, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      return r.data as {
+      return apiFetch<{
         summary: {
           createdCompanies: number;
           appendedMoas: number;
@@ -1140,7 +1155,10 @@ function CsvUploadDialog({
           failed: number;
         };
         results: BulkCsvRowResult[];
-      };
+      }>(csvEndpoint, {
+        method: "POST",
+        body: formData,
+      });
     },
     onSuccess: (data) => {
       if (!data) return;
@@ -1496,10 +1514,7 @@ function ZipUploadDialog({
       if (!file) return;
       const formData = new FormData();
       formData.append("file", file);
-      const r = await preconfiguredAxios.post(zipEndpoint, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      return r.data as {
+      return apiFetch<{
         summary: {
           createdCompanies: number;
           appendedMoas: number;
@@ -1507,7 +1522,10 @@ function ZipUploadDialog({
           failed: number;
         };
         results: BulkCsvRowResult[];
-      };
+      }>(zipEndpoint, {
+        method: "POST",
+        body: formData,
+      });
     },
     onSuccess: (data) => {
       if (!data) return;

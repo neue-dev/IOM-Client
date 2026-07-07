@@ -1,10 +1,20 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useUniversityProfile } from "@/app/providers/university-profile.provider";
-import { preconfiguredAxios } from "@/app/api/preconfig.axios";
+import {
+  getUniversityControllerGetAuditLogQueryKey,
+  getUniversityControllerGetBlacklistQueryKey,
+  getUniversityControllerListPartnersQueryKey,
+  useUniversityControllerListPartners,
+  useUniversityControllerGetBlacklist,
+  useUniversityControllerGetPartnerMoas,
+  useUniversityControllerGetPartnerLegacyCompany,
+  useUniversityControllerBlacklistCompany,
+  useUniversityControllerUnblacklistCompany,
+} from "@/app/api";
 import { PageContainer, PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -313,14 +323,12 @@ function LegacyRecordsSection({ currentCompanyId: companyId }: { currentCompanyI
   const [open, setOpen] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<{ url: string; title: string } | null>(null);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["partner-legacy-company", companyId],
-    queryFn: () =>
-      preconfiguredAxios
-        .get(`/api/university/partners/${companyId}/legacy-companies`)
-        .then((r) => r.data as { legacyCompany: LegacyCompanyDetail | null }),
-    enabled: open && !!companyId,
-  });
+  const { data, isLoading } = useUniversityControllerGetPartnerLegacyCompany(
+    companyId,
+    {
+      query: { enabled: open && !!companyId },
+    },
+  );
 
   const company = data?.legacyCompany;
 
@@ -347,7 +355,7 @@ function LegacyRecordsSection({ currentCompanyId: companyId }: { currentCompanyI
             <p className="text-sm text-muted-foreground">No legacy records matched.</p>
           ) : (
             <ReadOnlyLegacyDetail
-              company={company}
+              company={company as LegacyCompanyDetail}
               onPreviewDoc={(url, title) => setPreviewDoc({ url, title })}
             />
           )}
@@ -393,65 +401,50 @@ export default function PartnersPage() {
   // Clean up timer on unmount.
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
-  const { data: partnersData, isLoading: isPartnersLoading } = useQuery({
-    queryKey: ["university-partners"],
-    queryFn: () =>
-      preconfiguredAxios
-        .get("/api/university/partners")
-        .then((r) => r.data as { partners: Partner[] }),
-    enabled: !!account,
-  });
+  const { data: partnersData, isLoading: isPartnersLoading } =
+    useUniversityControllerListPartners({
+      query: { enabled: !!account },
+    });
 
-  const { data: blacklistData, isLoading: isBlacklistLoading } = useQuery({
-    queryKey: ["university-blacklist"],
-    queryFn: () =>
-      preconfiguredAxios
-        .get("/api/university/blacklist")
-        .then((r) => r.data as { blacklist: BlacklistEntry[] }),
-    enabled: !!account,
-  });
+  const { data: blacklistData, isLoading: isBlacklistLoading } =
+    useUniversityControllerGetBlacklist({
+      query: { enabled: !!account },
+    });
 
-  const { data: partnerMoasData, isLoading: isMoasLoading } = useQuery({
-    queryKey: ["university-partner-moas", currentCompanyId],
-    queryFn: () =>
-      preconfiguredAxios
-        .get(`/api/university/partners/${currentCompanyId}/moas`)
-        .then((r) => r.data as { company: Partner["company"] & { document_review_details?: DocReviewDetails }; moas: PartnerMoaEntry[]; companyDocuments: CompanyDoc[] }),
-    enabled: !!currentCompanyId,
-    refetchInterval: 25 * 60 * 1000,
-  });
+  const { data: partnerMoasData, isLoading: isMoasLoading } =
+    useUniversityControllerGetPartnerMoas(currentCompanyId, {
+      query: { enabled: !!currentCompanyId, refetchInterval: 25 * 60 * 1000 },
+    });
 
   const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: ["university-partners"] });
-    queryClient.invalidateQueries({ queryKey: ["university-blacklist"] });
-    queryClient.invalidateQueries({ queryKey: ["university-audit"] });
+    queryClient.invalidateQueries({ queryKey: getUniversityControllerListPartnersQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getUniversityControllerGetBlacklistQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getUniversityControllerGetAuditLogQueryKey() });
   };
 
-  const blacklistMutation = useMutation({
-    mutationFn: ({ companyId, reason }: { companyId: string; reason: string }) =>
-      preconfiguredAxios.post("/api/university/blacklist", {
-        companyId,
-        reason: reason || undefined,
-      }),
-    onSuccess: () => {
-      refresh();
-      setBlacklistTarget(null);
-      setReason("");
+  const blacklistMutation = useUniversityControllerBlacklistCompany({
+    mutation: {
+      onSuccess: () => {
+        refresh();
+        setBlacklistTarget(null);
+        setReason("");
+      },
     },
   });
 
-  const unblacklistMutation = useMutation({
-    mutationFn: (companyId: string) =>
-      preconfiguredAxios.delete(`/api/university/blacklist/${companyId}`),
-    onSuccess: () => {
-      refresh();
-      setUnblacklistTarget(null);
+  const unblacklistMutation = useUniversityControllerUnblacklistCompany({
+    mutation: {
+      onSuccess: () => {
+        refresh();
+        setUnblacklistTarget(null);
+      },
     },
   });
 
   const combined = useMemo<CombinedEntry[]>(() => {
     const map = new Map<string, CombinedEntry>();
     for (const p of partnersData?.partners ?? []) {
+      if (!p.company) continue;
       map.set(p.company.id, {
         company: p.company,
         latestMoaId: p.latestMoaId,
@@ -463,13 +456,13 @@ export default function PartnersPage() {
       const existing = map.get(b.company_id);
       if (existing) {
         existing.isBlacklisted = true;
-        existing.blacklistEntry = b;
+        existing.blacklistEntry = b as BlacklistEntry;
       } else {
         map.set(b.company_id, {
-          company: { ...b.company, company_type: null },
+          company: { id: b.company?.id ?? b.company_id, registered_name: b.company?.registered_name ?? "Unknown company", company_type: null },
           latestMoaId: null,
           isBlacklisted: true,
-          blacklistEntry: b,
+          blacklistEntry: b as BlacklistEntry,
         });
       }
     }
@@ -668,7 +661,7 @@ export default function PartnersPage() {
 
             {partnerMoasData?.company?.document_review_details && (
               <VerifiedDocumentDetails
-                details={partnerMoasData.company.document_review_details}
+                details={partnerMoasData.company.document_review_details as DocReviewDetails}
               />
             )}
             {partnerMoasData?.companyDocuments && (
@@ -771,7 +764,7 @@ export default function PartnersPage() {
               disabled={blacklistMutation.isPending}
               onClick={() =>
                 blacklistTarget &&
-                blacklistMutation.mutate({ companyId: blacklistTarget.company.id, reason })
+                blacklistMutation.mutate({ data: { companyId: blacklistTarget.company.id, reason: reason || undefined } })
               }
             >
               {blacklistMutation.isPending && <Loader2 className="animate-spin" />}
@@ -800,7 +793,7 @@ export default function PartnersPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() =>
-                unblacklistTarget && unblacklistMutation.mutate(unblacklistTarget.company.id)
+                unblacklistTarget && unblacklistMutation.mutate({ companyId: unblacklistTarget.company.id })
               }
             >
               Remove

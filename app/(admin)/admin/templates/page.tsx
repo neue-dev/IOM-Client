@@ -1,9 +1,14 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { ColumnDef } from "@tanstack/react-table";
-import { preconfiguredAxios } from "@/app/api/preconfig.axios";
+import {
+  getAdminControllerListTemplatesQueryKey,
+  useAdminControllerListTemplates,
+  useAdminControllerDeleteTemplate,
+  type AdminTemplateDto,
+} from "@/app/api";
 import { PageContainer, PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,24 +27,18 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 
-interface Template {
-  id: string;
-  name: string;
-  description: string | null;
-  term_months: number;
-}
-
-function ActionsCell({ template }: { template: Template }) {
+function ActionsCell({ template }: { template: AdminTemplateDto }) {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const remove = useMutation({
-    mutationFn: () => preconfiguredAxios.delete(`/api/admin/templates/${template.id}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-templates"] });
-      toast.success("Template deleted");
+  const remove = useAdminControllerDeleteTemplate({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getAdminControllerListTemplatesQueryKey() });
+        toast.success("Template deleted");
+      },
+      onError: (e: Error) => toast.error(e.message),
     },
-    onError: (e: Error) => toast.error(e.message),
   });
 
   return (
@@ -69,7 +68,7 @@ function ActionsCell({ template }: { template: Template }) {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => remove.mutate()}
+              onClick={() => remove.mutate({ templateId: template.id })}
             >
               Delete
             </AlertDialogAction>
@@ -80,7 +79,7 @@ function ActionsCell({ template }: { template: Template }) {
   );
 }
 
-const columns: ColumnDef<Template>[] = [
+const columns: ColumnDef<AdminTemplateDto>[] = [
   {
     id: "name",
     header: "Template",
@@ -116,13 +115,7 @@ const columns: ColumnDef<Template>[] = [
 export default function AdminTemplatesPage() {
   const router = useRouter();
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["admin-templates"],
-    queryFn: () =>
-      preconfiguredAxios
-        .get("/api/admin/templates")
-        .then((r) => r.data.templates as Template[]),
-  });
+  const { data, isLoading } = useAdminControllerListTemplates();
 
   return (
     <PageContainer className="space-y-6">
@@ -144,11 +137,10 @@ export default function AdminTemplatesPage() {
         <DataTable
           id="admin-templates"
           columns={columns}
-          data={data ?? []}
+          data={data?.templates ?? []}
           searchPlaceholder="Search templates..."
           rowLabelSingular="template"
           rowLabelPlural="templates"
-          pageSizes={[10, 25, 50]}
           onRowClick={(t) => router.push(`/templates/${t.id}`)}
         />
       )}

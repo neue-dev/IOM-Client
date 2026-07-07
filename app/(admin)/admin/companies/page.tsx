@@ -1,11 +1,19 @@
 "use client";
 import { useRef, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import type { ColumnDef } from "@tanstack/react-table";
 import { toast } from "sonner";
 import { Check, ChevronDown, Loader2, Plus, Upload } from "lucide-react";
-import { preconfiguredAxios } from "@/app/api/preconfig.axios";
+import {
+  getAdminControllerListCompaniesQueryKey,
+  useAdminControllerListCompanies,
+  useAdminControllerCreateCompany,
+  useAdminControllerVerifyTin,
+  useAdminControllerBulkCreateCompanies,
+  type AdminCompanyListItemDto,
+  type CreateCompanyAdminDtoCompanyType,
+} from "@/app/api";
 import { PageContainer, PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,18 +34,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { formatDateWithoutTime } from "@/lib/utils";
 
-interface Company {
-  id: string;
-  registered_name: string;
-  email: string | null;
-  email_verified: boolean | null;
-  is_deactivated: boolean | null;
-  has_pending_review: boolean;
-  is_profile_incomplete: boolean;
-  created_at: string;
-}
-
-const columns: ColumnDef<Company>[] = [
+const columns: ColumnDef<AdminCompanyListItemDto>[] = [
   {
     id: "name",
     header: "Company",
@@ -101,42 +98,32 @@ function CreateCompanyDialog({ open, onOpenChange }: { open: boolean; onOpenChan
     message?: string;
   }>({ loading: false, result: "idle" });
 
-  const create = useMutation({
-    mutationFn: () =>
-      preconfiguredAxios.post("/api/admin/companies", {
-        registered_name: form.registered_name,
-        tin: form.tin,
-        company_type: form.company_type || undefined,
-        registered_address: form.registered_address || undefined,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-companies"] });
-      toast.success("Company created");
-      setForm({ registered_name: "", tin: "", company_type: "", registered_address: "" });
-      setVerifyState({ loading: false, result: "idle" });
-      setError("");
-      onOpenChange(false);
+  const create = useAdminControllerCreateCompany({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getAdminControllerListCompaniesQueryKey() });
+        toast.success("Company created");
+        setForm({ registered_name: "", tin: "", company_type: "", registered_address: "" });
+        setVerifyState({ loading: false, result: "idle" });
+        setError("");
+        onOpenChange(false);
+      },
+      onError: (e: Error) => setError(e.message),
     },
-    onError: (e: Error) => setError(e.message),
   });
 
-  const verify = useMutation({
-    mutationFn: async () => {
-      const res = await preconfiguredAxios.post("/api/admin/companies/verify-tin", {
-        tin: form.tin,
-        registered_name: form.registered_name,
-      });
-      return res.data;
-    },
-    onSuccess: (data: any) => {
-      if (data.valid) {
-        setVerifyState({ loading: false, result: "verified", message: data.message });
-      } else {
-        setVerifyState({ loading: false, result: "failed", message: data.message });
-      }
-    },
-    onError: (e: Error) => {
-      setVerifyState({ loading: false, result: "failed", message: e.message });
+  const verify = useAdminControllerVerifyTin({
+    mutation: {
+      onSuccess: (data: any) => {
+        if (data.valid) {
+          setVerifyState({ loading: false, result: "verified", message: data.message });
+        } else {
+          setVerifyState({ loading: false, result: "failed", message: data.message });
+        }
+      },
+      onError: (e: Error) => {
+        setVerifyState({ loading: false, result: "failed", message: e.message });
+      },
     },
   });
 
@@ -152,7 +139,7 @@ function CreateCompanyDialog({ open, onOpenChange }: { open: boolean; onOpenChan
 
         <form
           id="create-company"
-          onSubmit={(e) => { e.preventDefault(); setError(""); create.mutate(); }}
+          onSubmit={(e) => { e.preventDefault(); setError(""); create.mutate({ data: { registered_name: form.registered_name, tin: form.tin, company_type: (form.company_type || undefined) as CreateCompanyAdminDtoCompanyType | undefined, registered_address: form.registered_address || undefined } }); }}
           className="space-y-4"
         >
           <FormError>{error}</FormError>
@@ -186,7 +173,7 @@ function CreateCompanyDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                 title={!form.tin ? "Enter a TIN to verify" : undefined}
                 onClick={() => {
                   setVerifyState({ loading: true, result: "idle" });
-                  verify.mutate();
+                  verify.mutate({ data: { tin: form.tin, registered_name: form.registered_name } });
                 }}
               >
                 {verify.isPending ? (
@@ -254,20 +241,15 @@ function BulkUploadDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const upload = useMutation({
-    mutationFn: async () => {
-      if (!file) throw new Error("No file selected");
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await preconfiguredAxios.post("/api/admin/companies/bulk", fd);
-      return res.data;
-    },
-    onSuccess: (data: any) => {
+  const upload = useAdminControllerBulkCreateCompanies({
+    mutation: {
+    onSuccess: (data) => {
       setResults(data);
-      queryClient.invalidateQueries({ queryKey: ["admin-companies"] });
+      queryClient.invalidateQueries({ queryKey: getAdminControllerListCompaniesQueryKey() });
       toast.success(`Import complete: ${data.summary.created} created`);
     },
     onError: (e: Error) => setError(e.message),
+    },
   });
 
   return (
@@ -376,7 +358,7 @@ function BulkUploadDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
             {results ? "Close" : "Cancel"}
           </Button>
           {!results && (
-            <Button disabled={!file || upload.isPending} onClick={() => upload.mutate()}>
+            <Button disabled={!file || upload.isPending} onClick={() => upload.mutate({ data: { file: file! } })}>
               {upload.isPending && <Loader2 className="animate-spin" />}
               {upload.isPending ? "Uploading…" : "Upload"}
             </Button>
@@ -421,13 +403,7 @@ function AddCompanyDropdown() {
 export default function AdminCompaniesPage() {
   const router = useRouter();
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["admin-companies"],
-    queryFn: async () => {
-      const res = await preconfiguredAxios.get("/api/admin/companies");
-      return res.data.companies as Company[];
-    },
-  });
+  const { data, isLoading } = useAdminControllerListCompanies();
 
   return (
     <PageContainer className="space-y-6">
@@ -447,11 +423,10 @@ export default function AdminCompaniesPage() {
         <DataTable
           id="admin-companies"
           columns={columns}
-          data={data ?? []}
+          data={data?.companies ?? []}
           searchPlaceholder="Search companies..."
           rowLabelSingular="company"
           rowLabelPlural="companies"
-          pageSizes={[10, 25, 50]}
           onRowClick={(company) => router.push(`/admin/companies/${company.id}`)}
         />
       )}

@@ -1,10 +1,16 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { ColumnDef } from "@tanstack/react-table";
-import { preconfiguredAxios } from "@/app/api/preconfig.axios";
+import {
+  getAdminControllerListUniversitiesQueryKey,
+  useAdminControllerListUniversities,
+  useAdminControllerCreateUniversity,
+  useAdminControllerDeactivateUniversity,
+  type AdminUniversityListItemDto,
+} from "@/app/api";
 import { PageContainer, PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,13 +41,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Loader2, Plus } from "lucide-react";
 
-interface University {
-  id: string;
-  registered_name: string;
-  is_deactivated: boolean | null;
-  university_accounts: { email: string; display_name: string }[];
-}
-
 const EMPTY_FORM = {
   registered_name: "",
   superadmin_email: "",
@@ -54,16 +53,17 @@ function CreateUniversityDialog() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState("");
 
-  const create = useMutation({
-    mutationFn: () => preconfiguredAxios.post("/api/admin/universities", form),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-universities"] });
-      toast.success("University created");
-      setForm(EMPTY_FORM);
-      setError("");
-      setOpen(false);
+  const create = useAdminControllerCreateUniversity({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getAdminControllerListUniversitiesQueryKey() });
+        toast.success("University created");
+        setForm(EMPTY_FORM);
+        setError("");
+        setOpen(false);
+      },
+      onError: (e: Error) => setError(e.message),
     },
-    onError: (e: Error) => setError(e.message),
   });
 
   const valid = form.registered_name && form.superadmin_email;
@@ -94,7 +94,7 @@ function CreateUniversityDialog() {
           onSubmit={(e) => {
             e.preventDefault();
             setError("");
-            create.mutate();
+            create.mutate({ data: form });
           }}
           className="space-y-4"
         >
@@ -151,17 +151,17 @@ function CreateUniversityDialog() {
   );
 }
 
-function DeactivateCell({ uni }: { uni: University }) {
+function DeactivateCell({ uni }: { uni: AdminUniversityListItemDto }) {
   const queryClient = useQueryClient();
 
-  const deactivate = useMutation({
-    mutationFn: () =>
-      preconfiguredAxios.patch(`/api/admin/universities/${uni.id}/deactivate`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-universities"] });
-      toast.success("University deactivated");
+  const deactivate = useAdminControllerDeactivateUniversity({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getAdminControllerListUniversitiesQueryKey() });
+        toast.success("University deactivated");
+      },
+      onError: (e: Error) => toast.error(e.message),
     },
-    onError: (e: Error) => toast.error(e.message),
   });
 
   if (uni.is_deactivated) return null;
@@ -190,7 +190,7 @@ function DeactivateCell({ uni }: { uni: University }) {
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            onClick={() => deactivate.mutate()}
+            onClick={() => deactivate.mutate({ universityId: uni.id })}
           >
             Deactivate
           </AlertDialogAction>
@@ -200,7 +200,7 @@ function DeactivateCell({ uni }: { uni: University }) {
   );
 }
 
-const columns: ColumnDef<University>[] = [
+const columns: ColumnDef<AdminUniversityListItemDto>[] = [
   {
     id: "name",
     header: "University",
@@ -244,13 +244,7 @@ const columns: ColumnDef<University>[] = [
 
 export default function AdminUniversitiesPage() {
   const router = useRouter();
-  const { data, isLoading } = useQuery({
-    queryKey: ["admin-universities"],
-    queryFn: async () => {
-      const res = await preconfiguredAxios.get("/api/admin/universities");
-      return res.data.universities as University[];
-    },
-  });
+  const { data, isLoading } = useAdminControllerListUniversities();
 
   return (
     <PageContainer className="space-y-6">
@@ -270,11 +264,10 @@ export default function AdminUniversitiesPage() {
         <DataTable
           id="admin-universities"
           columns={columns}
-          data={data ?? []}
+          data={data?.universities ?? []}
           searchPlaceholder="Search universities..."
           rowLabelSingular="university"
           rowLabelPlural="universities"
-          pageSizes={[10, 25, 50]}
           onRowClick={(uni) => router.push(`/admin/universities/${uni.id}`)}
         />
       )}

@@ -1,9 +1,14 @@
 "use client";
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { preconfiguredAxios } from "@/app/api/preconfig.axios";
+import {
+  getAdminControllerGetCompanyQueryKey,
+  getAdminControllerListCompaniesQueryKey,
+  useAdminControllerGetCompany,
+  useAdminControllerDeactivateCompany,
+} from "@/app/api";
 import { PageContainer } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -114,24 +119,19 @@ export default function AdminCompanyProfilePage() {
 
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["admin-company", companyId],
-    queryFn: () =>
-      preconfiguredAxios
-        .get(`/api/admin/companies/${companyId}`)
-        .then((r) => r.data as CompanyData),
-    refetchInterval: 25 * 60 * 1000,
+  const { data, isLoading } = useAdminControllerGetCompany(companyId, {
+    query: { refetchInterval: 25 * 60 * 1000 },
   });
 
-  const deactivate = useMutation({
-    mutationFn: () =>
-      preconfiguredAxios.patch(`/api/admin/companies/${companyId}/deactivate`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-company", companyId] });
-      queryClient.invalidateQueries({ queryKey: ["admin-companies"] });
-      toast.success("Company deactivated");
+  const deactivate = useAdminControllerDeactivateCompany({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getAdminControllerGetCompanyQueryKey(companyId) });
+        queryClient.invalidateQueries({ queryKey: getAdminControllerListCompaniesQueryKey() });
+        toast.success("Company deactivated");
+      },
+      onError: (e: Error) => toast.error(e.message),
     },
-    onError: (e: Error) => toast.error(e.message),
   });
 
   if (isLoading) {
@@ -191,7 +191,7 @@ export default function AdminCompanyProfilePage() {
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    onClick={() => deactivate.mutate()}
+                    onClick={() => deactivate.mutate({ companyId })}
                   >
                     Deactivate
                   </AlertDialogAction>

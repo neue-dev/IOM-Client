@@ -1,11 +1,16 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { toast } from "sonner";
 import { useUniversityProfile } from "@/app/providers/university-profile.provider";
-import { preconfiguredAxios } from "@/app/api/preconfig.axios";
+import {
+  getUniversityControllerListTemplatesQueryKey,
+  useUniversityControllerListTemplates,
+  useUniversityControllerToggleTemplateOffer,
+  type UniversityTemplateOfferDto,
+} from "@/app/api";
 import { PageContainer, PageHeader } from "@/components/page-header";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,51 +28,35 @@ import {
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 
-interface TemplateOffer {
-  id: string;
-  is_available: boolean;
-  template: {
-    id: string;
-    name: string;
-    description: string | null;
-    term_months: number;
-    is_deleted: boolean | null;
-  };
-}
-
 export default function UniversityTemplatesPage() {
   const { account, isLoading, isSuperadmin } = useUniversityProfile();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [pending, setPending] = useState<{ offer: TemplateOffer; next: boolean } | null>(null);
+  const [pending, setPending] = useState<{ offer: UniversityTemplateOfferDto; next: boolean } | null>(null);
 
   useEffect(() => {
     if (!isLoading && !isSuperadmin) router.replace("/university/partners");
   }, [isLoading, isSuperadmin, router]);
 
-  const { data, isLoading: tLoading } = useQuery({
-    queryKey: ["university-templates"],
-    queryFn: () =>
-      preconfiguredAxios
-        .get("/api/university/templates")
-        .then((r) => r.data as { templates: TemplateOffer[] }),
-    enabled: !!account && isSuperadmin,
+  const { data, isLoading: tLoading } = useUniversityControllerListTemplates({
+    query: {
+      enabled: !!account && isSuperadmin,
+    },
   });
 
-  const toggle = useMutation({
-    mutationFn: ({ templateId, is_available }: { templateId: string; is_available: boolean }) =>
-      preconfiguredAxios.put(`/api/university/templates/${templateId}`, { is_available }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["university-templates"] });
-      queryClient.invalidateQueries({ queryKey: ["university-templates-for-invite"] });
+  const toggle = useUniversityControllerToggleTemplateOffer({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getUniversityControllerListTemplatesQueryKey() });
+      },
+      onError: (e: Error) => toast.error(e.message),
+      onSettled: () => setPending(null),
     },
-    onError: (e: Error) => toast.error(e.message),
-    onSettled: () => setPending(null),
   });
 
   const offers = (data?.templates ?? []).filter((o) => !o.template.is_deleted);
 
-  const templateColumns = useMemo<ColumnDef<TemplateOffer>[]>(
+  const templateColumns = useMemo<ColumnDef<UniversityTemplateOfferDto>[]>(
     () => [
       {
         id: "template",
@@ -174,7 +163,7 @@ export default function UniversityTemplatesPage() {
                 pending &&
                 toggle.mutate({
                   templateId: pending.offer.template.id,
-                  is_available: pending.next,
+                  data: { is_available: pending.next },
                 })
               }
             >

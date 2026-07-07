@@ -1,9 +1,14 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useUniversityProfile } from "@/app/providers/university-profile.provider";
-import { preconfiguredAxios } from "@/app/api/preconfig.axios";
+import {
+  useUniversityControllerListRegisteredCompanies,
+  useUniversityControllerListTemplates,
+  useUniversityControllerListInvites,
+  useUniversityControllerSendInvite,
+} from "@/app/api";
 import { PageContainer, PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,7 +54,7 @@ interface AvailableTemplate {
 interface RegisteredCompany {
   id: string;
   registered_name: string;
-  email: string;
+  email: string | null;
 }
 
 function InviteStatusBadge({ status }: { status: CompanyInvite["status"] }) {
@@ -134,21 +139,10 @@ function InviteModal({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  const { data: companiesData, isLoading: companiesLoading } = useQuery({
-    queryKey: ["university-registered-companies"],
-    queryFn: () =>
-      preconfiguredAxios
-        .get("/api/university/companies")
-        .then((r) => r.data as { companies: RegisteredCompany[] }),
-  });
+  const { data: companiesData, isLoading: companiesLoading } =
+    useUniversityControllerListRegisteredCompanies();
 
-  const { data: templatesData } = useQuery({
-    queryKey: ["university-templates-for-invite"],
-    queryFn: () =>
-      preconfiguredAxios
-        .get("/api/university/templates")
-        .then((r) => r.data as { templates: AvailableTemplate[] }),
-  });
+  const { data: templatesData } = useUniversityControllerListTemplates();
 
   const availableTemplates = (templatesData?.templates ?? []).filter((t) => t.is_available);
 
@@ -161,31 +155,19 @@ function InviteModal({
   const invitedName =
     mode === "registered" ? selectedCompany?.registered_name : companyName.trim() || undefined;
 
-  const send = useMutation({
-    mutationFn: () =>
-      preconfiguredAxios
-        .post("/api/university/invites", {
-          invitedEmail,
-          companyName: invitedName,
-          templateId: templateId || undefined,
-          personalMessage: message.trim() || undefined,
-        })
-        .then((r) => r.data as { superseded: boolean; message: string }),
-    onSuccess: (res) => {
-      toast(
-        res.superseded
-          ? "Invite sent. A previous pending invite to this email was superseded."
-          : "Invite sent.",
-        toastPresets.success,
-      );
-      onSent();
-      onClose();
+  const send = useUniversityControllerSendInvite({
+    mutation: {
+      onSuccess: () => {
+        toast("Invite sent.", toastPresets.success);
+        onSent();
+        onClose();
+      },
+      onError: (e: Error) => setError(e.message),
     },
-    onError: (e: Error) => setError(e.message),
   });
 
   const step1CanNext =
-    mode === "registered" ? !!selectedCompany : !!companyName.trim() && !!email.trim();
+    mode === "registered" ? !!selectedCompany?.email : !!companyName.trim() && !!email.trim();
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -247,7 +229,7 @@ function InviteModal({
                         const company = id
                           ? (companiesData?.companies ?? []).find((c) => c.id === id) ?? null
                           : null;
-                        setSelectedCompany(company);
+                        setSelectedCompany(company as RegisteredCompany | null);
                       }}
                       placeholder="Search companies…"
                     />
@@ -391,7 +373,14 @@ function InviteModal({
               <Button
                 onClick={() => {
                   setError("");
-                  send.mutate();
+                  send.mutate({
+                    data: {
+                      invitedEmail,
+                      companyName: invitedName,
+                      templateId: templateId || undefined,
+                      personalMessage: message.trim() || undefined,
+                    },
+                  });
                 }}
                 disabled={send.isPending}
               >
@@ -425,22 +414,12 @@ export default function InvitesPage() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showNoTemplatesPrompt, setShowNoTemplatesPrompt] = useState(false);
 
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ["university-invites"],
-    queryFn: () =>
-      preconfiguredAxios
-        .get("/api/university/invites")
-        .then((r) => r.data as { invites: CompanyInvite[] }),
-    enabled: !!account,
+  const { data, isLoading, refetch } = useUniversityControllerListInvites({
+    query: { enabled: !!account },
   });
 
-  const { data: templatesData } = useQuery({
-    queryKey: ["university-templates-for-invite"],
-    queryFn: () =>
-      preconfiguredAxios
-        .get("/api/university/templates")
-        .then((r) => r.data as { templates: AvailableTemplate[] }),
-    enabled: !!account,
+  const { data: templatesData } = useUniversityControllerListTemplates({
+    query: { enabled: !!account },
   });
   const availableTemplates = (templatesData?.templates ?? []).filter((t) => t.is_available);
 
@@ -526,7 +505,7 @@ export default function InvitesPage() {
         <DataTable
           id="invites"
           columns={columns}
-          data={invites}
+          data={invites as CompanyInvite[]}
           searchKey="company"
           searchPlaceholder="Search by company…"
           rowLabelSingular="invite"

@@ -38,6 +38,7 @@ import type {
   CompanyRegisterResponse,
   CompanyResetDto,
   ErrorResponse,
+  LoginViaInviteDto,
   RegisterInvitedCompanyDto,
 } from "../../models";
 
@@ -855,10 +856,15 @@ export const useCompanyAuthControllerRegisterInvited = <
 
   return useMutation(mutationOptions, queryClient);
 };
-export const companyAuthControllerLoginViaInvite = (signal?: AbortSignal) => {
+export const companyAuthControllerLoginViaInvite = (
+  loginViaInviteDto: LoginViaInviteDto,
+  signal?: AbortSignal,
+) => {
   return preconfiguredAxiosFunction<CompanyLoginInviteResponse>({
     url: `/api/auth/company/login-invite`,
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    data: loginViaInviteDto,
     signal,
   });
 };
@@ -870,13 +876,13 @@ export const getCompanyAuthControllerLoginViaInviteMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof companyAuthControllerLoginViaInvite>>,
     TError,
-    void,
+    { data: LoginViaInviteDto },
     TContext
   >;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof companyAuthControllerLoginViaInvite>>,
   TError,
-  void,
+  { data: LoginViaInviteDto },
   TContext
 > => {
   const mutationKey = ["companyAuthControllerLoginViaInvite"];
@@ -890,9 +896,11 @@ export const getCompanyAuthControllerLoginViaInviteMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof companyAuthControllerLoginViaInvite>>,
-    void
-  > = () => {
-    return companyAuthControllerLoginViaInvite();
+    { data: LoginViaInviteDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return companyAuthControllerLoginViaInvite(data);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -901,7 +909,7 @@ export const getCompanyAuthControllerLoginViaInviteMutationOptions = <
 export type CompanyAuthControllerLoginViaInviteMutationResult = NonNullable<
   Awaited<ReturnType<typeof companyAuthControllerLoginViaInvite>>
 >;
-
+export type CompanyAuthControllerLoginViaInviteMutationBody = LoginViaInviteDto;
 export type CompanyAuthControllerLoginViaInviteMutationError = ErrorResponse;
 
 export const useCompanyAuthControllerLoginViaInvite = <
@@ -912,7 +920,7 @@ export const useCompanyAuthControllerLoginViaInvite = <
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof companyAuthControllerLoginViaInvite>>,
       TError,
-      void,
+      { data: LoginViaInviteDto },
       TContext
     >;
   },
@@ -920,7 +928,7 @@ export const useCompanyAuthControllerLoginViaInvite = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof companyAuthControllerLoginViaInvite>>,
   TError,
-  void,
+  { data: LoginViaInviteDto },
   TContext
 > => {
   const mutationOptions =

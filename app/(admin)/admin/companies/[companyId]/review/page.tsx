@@ -2,10 +2,10 @@
 import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { ColumnDef } from "@tanstack/react-table";
-import { preconfiguredAxios } from "@/app/api/preconfig.axios";
+import { getAdminControllerCompanyReviewQueueQueryKey, useAdminControllerCompanyReviewDetail, useAdminControllerApproveCompany, useAdminControllerRejectCompany } from "@/app/api";
 import { PageContainer } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -261,19 +261,13 @@ export default function AdminCompanyReviewPage() {
   const [approvalExpiresAt, setApprovalExpiresAt] = useState("");
   const [selectedPast, setSelectedPast] = useState<HistoryEntry | null>(null);
 
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ["admin-company-review", companyId],
-    queryFn: () =>
-      preconfiguredAxios
-        .get(`/api/admin/companies/${companyId}/review`)
-        .then((r) => r.data as ReviewDetail),
-    enabled: !!companyId,
-    refetchInterval: 25 * 60 * 1000,
+  const { data, isLoading, refetch } = useAdminControllerCompanyReviewDetail(companyId, {
+    query: { enabled: !!companyId, refetchInterval: 25 * 60 * 1000 },
   });
 
   const invalidate = () => {
     refetch();
-    queryClient.invalidateQueries({ queryKey: ["admin-company-reviews"] });
+    queryClient.invalidateQueries({ queryKey: getAdminControllerCompanyReviewQueueQueryKey() });
   };
 
   const onConflict = (e: Error) => {
@@ -286,41 +280,43 @@ export default function AdminCompanyReviewPage() {
     return false;
   };
 
-  const approve = useMutation({
-    mutationFn: () =>
-      preconfiguredAxios.post(`/api/admin/companies/${companyId}/approve`, {
-        document_review_details: buildReviewDetails(reviewValues),
-        approval_expires_at: approvalExpiresAt,
-      }),
-    onSuccess: () => {
-      toast.success("Company verified");
-      setReviewValues({});
-      setApprovalExpiresAt("");
-      invalidate();
-    },
-    onError: (e: Error) => {
-      if (!onConflict(e)) toast.error(e.message);
+  const approve = useAdminControllerApproveCompany({
+    mutation: {
+      onSuccess: () => {
+        toast.success("Company verified");
+        setReviewValues({});
+        setApprovalExpiresAt("");
+        invalidate();
+      },
+      onError: (e: Error) => {
+        if (!onConflict(e)) toast.error(e.message);
+      },
     },
   });
 
-  const reject = useMutation({
-    mutationFn: () =>
-      preconfiguredAxios.post(`/api/admin/companies/${companyId}/reject`, {
-        reason: reason || undefined,
-      }),
-    onSuccess: () => {
-      toast.success("Company review rejected");
-      setShowReject(false);
-      setReason("");
-      invalidate();
-    },
-    onError: (e: Error) => {
-      if (!onConflict(e)) toast.error(e.message);
+  const reject = useAdminControllerRejectCompany({
+    mutation: {
+      onSuccess: () => {
+        toast.success("Company review rejected");
+        setShowReject(false);
+        setReason("");
+        invalidate();
+      },
+      onError: (e: Error) => {
+        if (!onConflict(e)) toast.error(e.message);
+      },
     },
   });
 
   const { openEntry, pastEntries } = useMemo(() => {
-    const visible = (data?.history ?? []).filter((h) => h.status !== "superseded");
+    const visible = (data?.history ?? [])
+      .filter((h) => h.status !== "superseded")
+      .map((h): HistoryEntry => ({
+        ...h,
+        document_review_details: (h.document_review_details ?? {}) as ReviewFieldDetails,
+        material: h.material as Record<string, string | null> | null,
+        documents: (h.documents ?? []) as ReviewDoc[],
+      }));
     const open = data?.openReviewId ? visible.find((h) => h.id === data.openReviewId) : undefined;
     const past = visible.filter((h) => h.id !== data?.openReviewId);
     return { openEntry: open ?? null, pastEntries: past };
@@ -421,7 +417,7 @@ export default function AdminCompanyReviewPage() {
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction
                     className="bg-supportive text-supportive-foreground hover:bg-supportive/90"
-                    onClick={() => approve.mutate()}
+                    onClick={() => approve.mutate({ companyId, data: { document_review_details: buildReviewDetails(reviewValues), approval_expires_at: approvalExpiresAt } })}
                   >
                     Approve
                   </AlertDialogAction>
@@ -538,7 +534,7 @@ export default function AdminCompanyReviewPage() {
             <Button
               scheme="destructive"
               disabled={reject.isPending}
-              onClick={() => reject.mutate()}
+              onClick={() => reject.mutate({ companyId, data: { reason: reason || undefined } })}
             >
               {reject.isPending && <Loader2 className="animate-spin" />}
               {reject.isPending ? "Rejecting…" : "Reject"}

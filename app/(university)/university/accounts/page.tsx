@@ -1,10 +1,18 @@
 "use client";
 import { useMemo, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { toast } from "sonner";
 import { useUniversityProfile } from "@/app/providers/university-profile.provider";
-import { preconfiguredAxios } from "@/app/api/preconfig.axios";
+import {
+  getUniversityControllerGetAccountsQueryKey,
+  useUniversityControllerGetAccounts,
+  useUniversityControllerCreateStaff,
+  useUniversityControllerDeactivateStaff,
+  useUniversityControllerReactivateStaff,
+  useUniversityControllerResendInvite,
+  type UniversityStaffAccountDto,
+} from "@/app/api";
 import { PageContainer, PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,15 +32,6 @@ import {
 } from "@/components/ui/dialog";
 import { Loader2, Plus } from "lucide-react";
 
-interface StaffAccount {
-  id: string;
-  email: string;
-  display_name: string;
-  role: "superadmin" | "staff";
-  is_deactivated: boolean | null;
-  created_at: string;
-}
-
 function InviteStaffDialog() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -40,21 +39,18 @@ function InviteStaffDialog() {
   const [name, setName] = useState("");
   const [error, setError] = useState("");
 
-  const createStaff = useMutation({
-    mutationFn: () =>
-      preconfiguredAxios.post("/api/university/accounts", {
-        email,
-        display_name: name,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["university-accounts"] });
-      toast.success("Invitation sent");
-      setEmail("");
-      setName("");
-      setError("");
-      setOpen(false);
+  const createStaff = useUniversityControllerCreateStaff({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getUniversityControllerGetAccountsQueryKey() });
+        toast.success("Invitation sent");
+        setEmail("");
+        setName("");
+        setError("");
+        setOpen(false);
+      },
+      onError: (e: Error) => setError(e.message),
     },
-    onError: (e: Error) => setError(e.message),
   });
 
   return (
@@ -82,7 +78,7 @@ function InviteStaffDialog() {
           onSubmit={(e) => {
             e.preventDefault();
             setError("");
-            createStaff.mutate();
+            createStaff.mutate({ data: { email, display_name: name } });
           }}
           className="space-y-4"
         >
@@ -131,38 +127,35 @@ export default function AccountsPage() {
   const { account, isLoading, isSuperadmin } = useUniversityProfile();
   const queryClient = useQueryClient();
 
-  const { data, isLoading: accountsLoading } = useQuery({
-    queryKey: ["university-accounts"],
-    queryFn: () =>
-      preconfiguredAxios
-        .get("/api/university/accounts")
-        .then((r) => r.data as { accounts: StaffAccount[] }),
-    enabled: !!account && isSuperadmin,
+  const { data, isLoading: accountsLoading } = useUniversityControllerGetAccounts({
+    query: {
+      enabled: !!account && isSuperadmin,
+    },
   });
 
   const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: ["university-accounts"] });
+    queryClient.invalidateQueries({ queryKey: getUniversityControllerGetAccountsQueryKey() });
 
-  const deactivate = useMutation({
-    mutationFn: (id: string) =>
-      preconfiguredAxios.patch(`/api/university/accounts/${id}/deactivate`),
-    onSuccess: invalidate,
-    onError: (e: Error) => toast.error(e.message),
+  const deactivate = useUniversityControllerDeactivateStaff({
+    mutation: {
+      onSuccess: invalidate,
+      onError: (e: Error) => toast.error(e.message),
+    },
   });
-  const reactivate = useMutation({
-    mutationFn: (id: string) =>
-      preconfiguredAxios.patch(`/api/university/accounts/${id}/reactivate`),
-    onSuccess: invalidate,
-    onError: (e: Error) => toast.error(e.message),
+  const reactivate = useUniversityControllerReactivateStaff({
+    mutation: {
+      onSuccess: invalidate,
+      onError: (e: Error) => toast.error(e.message),
+    },
   });
-  const resendInvite = useMutation({
-    mutationFn: (id: string) =>
-      preconfiguredAxios.post(`/api/university/accounts/${id}/resend-invite`),
-    onSuccess: () => toast.success("Invitation resent"),
-    onError: (e: Error) => toast.error(e.message),
+  const resendInvite = useUniversityControllerResendInvite({
+    mutation: {
+      onSuccess: () => toast.success("Invitation resent"),
+      onError: (e: Error) => toast.error(e.message),
+    },
   });
 
-  const staffColumns = useMemo<ColumnDef<StaffAccount>[]>(
+  const staffColumns = useMemo<ColumnDef<UniversityStaffAccountDto>[]>(
     () => [
       {
         id: "name",
@@ -204,7 +197,7 @@ export default function AccountsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => resendInvite.mutate(a.id)}
+                onClick={() => resendInvite.mutate({ accountId: a.id })}
                 disabled={resendInvite.isPending}
               >
                 Resend invite
@@ -214,7 +207,7 @@ export default function AccountsPage() {
                   variant="outline"
                   scheme="supportive"
                   size="sm"
-                  onClick={() => reactivate.mutate(a.id)}
+                  onClick={() => reactivate.mutate({ accountId: a.id })}
                   disabled={reactivate.isPending}
                 >
                   Reactivate
@@ -224,7 +217,7 @@ export default function AccountsPage() {
                   variant="outline"
                   scheme="destructive"
                   size="sm"
-                  onClick={() => deactivate.mutate(a.id)}
+                  onClick={() => deactivate.mutate({ accountId: a.id })}
                   disabled={deactivate.isPending}
                 >
                   Deactivate

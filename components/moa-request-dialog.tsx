@@ -1,8 +1,15 @@
 "use client";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { preconfiguredAxios, type ApiError } from "@/app/api/preconfig.axios";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  getCompanyControllerListMoasQueryKey,
+  getCompanyControllerListPendingInvitesQueryKey,
+  getCompanyControllerListQueuedMoasQueryKey,
+  useCompanyControllerCreateQueuedMoa,
+  useCompanyControllerGetRequestableTemplates,
+  useCompanyControllerRequestMoa,
+} from "@/app/api/app/api/endpoints/company/company";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +29,8 @@ import { toast } from "sonner";
 import { toastPresets } from "@/components/sonner-toaster";
 import { cn } from "@/lib/utils";
 import { Check, Loader2, Upload } from "lucide-react";
+
+type ApiError = { code?: string; data?: { limit?: number }; response?: { data?: { code?: string; data?: { limit?: number } } } };
 
 interface Template {
   id: string;
@@ -94,64 +103,65 @@ export function RequestDialog({
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["university-templates", universityId],
-    queryFn: () =>
-      preconfiguredAxios
-        .get(`/api/company/universities/${universityId}/templates`)
-        .then((r) => r.data as { templates: Template[]; university: { registered_name: string } }),
-  });
+  const { data, isLoading } = useCompanyControllerGetRequestableTemplates(universityId);
 
-  const request = useMutation({
-    mutationFn: () => {
-      const fd = new FormData();
-      fd.append("universityId", universityId);
-      fd.append("templateId", selectedTemplate!);
-      fd.append("repName", repName);
-      fd.append("repTitle", repTitle);
-      if (sigMode === "upload" && sigFile) {
-        fd.append("signature", sigFile);
-      } else {
-        fd.append("repSignatureText", sigText);
-      }
-      if (inviteId) fd.append("invite_id", inviteId);
-      const endpoint = verified ? "/api/company/moas" : "/api/company/queued-moas";
-      return preconfiguredAxios
-        .post(endpoint, fd)
-        .then((r) => r.data as { moa?: { id: string }; queued?: { id: string } });
-    },
-    onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ["company-moas"] });
-      queryClient.invalidateQueries({ queryKey: ["company-pending-invites"] });
-      if (verified && res.moa) {
-        toast("MOA Issued", toastPresets.success);
-        onClose();
-        router.push(`/company/moas/${res.moa.id}`);
-      } else {
-        toast(
-          "MOA request submitted — it will be issued automatically once your company is verified.",
-          toastPresets.success,
-        );
-        onClose();
-        router.push("/company/dashboard");
-      }
-    },
-    onError: (e: Error) => {
-      const err = e as ApiError;
-      const code = err.response?.data?.code || "";
-      if (code === "AT_ACTIVE_MOA_CAP") {
-        const limit = err.response?.data?.data?.limit ?? "the maximum";
-        setError(`You have reached the maximum of ${limit} active MOAs with this university.`);
-      } else if (code === "COMPANY_NOT_VERIFIED") {
-        setError(
-          "Your company must be verified by the platform team before you can request MOAs. " +
-            "If you recently changed your details, they need to be re-verified.",
-        );
-      } else {
-        setError("Couldn't request from this university at this time. Please contact us for help.");
-      }
-    },
-  });
+  const requestMoa = useCompanyControllerRequestMoa();
+  const createQueuedMoa = useCompanyControllerCreateQueuedMoa();
+  const isRequestPending = requestMoa.isPending || createQueuedMoa.isPending;
+
+  const handleSuccess = (res: { moa?: { id: string }; queued?: { id: string } }) => {
+    queryClient.invalidateQueries({ queryKey: getCompanyControllerListMoasQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getCompanyControllerListQueuedMoasQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getCompanyControllerListPendingInvitesQueryKey() });
+    if (verified && res.moa) {
+      toast("MOA Issued", toastPresets.success);
+      onClose();
+      router.push(`/company/moas/${res.moa.id}`);
+    } else {
+      toast(
+        "MOA request submitted — it will be issued automatically once your company is verified.",
+        toastPresets.success,
+      );
+      onClose();
+      router.push("/company/dashboard");
+    }
+  };
+
+  const handleError = (e: unknown) => {
+    const err = e as ApiError;
+    const code = err.response?.data?.code || err.code || "";
+    if (code === "AT_ACTIVE_MOA_CAP") {
+      const limit = err.response?.data?.data?.limit ?? err.data?.limit ?? "the maximum";
+      setError(`You have reached the maximum of ${limit} active MOAs with this university.`);
+    } else if (code === "COMPANY_NOT_VERIFIED") {
+      setError(
+        "Your company must be verified by the platform team before you can request MOAs. " +
+          "If you recently changed your details, they need to be re-verified.",
+      );
+    } else {
+      setError("Couldn't request from this university at this time. Please contact us for help.");
+    }
+  };
+
+  const submitRequest = () => {
+    const data = {
+      universityId,
+      templateId: selectedTemplate!,
+      repName,
+      repTitle,
+      ...(sigMode === "upload" && sigFile
+        ? { signature: sigFile }
+        : { repSignatureText: sigText }),
+      ...(inviteId ? { invite_id: inviteId } : {}),
+    };
+
+    if (verified) {
+      requestMoa.mutate({ data }, { onSuccess: handleSuccess, onError: handleError });
+      return;
+    }
+
+    createQueuedMoa.mutate({ data }, { onSuccess: handleSuccess, onError: handleError });
+  };
 
   const templates = data?.templates ?? [];
   const universityName = data?.university?.registered_name ?? "";
@@ -352,11 +362,11 @@ export function RequestDialog({
                   Back
                 </Button>
                 <Button
-                  onClick={() => request.mutate()}
-                  disabled={!step2Ready || request.isPending}
+                  onClick={submitRequest}
+                  disabled={!step2Ready || isRequestPending}
                 >
-                  {request.isPending && <Loader2 className="animate-spin" />}
-                  {request.isPending ? "Requesting…" : "Request MOA"}
+                  {isRequestPending && <Loader2 className="animate-spin" />}
+                  {isRequestPending ? "Requesting…" : "Request MOA"}
                 </Button>
               </>
             )}

@@ -1,9 +1,8 @@
 "use client";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { preconfiguredAxios } from "@/app/api/preconfig.axios";
+import { useAdminControllerGetUniversityMoaDetail } from "@/app/api";
 import { PageContainer } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -56,14 +55,12 @@ export default function AdminMoaDetailPage() {
   const { universityId, moaId } = useParams<{ universityId: string; moaId: string }>();
   const [previewDoc, setPreviewDoc] = useState<{ url: string; label: string } | null>(null);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["admin-moa", universityId, moaId],
-    queryFn: () =>
-      preconfiguredAxios
-        .get(`/api/admin/universities/${universityId}/moas/${moaId}`)
-        .then((r) => r.data as MoaDetail),
-    enabled: !!universityId && !!moaId,
-  });
+  const { data, isLoading } = useAdminControllerGetUniversityMoaDetail(
+    universityId,
+    moaId,
+  );
+
+  const detail = data as unknown as MoaDetail | undefined;
 
   if (isLoading) {
     return (
@@ -74,7 +71,7 @@ export default function AdminMoaDetailPage() {
       </PageContainer>
     );
   }
-  if (!data?.moa) {
+  if (!data) {
     return (
       <PageContainer className="max-w-3xl">
         <Card>
@@ -86,7 +83,7 @@ export default function AdminMoaDetailPage() {
     );
   }
 
-  const { moa, pdfUrl, companyDocuments = [] } = data;
+  const { moa, pdfUrl, companyDocuments = [] } = detail!;
   const company = moa.company;
 
   return (

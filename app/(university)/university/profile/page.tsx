@@ -1,9 +1,16 @@
 "use client";
 import { useState, useRef } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useUniversityProfile } from "@/app/providers/university-profile.provider";
-import { preconfiguredAxios } from "@/app/api/preconfig.axios";
+import {
+  getUniversityControllerGetProfileQueryKey,
+  getUniversityControllerMeQueryKey,
+  useUniversityControllerGetProfile,
+  useUniversityControllerPatchProfile,
+  useUniversityControllerUploadLogo,
+  useUniversityControllerUploadSignature,
+} from "@/app/api";
 import { PageContainer } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,66 +57,56 @@ export default function UniversityProfilePage() {
   const [sigPreviewUrl, setSigPreviewUrl] = useState<string | null>(null);
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
 
-  const { data } = useQuery({
-    queryKey: ["university-profile"],
-    queryFn: () =>
-      preconfiguredAxios
-        .get("/api/university/profile")
-        .then((r) => r.data as { university: UniversityProfile }),
-    enabled: !!account,
+  const { data } = useUniversityControllerGetProfile({
+    query: { enabled: !!account },
   });
 
   const uni = data?.university;
   const displayLogoUrl = logoPreviewUrl ?? uni?.logo_url ?? null;
   const displaySigUrl = sigPreviewUrl ?? uni?.rep_signature_url ?? null;
 
-  const save = useMutation({
-    mutationFn: () => preconfiguredAxios.patch("/api/university/profile", draft),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["university-profile"] });
-      queryClient.invalidateQueries({ queryKey: ["university-me"] });
-      toast.success("Profile saved");
-      cancelEdit();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const uploadLogo = useMutation({
-    mutationFn: (file: File) => {
-      const fd = new FormData();
-      fd.append("file", file);
-      return preconfiguredAxios.post("/api/university/profile/logo", fd);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["university-profile"] });
-      toast.success("Logo uploaded");
-    },
-    onError: (e: Error) => {
-      setLogoPreviewUrl(null);
-      toast.error(e.message);
+  const save = useUniversityControllerPatchProfile({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getUniversityControllerGetProfileQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getUniversityControllerMeQueryKey() });
+        toast.success("Profile saved");
+        cancelEdit();
+      },
+      onError: (e: Error) => toast.error(e.message),
     },
   });
 
-  const uploadSig = useMutation({
-    mutationFn: (file: File) => {
-      const fd = new FormData();
-      fd.append("file", file);
-      return preconfiguredAxios.post("/api/university/profile/signature", fd);
+  const uploadLogo = useUniversityControllerUploadLogo({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getUniversityControllerGetProfileQueryKey() });
+        toast.success("Logo uploaded");
+      },
+      onError: (e: Error) => {
+        setLogoPreviewUrl(null);
+        toast.error(e.message);
+      },
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["university-profile"] });
-      toast.success("Signature uploaded");
-    },
-    onError: (e: Error) => {
-      setSigPreviewUrl(null);
-      toast.error(e.message);
+  });
+
+  const uploadSig = useUniversityControllerUploadSignature({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getUniversityControllerGetProfileQueryKey() });
+        toast.success("Signature uploaded");
+      },
+      onError: (e: Error) => {
+        setSigPreviewUrl(null);
+        toast.error(e.message);
+      },
     },
   });
 
   if (isLoading || !account) return null;
 
   function persisted(key: string): string {
-    return `${uni?.[key] ?? ""}`;
+    return `${(uni as Record<string, unknown> | undefined)?.[key] ?? ""}`;
   }
   function draftVal(key: string): string {
     return key in draft ? draft[key] : persisted(key);
@@ -163,7 +160,7 @@ export default function UniversityProfilePage() {
         <Button variant="ghost" size="sm" onClick={cancelEdit} disabled={save.isPending}>
           Cancel
         </Button>
-        <Button size="sm" onClick={() => save.mutate()} disabled={save.isPending}>
+        <Button size="sm" onClick={() => save.mutate({ data: draft })} disabled={save.isPending}>
           {save.isPending && <Loader2 className="animate-spin" />}
           Save
         </Button>
@@ -226,7 +223,7 @@ export default function UniversityProfilePage() {
               const f = e.target.files?.[0];
               if (!f) return;
               setLogoPreviewUrl(URL.createObjectURL(f));
-              uploadLogo.mutate(f);
+              uploadLogo.mutate({ data: { file: f } });
               e.target.value = "";
             }}
           />
@@ -306,7 +303,7 @@ export default function UniversityProfilePage() {
                   const f = e.target.files?.[0];
                   if (!f) return;
                   setSigPreviewUrl(URL.createObjectURL(f));
-                  uploadSig.mutate(f);
+                  uploadSig.mutate({ data: { file: f } });
                   e.target.value = "";
                 }}
               />
