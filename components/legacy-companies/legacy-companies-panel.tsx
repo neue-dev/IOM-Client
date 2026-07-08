@@ -1248,7 +1248,7 @@ function UploadDialog({
 interface BulkCsvRowResult {
   row: number;
   company_name: string;
-  status: "created_company" | "appended_moa" | "invalid" | "failed";
+  status: "created_company" | "appended_moa" | "updated_company" | "invalid" | "failed";
   message?: string;
 }
 
@@ -1296,9 +1296,7 @@ function CsvUploadDialog({
     onSuccess: (data) => {
       if (!data) return;
       setResult(data);
-      if (data.summary.createdCompanies + data.summary.appendedMoas > 0) {
-        queryClient.invalidateQueries({ queryKey: [queryKeyPrefix] });
-      }
+      queryClient.invalidateQueries({ queryKey: [queryKeyPrefix] });
     },
     onError: () => {
       toast("CSV upload failed", toastPresets.destructive);
@@ -1314,14 +1312,14 @@ function CsvUploadDialog({
     },
     {
       name: "effective_date",
-      required: true,
-      description: "MOA start date (YYYY-MM-DD)",
+      required: false,
+      description: "MOA start date (YYYY-MM-DD). Required when adding an MOA",
       example: "2023-01-15",
     },
     {
       name: "expiry_date",
-      required: true,
-      description: "MOA expiry date (YYYY-MM-DD)",
+      required: false,
+      description: "MOA expiry date (YYYY-MM-DD). Required when adding an MOA",
       example: "2025-01-15",
     },
     {
@@ -1412,7 +1410,7 @@ function CsvUploadDialog({
               <p className="text-sm font-medium">
                 Required columns:{" "}
                 <span className="font-normal text-muted-foreground">
-                  company_name, effective_date, expiry_date
+                  company_name
                 </span>
               </p>
 
@@ -1505,8 +1503,8 @@ function CsvUploadDialog({
                   </table>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Each row is one MOA. At least company_name, effective_date,
-                  and expiry_date are required. Wrap values containing commas in
+                  Each row creates or updates one legacy company. Add both effective_date
+                  and expiry_date when the row should also add an MOA. Wrap values containing commas in
                   double quotes (e.g.{" "}
                   <code className="text-xs">&quot;Acme, Inc.&quot;</code>). Use
                   two double quotes to escape a literal quote (e.g.{" "}
@@ -1570,7 +1568,7 @@ function CsvUploadDialog({
 
               {result.results.filter(
                 (r) =>
-                  r.status !== "created_company" && r.status !== "appended_moa",
+                  r.status !== "created_company" && r.status !== "appended_moa" && r.status !== "updated_company",
               ).length > 0 && (
                 <div>
                   <p className="font-medium mb-2">Row details</p>
@@ -1584,7 +1582,8 @@ function CsvUploadDialog({
                         <span
                           className={
                             r.status === "created_company" ||
-                            r.status === "appended_moa"
+                            r.status === "appended_moa" ||
+                            r.status === "updated_company"
                               ? "text-green-700"
                               : "text-red-700"
                           }
@@ -1663,9 +1662,7 @@ function ZipUploadDialog({
     onSuccess: (data) => {
       if (!data) return;
       setResult(data);
-      if (data.summary.createdCompanies + data.summary.appendedMoas > 0) {
-        queryClient.invalidateQueries({ queryKey: [queryKeyPrefix] });
-      }
+      queryClient.invalidateQueries({ queryKey: [queryKeyPrefix] });
     },
     onError: () => {
       toast("ZIP upload failed", toastPresets.destructive);
@@ -1681,14 +1678,14 @@ function ZipUploadDialog({
     },
     {
       name: "effective_date",
-      required: true,
-      description: "MOA start date (YYYY-MM-DD)",
+      required: false,
+      description: "MOA start date (YYYY-MM-DD). Required when adding an MOA",
       example: "2023-01-15",
     },
     {
       name: "expiry_date",
-      required: true,
-      description: "MOA expiry date (YYYY-MM-DD)",
+      required: false,
+      description: "MOA expiry date (YYYY-MM-DD). Required when adding an MOA",
       example: "2025-01-15",
     },
     {
@@ -1797,7 +1794,7 @@ function ZipUploadDialog({
           <DialogDescription>
             Upload a ZIP file containing a{" "}
             <code className="text-xs">legacy-import.csv</code> manifest and
-            referenced PDF files. Each CSV row represents one legacy MOA.
+            referenced PDF files. Each CSV row creates or updates one legacy company, and can also add an MOA.
           </DialogDescription>
         </DialogHeader>
 
@@ -1807,7 +1804,7 @@ function ZipUploadDialog({
               <p className="text-sm font-medium">
                 Required columns:{" "}
                 <span className="font-normal text-muted-foreground">
-                  company_name, effective_date, expiry_date
+                  company_name
                 </span>
               </p>
 
@@ -1915,9 +1912,9 @@ company-documents/acme-mayor.pdf`}
                   </table>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Each row is one MOA. At least company_name, effective_date,
-                  and expiry_date are required. File columns reference paths
-                  inside the ZIP. Invalid rows are skipped; valid rows are still
+                  Each row creates or updates one legacy company. Add both effective_date
+                  and expiry_date when the row should also add an MOA. A moa_file requires both MOA dates.
+                  File columns reference paths inside the ZIP. Invalid rows are skipped; valid rows are still
                   uploaded. Wrap values containing commas in double quotes.
                 </p>
               </div>
@@ -1975,7 +1972,7 @@ company-documents/acme-mayor.pdf`}
 
               {result.results.filter(
                 (r) =>
-                  r.status !== "created_company" && r.status !== "appended_moa",
+                  r.status !== "created_company" && r.status !== "appended_moa" && r.status !== "updated_company",
               ).length > 0 && (
                 <div>
                   <p className="font-medium mb-2">Row details</p>
@@ -1989,7 +1986,8 @@ company-documents/acme-mayor.pdf`}
                         <span
                           className={
                             r.status === "created_company" ||
-                            r.status === "appended_moa"
+                            r.status === "appended_moa" ||
+                            r.status === "updated_company"
                               ? "text-green-700"
                               : "text-red-700"
                           }
