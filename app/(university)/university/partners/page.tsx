@@ -10,16 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
-import {
-  Dialog,
-  DialogBottomSheet,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { useModal } from "@/app/providers/modal-provider";
 import { useIomModalRegistry } from "@/components/modal-registry";
 import { Card } from "@/components/ui/card";
 import { MoaStatusBadge } from "@/components/status-badge";
-import { LegacyCompaniesPanel, LegacyCompanyDetail, formatLegacyLabel, formatLegacyFieldLabel, formatLegacyMoaPeriod, isFilledValue, isLegacyMoaExpired } from "@/components/legacy-companies/legacy-companies-panel";
-import { UploadDialog, CsvUploadDialog, ZipUploadDialog } from "@/components/legacy-companies/legacy-companies-panel";
+import { LegacyCompaniesPanel, LegacyCompanyDetail, formatLegacyLabel, formatLegacyFieldLabel, formatLegacyMoaPeriod, isFilledValue, isLegacyMoaExpired, UploadDialog, CsvUploadDialog, ZipUploadDialog } from "@/components/legacy-companies/legacy-companies-panel";
 import { formatDateWithoutTime, cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { toastPresets } from "@/components/sonner-toaster";
@@ -125,63 +120,54 @@ function VerifiedDocumentDetails({ details }: { details: DocReviewDetails }) {
 }
 
 function DocumentsSection({ documents }: { documents: CompanyDoc[] }) {
-  const [previewDoc, setPreviewDoc] = useState<CompanyDoc | null>(null);
+  const { openModal } = useModal();
   return (
-    <>
-      <Card className="gap-4 py-5">
-        <p className="px-5 text-sm font-semibold text-gray-900">Documents</p>
-        <div className="space-y-1">
-          {DOC_TYPES_LIST.map(([type, label]) => {
-            const doc = documents.find((d) => d.type === type);
-            return (
-              <div
-                key={type}
-                className="flex flex-row items-center px-5 duration-200 hover:cursor-pointer hover:bg-gray-50"
-                onClick={() => doc?.url && setPreviewDoc(doc)}
-              >
-                {doc
-                  ? <CircleCheck className="text-supportive flex-shrink-0" />
-                  : <CircleAlert className="text-warning flex-shrink-0" />
-                }
-                <div className="flex flex-1 items-center gap-3 rounded-[0.16em] p-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-800">{label}</p>
-                    {doc && (
-                      <p className="text-muted-foreground mt-0.5 truncate text-xs">{doc.filename}</p>
-                    )}
+    <Card className="gap-4 py-5">
+      <p className="px-5 text-sm font-semibold text-gray-900">Documents</p>
+      <div className="space-y-1">
+        {DOC_TYPES_LIST.map(([type, label]) => {
+          const doc = documents.find((d) => d.type === type);
+          return (
+            <div
+              key={type}
+              className="flex flex-row items-center px-5 duration-200 hover:cursor-pointer hover:bg-gray-50"
+              onClick={() => {
+                if (!doc?.url) return;
+                openModal("preview-doc", doc.url ? (
+                  <iframe
+                    src={doc.url}
+                    className="h-full w-full border-none"
+                    title={doc.filename}
+                  />
+                ) : (
+                  <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
+                    Couldn&apos;t load that document.
                   </div>
+                ), {
+                  title: DOC_LABELS[doc.type] ?? doc.type.replace(/_/g, " "),
+                  panelClassName: "!w-full sm:!max-w-4xl",
+                  contentClassName: "min-h-0 flex-1 overflow-hidden p-0 sm:p-0",
+                  showHeaderDivider: true,
+                });
+              }}
+            >
+              {doc
+                ? <CircleCheck className="text-supportive flex-shrink-0" />
+                : <CircleAlert className="text-warning flex-shrink-0" />
+              }
+              <div className="flex flex-1 items-center gap-3 rounded-[0.16em] p-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-800">{label}</p>
+                  {doc && (
+                    <p className="text-muted-foreground mt-0.5 truncate text-xs">{doc.filename}</p>
+                  )}
                 </div>
               </div>
-            );
-          })}
-        </div>
-      </Card>
-
-      {previewDoc && (
-        <Dialog open onOpenChange={(o) => !o && setPreviewDoc(null)}>
-          <DialogBottomSheet className="flex h-[88vh] flex-col p-0">
-            <div className="flex items-center border-b border-gray-100 px-5 py-3.5 pr-14">
-              <DialogTitle className="text-sm font-medium text-gray-900">
-                {DOC_LABELS[previewDoc.type] ?? previewDoc.type.replace(/_/g, " ")}
-              </DialogTitle>
             </div>
-            <div className="min-h-0 flex-1 overflow-hidden">
-              {previewDoc.url ? (
-                <iframe
-                  src={previewDoc.url}
-                  className="h-full w-full border-none"
-                  title={previewDoc.filename}
-                />
-              ) : (
-                <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-                  Couldn&apos;t load that document.
-                </div>
-              )}
-            </div>
-          </DialogBottomSheet>
-        </Dialog>
-      )}
-    </>
+          );
+        })}
+      </div>
+    </Card>
   );
 }
 
@@ -349,7 +335,7 @@ function ReadOnlyLegacyDetail({
 
 function LegacyRecordsSection({ currentCompanyId: companyId }: { currentCompanyId: string | null }) {
   const [open, setOpen] = useState(false);
-  const [previewDoc, setPreviewDoc] = useState<{ url: string; title: string } | null>(null);
+  const { openModal } = useModal();
 
   const { data, isLoading } = useQuery({
     queryKey: ["partner-legacy-company", companyId],
@@ -386,29 +372,23 @@ function LegacyRecordsSection({ currentCompanyId: companyId }: { currentCompanyI
           ) : (
             <ReadOnlyLegacyDetail
               company={company}
-              onPreviewDoc={(url, title) => setPreviewDoc({ url, title })}
+              onPreviewDoc={(url, title) =>
+                openModal("preview-doc", (
+                  <iframe
+                    src={url}
+                    className="h-full w-full border-none"
+                    title={title}
+                  />
+                ), {
+                  title,
+                  panelClassName: "!w-full sm:!max-w-4xl",
+                  contentClassName: "min-h-0 flex-1 overflow-hidden p-0 sm:p-0",
+                  showHeaderDivider: true,
+                })
+              }
             />
           )}
         </div>
-      )}
-
-      {previewDoc && (
-        <Dialog open onOpenChange={(o) => !o && setPreviewDoc(null)}>
-          <DialogBottomSheet className="flex h-[88vh] flex-col p-0">
-            <div className="flex items-center border-b border-gray-100 px-5 py-3.5 pr-14">
-              <DialogTitle className="text-sm font-medium text-gray-900">
-                {previewDoc.title}
-              </DialogTitle>
-            </div>
-            <div className="min-h-0 flex-1 overflow-hidden">
-              <iframe
-                src={previewDoc.url}
-                className="h-full w-full border-none"
-                title={previewDoc.title}
-              />
-            </div>
-          </DialogBottomSheet>
-        </Dialog>
       )}
     </div>
   );
@@ -425,12 +405,8 @@ export default function PartnersPage() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
+  const { openModal, closeModal } = useModal();
   const modal = useIomModalRegistry();
-
-  const [legacyUploadOpen, setLegacyUploadOpen] = useState(false);
-  const [csvUploadOpen, setCsvUploadOpen] = useState(false);
-  const [zipUploadOpen, setZipUploadOpen] = useState(false);
-  const [previewDoc, setPreviewDoc] = useState<{ url: string; title: string } | null>(null);
 
   // Clean up timer on unmount.
   useEffect(() => () => clearTimeout(timerRef.current), []);
@@ -784,7 +760,23 @@ export default function PartnersPage() {
                 toolbarActions={
                   <div className="flex">
                     <Button
-                      onClick={() => setLegacyUploadOpen(true)}
+                      onClick={() =>
+                        openModal("legacy-upload", (
+                          <UploadDialog
+                            uploadEndpoint="/api/university/legacy-companies"
+                            queryKeyPrefix="university-legacy-companies"
+                            onClose={() => {
+                              closeModal("legacy-upload");
+                              queryClient.invalidateQueries({ queryKey: ["university-partners"] });
+                              queryClient.invalidateQueries({ queryKey: ["university-legacy-companies"] });
+                            }}
+                          />
+                        ), {
+                          title: "Add Legacy Company",
+                          description: "Create a legacy company record. You can add MOAs now or later from the company detail view.",
+                          panelClassName: "!w-full sm:!max-w-2xl",
+                        })
+                      }
                       className="rounded-r-none"
                     >
                       <Plus /> Import Partner
@@ -796,11 +788,43 @@ export default function PartnersPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onSelect={() => setCsvUploadOpen(true)}>
+                        <DropdownMenuItem onSelect={() =>
+                          openModal("csv-upload", (
+                            <CsvUploadDialog
+                              csvEndpoint="/api/university/legacy-companies/bulk/csv"
+                              queryKeyPrefix="university-legacy-companies"
+                              onClose={() => {
+                                closeModal("csv-upload");
+                                queryClient.invalidateQueries({ queryKey: ["university-partners"] });
+                                queryClient.invalidateQueries({ queryKey: ["university-legacy-companies"] });
+                              }}
+                            />
+                          ), {
+                            title: "Bulk Upload Legacy MOAs",
+                            description: "Upload a CSV file to create or append multiple legacy MOAs at once. Each row represents one legacy MOA. Rows with the same company name append MOAs to the same legacy partner.",
+                            panelClassName: "!w-full sm:!max-w-5xl",
+                          })
+                        }>
                           <Upload className="h-4 w-4" />
                           Bulk upload via CSV
                         </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => setZipUploadOpen(true)}>
+                        <DropdownMenuItem onSelect={() =>
+                          openModal("zip-upload", (
+                            <ZipUploadDialog
+                              zipEndpoint="/api/university/legacy-companies/bulk/zip"
+                              queryKeyPrefix="university-legacy-companies"
+                              onClose={() => {
+                                closeModal("zip-upload");
+                                queryClient.invalidateQueries({ queryKey: ["university-partners"] });
+                                queryClient.invalidateQueries({ queryKey: ["university-legacy-companies"] });
+                              }}
+                            />
+                          ), {
+                            title: "Bulk Upload Legacy MOAs via ZIP",
+                            description: "Upload a ZIP file containing a legacy-import.csv manifest and referenced PDF files. Each CSV row creates or updates one legacy company, and can also add an MOA.",
+                            panelClassName: "!w-full sm:!max-w-5xl",
+                          })
+                        }>
                           <Upload className="h-4 w-4" />
                           Bulk upload via ZIP
                         </DropdownMenuItem>
@@ -980,7 +1004,7 @@ export default function PartnersPage() {
                 ) : legacyCompany ? (
                   <ReadOnlyLegacyDetail
                     company={legacyCompany}
-                    onPreviewDoc={(url, title) => setPreviewDoc({ url, title })}
+                    onPreviewDoc={(url, title) => modal.previewDocument.open(url, title)}
                   />
                 ) : (
                   <p className="text-muted-foreground text-sm">Legacy company not found.</p>
@@ -991,60 +1015,6 @@ export default function PartnersPage() {
         )}
       </div>
 
-      {/* ── Preview document ─────────────────────────────────────────────── */}
-      {previewDoc && (
-        <Dialog open onOpenChange={(o) => !o && setPreviewDoc(null)}>
-          <DialogBottomSheet className="flex h-[88vh] flex-col p-0">
-            <div className="flex items-center border-b border-gray-100 px-5 py-3.5 pr-14">
-              <DialogTitle className="text-sm font-medium text-gray-900">
-                {previewDoc.title}
-              </DialogTitle>
-            </div>
-            <div className="min-h-0 flex-1 overflow-hidden">
-              <iframe
-                src={previewDoc.url}
-                className="h-full w-full border-none"
-                title={previewDoc.title}
-              />
-            </div>
-          </DialogBottomSheet>
-        </Dialog>
-      )}
-
-      {/* ── Legacy upload dialogs ───────────────────────────────────────── */}
-      {legacyUploadOpen && (
-        <UploadDialog
-          uploadEndpoint="/api/university/legacy-companies"
-          queryKeyPrefix="university-legacy-companies"
-          onClose={() => {
-            setLegacyUploadOpen(false);
-            queryClient.invalidateQueries({ queryKey: ["university-partners"] });
-            queryClient.invalidateQueries({ queryKey: ["university-legacy-companies"] });
-          }}
-        />
-      )}
-      {csvUploadOpen && (
-        <CsvUploadDialog
-          csvEndpoint="/api/university/legacy-companies/bulk/csv"
-          queryKeyPrefix="university-legacy-companies"
-          onClose={() => {
-            setCsvUploadOpen(false);
-            queryClient.invalidateQueries({ queryKey: ["university-partners"] });
-            queryClient.invalidateQueries({ queryKey: ["university-legacy-companies"] });
-          }}
-        />
-      )}
-      {zipUploadOpen && (
-        <ZipUploadDialog
-          zipEndpoint="/api/university/legacy-companies/bulk/zip"
-          queryKeyPrefix="university-legacy-companies"
-          onClose={() => {
-            setZipUploadOpen(false);
-            queryClient.invalidateQueries({ queryKey: ["university-partners"] });
-            queryClient.invalidateQueries({ queryKey: ["university-legacy-companies"] });
-          }}
-        />
-      )}
     </PageContainer>
   );
 }

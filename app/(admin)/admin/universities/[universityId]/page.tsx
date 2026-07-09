@@ -9,14 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogBottomSheet,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { useModal } from "@/app/providers/modal-provider";
 import { DataTable } from "@/components/ui/data-table";
-import { LegacyCompanyDetail, formatLegacyLabel, formatLegacyFieldLabel, formatLegacyMoaPeriod, isFilledValue, isLegacyMoaExpired } from "@/components/legacy-companies/legacy-companies-panel";
-import { UploadDialog, CsvUploadDialog, ZipUploadDialog } from "@/components/legacy-companies/legacy-companies-panel";
+import { UploadDialog, CsvUploadDialog, ZipUploadDialog, LegacyCompanyDetail, formatLegacyLabel, formatLegacyFieldLabel, formatLegacyMoaPeriod, isFilledValue, isLegacyMoaExpired } from "@/components/legacy-companies/legacy-companies-panel";
 import { ArrowLeft, Ban, ChevronDown, ChevronRight, CircleAlert, CircleCheck, Clock, Eye, Minus, Plus, ShieldCheck, Upload } from "lucide-react";
 import { formatDateWithoutTime } from "@/lib/utils";
 import { MoaStatusBadge } from "@/components/status-badge";
@@ -287,7 +282,7 @@ function ReadOnlyLegacyDetail({
 
 function LegacyRecordsSection({ universityId, companyId }: { universityId: string; companyId: string | null }) {
   const [open, setOpen] = useState(false);
-  const [previewDoc, setPreviewDoc] = useState<{ url: string; title: string } | null>(null);
+  const { openModal, closeModal } = useModal();
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-partner-legacy-company", universityId, companyId],
@@ -324,29 +319,17 @@ function LegacyRecordsSection({ universityId, companyId }: { universityId: strin
           ) : (
             <ReadOnlyLegacyDetail
               company={company}
-              onPreviewDoc={(url, title) => setPreviewDoc({ url, title })}
+              onPreviewDoc={(url, title) =>
+                openModal("preview-doc", <iframe src={url} className="h-full w-full border-none" title={title} />, {
+                  title,
+                  panelClassName: "!w-full sm:!max-w-4xl",
+                  contentClassName: "min-h-0 flex-1 overflow-hidden p-0 sm:p-0",
+                  showHeaderDivider: true,
+                })
+              }
             />
           )}
         </div>
-      )}
-
-      {previewDoc && (
-        <Dialog open onOpenChange={(o) => !o && setPreviewDoc(null)}>
-          <DialogBottomSheet className="flex h-[88vh] flex-col p-0">
-            <div className="flex items-center border-b border-gray-100 px-5 py-3.5 pr-14">
-              <DialogTitle className="text-sm font-medium text-gray-900">
-                {previewDoc.title}
-              </DialogTitle>
-            </div>
-            <div className="min-h-0 flex-1 overflow-hidden">
-              <iframe
-                src={previewDoc.url}
-                className="h-full w-full border-none"
-                title={previewDoc.title}
-              />
-            </div>
-          </DialogBottomSheet>
-        </Dialog>
       )}
     </div>
   );
@@ -356,13 +339,10 @@ export default function AdminUniversityPartnersPage() {
   const { universityId } = useParams<{ universityId: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { openModal, closeModal } = useModal();
 
   const [detailType, setDetailType] = useState<"partner" | "legacy" | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
-  const [legacyUploadOpen, setLegacyUploadOpen] = useState(false);
-  const [csvUploadOpen, setCsvUploadOpen] = useState(false);
-  const [zipUploadOpen, setZipUploadOpen] = useState(false);
-  const [previewDoc, setPreviewDoc] = useState<{ url: string; title: string } | null>(null);
 
   const showDetail = detailType !== null;
 
@@ -644,8 +624,23 @@ export default function AdminUniversityPartnersPage() {
               toolbarActions={
                 <div className="flex">
                   <Button
-                    onClick={() => setLegacyUploadOpen(true)}
-                    className={(true) ? "rounded-r-none" : undefined}
+                    onClick={() =>
+                      openModal("legacy-upload", (
+                        <UploadDialog
+                          uploadEndpoint={`/api/admin/universities/${universityId}/legacy-companies`}
+                          queryKeyPrefix={`admin-university-legacy-${universityId}`}
+                          onClose={() => {
+                            closeModal("legacy-upload");
+                            queryClient.invalidateQueries({ queryKey: ["admin-university-partners", universityId] });
+                            queryClient.invalidateQueries({ queryKey: ["admin-university-legacy", universityId] });
+                          }}
+                        />
+                      ), {
+                        title: "Add Legacy Company",
+                        description: "Create a legacy company record. You can add MOAs now or later from the company detail view.",
+                        panelClassName: "!w-full sm:!max-w-2xl",
+                      })
+                    }
                   >
                     <Plus /> Import Partner
                   </Button>
@@ -656,11 +651,43 @@ export default function AdminUniversityPartnersPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onSelect={() => setCsvUploadOpen(true)}>
+                      <DropdownMenuItem onSelect={() =>
+                        openModal("csv-upload", (
+                          <CsvUploadDialog
+                            csvEndpoint={`/api/admin/universities/${universityId}/legacy-companies/bulk/csv`}
+                            queryKeyPrefix={`admin-university-legacy-${universityId}`}
+                            onClose={() => {
+                              closeModal("csv-upload");
+                              queryClient.invalidateQueries({ queryKey: ["admin-university-partners", universityId] });
+                              queryClient.invalidateQueries({ queryKey: ["admin-university-legacy", universityId] });
+                            }}
+                          />
+                        ), {
+                          title: "Bulk Upload Legacy MOAs",
+                          description: "Upload a CSV file to create or append multiple legacy MOAs at once. Each row represents one legacy MOA. Rows with the same company name append MOAs to the same legacy partner.",
+                          panelClassName: "!w-full sm:!max-w-5xl",
+                        })
+                      }>
                         <Upload className="h-4 w-4" />
                         Bulk upload via CSV
                       </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => setZipUploadOpen(true)}>
+                      <DropdownMenuItem onSelect={() =>
+                        openModal("zip-upload", (
+                          <ZipUploadDialog
+                            zipEndpoint={`/api/admin/universities/${universityId}/legacy-companies/bulk/zip`}
+                            queryKeyPrefix={`admin-university-legacy-${universityId}`}
+                            onClose={() => {
+                              closeModal("zip-upload");
+                              queryClient.invalidateQueries({ queryKey: ["admin-university-partners", universityId] });
+                              queryClient.invalidateQueries({ queryKey: ["admin-university-legacy", universityId] });
+                            }}
+                          />
+                        ), {
+                          title: "Bulk Upload Legacy MOAs via ZIP",
+                          description: "Upload a ZIP file containing a legacy-import.csv manifest and referenced PDF files. Each CSV row creates or updates one legacy company, and can also add an MOA.",
+                          panelClassName: "!w-full sm:!max-w-5xl",
+                        })
+                      }>
                         <Upload className="h-4 w-4" />
                         Bulk upload via ZIP
                       </DropdownMenuItem>
@@ -790,7 +817,12 @@ export default function AdminUniversityPartnersPage() {
           ) : legacyCompany ? (
             <ReadOnlyLegacyDetail
               company={legacyCompany}
-              onPreviewDoc={(url, title) => setPreviewDoc({ url, title })}
+              onPreviewDoc={(url, title) => openModal("preview-doc", <iframe src={url} className="h-full w-full border-none" title={title} />, {
+                title,
+                panelClassName: "!w-full sm:!max-w-4xl",
+                contentClassName: "min-h-0 flex-1 overflow-hidden p-0 sm:p-0",
+                showHeaderDivider: true,
+              })}
             />
           ) : (
             <p className="text-muted-foreground text-sm">Legacy company not found.</p>
@@ -799,60 +831,6 @@ export default function AdminUniversityPartnersPage() {
       )}
     </div>
 
-    {previewDoc && (
-      <Dialog open onOpenChange={(o) => !o && setPreviewDoc(null)}>
-        <DialogBottomSheet className="flex h-[88vh] flex-col p-0">
-          <div className="flex items-center border-b border-gray-100 px-5 py-3.5 pr-14">
-            <DialogTitle className="text-sm font-medium text-gray-900">
-              {previewDoc.title}
-            </DialogTitle>
-          </div>
-          <div className="min-h-0 flex-1 overflow-hidden">
-            <iframe
-              src={previewDoc.url}
-              className="h-full w-full border-none"
-              title={previewDoc.title}
-            />
-          </div>
-        </DialogBottomSheet>
-      </Dialog>
-    )}
-
-    {legacyUploadOpen && (
-      <UploadDialog
-        uploadEndpoint={`/api/admin/universities/${universityId}/legacy-companies`}
-        queryKeyPrefix={`admin-university-legacy-${universityId}`}
-        onClose={() => {
-          setLegacyUploadOpen(false);
-          queryClient.invalidateQueries({ queryKey: ["admin-university-partners", universityId] });
-          queryClient.invalidateQueries({ queryKey: ["admin-university-legacy", universityId] });
-        }}
-      />
-    )}
-
-    {csvUploadOpen && (
-      <CsvUploadDialog
-        csvEndpoint={`/api/admin/universities/${universityId}/legacy-companies/bulk/csv`}
-        queryKeyPrefix={`admin-university-legacy-${universityId}`}
-        onClose={() => {
-          setCsvUploadOpen(false);
-          queryClient.invalidateQueries({ queryKey: ["admin-university-partners", universityId] });
-          queryClient.invalidateQueries({ queryKey: ["admin-university-legacy", universityId] });
-        }}
-      />
-    )}
-
-    {zipUploadOpen && (
-      <ZipUploadDialog
-        zipEndpoint={`/api/admin/universities/${universityId}/legacy-companies/bulk/zip`}
-        queryKeyPrefix={`admin-university-legacy-${universityId}`}
-        onClose={() => {
-          setZipUploadOpen(false);
-          queryClient.invalidateQueries({ queryKey: ["admin-university-partners", universityId] });
-          queryClient.invalidateQueries({ queryKey: ["admin-university-legacy", universityId] });
-        }}
-      />
-    )}
     </PageContainer>
   );
 }

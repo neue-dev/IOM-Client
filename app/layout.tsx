@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { SonnerToaster } from "@/components/sonner-toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ModalProvider } from "@/app/providers/modal-provider";
+import { QueryProvider } from "@/app/providers/query-provider";
 
 export const metadata: Metadata = {
   title: "Institutional MOA Platform",
@@ -17,7 +18,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body suppressHydrationWarning>
         <TooltipProvider>
           <ThemeProvider>
-            <ModalProvider>{children}</ModalProvider>
+            <QueryProvider>
+              <ModalProvider>{children}</ModalProvider>
+            </QueryProvider>
           </ThemeProvider>
           <SonnerToaster />
         </TooltipProvider>

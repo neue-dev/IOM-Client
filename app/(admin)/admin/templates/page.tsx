@@ -9,17 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DataTable } from "@/components/ui/data-table";
-import {
-  AlertDialog,
-  AlertDialogTrigger,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogCancel,
-  AlertDialogAction,
-} from "@/components/ui/alert-dialog";
+import { useIomModalRegistry } from "@/components/modal-registry";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 
 interface Template {
@@ -32,6 +22,7 @@ interface Template {
 function ActionsCell({ template }: { template: Template }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { confirmAction } = useIomModalRegistry();
 
   const remove = useMutation({
     mutationFn: () => preconfiguredAxios.delete(`/api/admin/templates/${template.id}`),
@@ -51,31 +42,22 @@ function ActionsCell({ template }: { template: Template }) {
       >
         <Pencil className="h-3.5 w-3.5" /> Edit
       </Button>
-      <AlertDialog>
-        <AlertDialogTrigger asChild>
-          <Button variant="outline" scheme="destructive" size="sm">
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-        </AlertDialogTrigger>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete {template.name}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              It will be removed from the catalog and universities can no longer offer it.
-              Existing MOAs are unaffected (their PDFs are frozen). This can&apos;t be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => remove.mutate()}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <Button
+        variant="outline"
+        scheme="destructive"
+        size="sm"
+        onClick={() =>
+          confirmAction.open({
+            title: `Delete ${template.name}?`,
+            description: "It will be removed from the catalog and universities can no longer offer it. Existing MOAs are unaffected (their PDFs are frozen). This can't be undone.",
+            confirmLabel: "Delete",
+            onConfirm: () => remove.mutate(),
+            isPending: remove.isPending,
+          })
+        }
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </Button>
     </div>
   );
 }

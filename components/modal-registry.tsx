@@ -12,6 +12,20 @@ export function useIomModalRegistry() {
   const { openModal, closeModal } = useModal();
 
   return {
+    previewDocument: {
+      open: (url: string, title: string) =>
+        openModal(
+          "preview-document",
+          <iframe src={url} className="h-full w-full border-none" title={title} />,
+          {
+            title,
+            panelClassName: "!w-full sm:!max-w-4xl",
+            contentClassName: "min-h-0 flex-1 overflow-hidden p-0 sm:p-0",
+            showHeaderDivider: true,
+          }
+        ),
+      close: () => closeModal("preview-document"),
+    },
     invitePartner: {
       open: (opts: {
         companyName: string;

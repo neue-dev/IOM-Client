@@ -11,6 +11,7 @@ type ModalOptions = {
   closeOnEsc?: boolean;
   hasClose?: boolean;
   title?: React.ReactNode;
+  description?: string;
   headerClassName?: string;
   panelClassName?: string;
   contentClassName?: string;
@@ -158,7 +159,7 @@ const ModalWrapper = ({
             "relative overflow-hidden border bg-white shadow-2xl",
             "w-full max-w-full min-w-[100svw] rounded-t-[0.33em] rounded-b-none",
             "max-h-screen",
-            "sm:max-h-[90vh] sm:w-auto sm:max-w-2xl sm:min-w-0 sm:rounded-[0.33em]",
+            "sm:max-h-[90vh] sm:w-auto sm:max-w-2xl sm:min-w-sm sm:rounded-[0.33em]",
             options.panelClassName ?? "",
           ].join(" ")}
           onClick={(e) => e.stopPropagation()}
@@ -173,11 +174,21 @@ const ModalWrapper = ({
             >
               {options.title ? (
                 typeof options.title === "string" ? (
-                  <h2 className="text-2xl leading-snug font-semibold tracking-tight">
-                    {options.title}
-                  </h2>
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-2xl leading-snug font-semibold tracking-tight">
+                      {options.title}
+                    </h2>
+                    {options.description && (
+                      <p className="mt-1 text-sm text-muted-foreground">{options.description}</p>
+                    )}
+                  </div>
                 ) : (
-                  <div className="min-w-0 flex-1">{options.title}</div>
+                  <div className="min-w-0 flex-1">
+                    {options.title}
+                    {options.description && (
+                      <p className="mt-1 text-sm text-muted-foreground">{options.description}</p>
+                    )}
+                  </div>
                 )
               ) : (
                 <div className="flex-1" />

@@ -13,15 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DataTable } from "@/components/ui/data-table";
 import { FormError } from "@/components/auth-shell";
-import {
-  Dialog,
-  DialogTrigger,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { useModal } from "@/app/providers/modal-provider";
 import { Loader2, Plus } from "lucide-react";
 
 interface StaffAccount {
@@ -33,9 +25,8 @@ interface StaffAccount {
   created_at: string;
 }
 
-function InviteStaffDialog() {
+function InviteStaffForm({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState("");
@@ -49,87 +40,58 @@ function InviteStaffDialog() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["university-accounts"] });
       toast.success("Invitation sent");
-      setEmail("");
-      setName("");
-      setError("");
-      setOpen(false);
+      onClose();
     },
     onError: (e: Error) => setError(e.message),
   });
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        setOpen(o);
-        if (!o) setError("");
+    <form
+      id="invite-staff"
+      onSubmit={(e) => {
+        e.preventDefault();
+        setError("");
+        createStaff.mutate();
       }}
+      className="space-y-4"
     >
-      <DialogTrigger asChild>
-        <Button>
-          <Plus /> Invite staff
+      <FormError>{error}</FormError>
+      <div className="space-y-1.5">
+        <Label htmlFor="email">Email</Label>
+        <Input
+          id="email"
+          type="email"
+          placeholder="staff@university.edu"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="name">Display name</Label>
+        <Input
+          id="name"
+          placeholder="Juan Dela Cruz"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+        />
+      </div>
+      <div className="flex justify-end gap-2 pt-2">
+        <Button variant="outline" onClick={onClose}>Cancel</Button>
+        <Button type="submit" form="invite-staff" disabled={!email || !name || createStaff.isPending}>
+          {createStaff.isPending && <Loader2 className="animate-spin" />}
+          {createStaff.isPending ? "Sending…" : "Send invite"}
         </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Invite staff member</DialogTitle>
-          <DialogDescription>
-            They&apos;ll receive an email to set their password and join your institution.
-          </DialogDescription>
-        </DialogHeader>
-        <form
-          id="invite-staff"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setError("");
-            createStaff.mutate();
-          }}
-          className="space-y-4"
-        >
-          <FormError>{error}</FormError>
-          <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="staff@university.edu"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="name">Display name</Label>
-            <Input
-              id="name"
-              placeholder="Juan Dela Cruz"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-          </div>
-        </form>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            form="invite-staff"
-            disabled={!email || !name || createStaff.isPending}
-          >
-            {createStaff.isPending && <Loader2 className="animate-spin" />}
-            {createStaff.isPending ? "Sending…" : "Send invite"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </form>
   );
 }
 
 export default function AccountsPage() {
   const { account, isLoading, isSuperadmin } = useUniversityProfile();
   const queryClient = useQueryClient();
+  const { openModal, closeModal } = useModal();
 
   const { data, isLoading: accountsLoading } = useQuery({
     queryKey: ["university-accounts"],
@@ -269,7 +231,19 @@ export default function AccountsPage() {
           searchPlaceholder="Search by name or email..."
           rowLabelSingular="account"
           rowLabelPlural="accounts"
-          toolbarActions={<InviteStaffDialog />}
+          toolbarActions={
+            <Button
+              onClick={() =>
+                openModal("invite-staff", <InviteStaffForm onClose={() => closeModal("invite-staff")} />, {
+                  title: "Invite staff member",
+                  description: "They'll receive an email to set their password and join your institution.",
+                  panelClassName: "!w-full sm:!max-w-md",
+                })
+              }
+            >
+              <Plus /> Invite staff
+            </Button>
+          }
         />
       )}
     </PageContainer>
