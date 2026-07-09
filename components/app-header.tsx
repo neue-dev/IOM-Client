@@ -62,7 +62,7 @@ export function AppHeader({
 
   return (
     <header className="bg-background/80 sticky top-0 z-40 border-b backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-5xl items-center gap-3 px-4 sm:px-6">
+      <div className="mx-auto flex h-14 w-full items-center gap-3 px-4 sm:px-6">
         {nav.length > 0 && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild className="md:hidden">
