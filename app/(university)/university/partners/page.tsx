@@ -7,29 +7,15 @@ import { useUniversityProfile } from "@/app/providers/university-profile.provide
 import { preconfiguredAxios } from "@/app/api/preconfig.axios";
 import { PageContainer, PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import {
   Dialog,
   DialogBottomSheet,
-  DialogContent,
-  DialogHeader,
   DialogTitle,
-  DialogDescription,
-  DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogCancel,
-  AlertDialogAction,
-} from "@/components/ui/alert-dialog";
+import { useIomModalRegistry } from "@/components/modal-registry";
 import { Card } from "@/components/ui/card";
 import { MoaStatusBadge } from "@/components/status-badge";
 import { LegacyCompaniesPanel, LegacyCompanyDetail, formatLegacyLabel, formatLegacyFieldLabel, formatLegacyMoaPeriod, isFilledValue, isLegacyMoaExpired } from "@/components/legacy-companies/legacy-companies-panel";
@@ -37,10 +23,8 @@ import { UploadDialog, CsvUploadDialog, ZipUploadDialog } from "@/components/leg
 import { formatDateWithoutTime, cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { toastPresets } from "@/components/sonner-toaster";
-import { ArrowLeft, ChevronDown, ChevronRight, CircleAlert, CircleCheck, Eye, Loader2, Plus, ShieldCheck, Upload, UserPlus } from "lucide-react";
+import { ArrowLeft, Ban, ChevronDown, ChevronRight, CircleAlert, CircleCheck, Clock, Eye, Loader2, Minus, Plus, ShieldCheck, Upload, UserPlus } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 interface Partner {
   company: {
@@ -106,11 +90,17 @@ const DOC_LABELS: Record<string, string> = {
 const DOC_TYPES_LIST = Object.entries(DOC_LABELS);
 
 function PartnerStatusBadge({ status }: { status: string }) {
-  if (status === "Active") return <Badge className="border-transparent bg-supportive text-white">Active</Badge>;
-  if (status === "Expired") return <Badge className="border-transparent bg-destructive text-white">Expired</Badge>;
-  if (status === "Blacklisted" || status === "Revoked") return <Badge className="border-transparent bg-destructive text-white">{status}</Badge>;
-  if (status === "None") return <Badge className="border-transparent bg-gray-500 text-white">None</Badge>;
-  return <Badge className="border-transparent bg-primary text-white">{status}</Badge>;
+  if (status === "Active")
+    return <Badge className="border-transparent bg-supportive gap-1 text-white"><CircleCheck className="h-3.5 w-3.5" />Active</Badge>;
+  if (status === "Expired")
+    return <Badge className="border-transparent bg-destructive gap-1 text-white"><Clock className="h-3.5 w-3.5" />Expired</Badge>;
+  if (status === "Blacklisted")
+    return <Badge className="border-transparent bg-destructive gap-1 text-white"><Ban className="h-3.5 w-3.5" />Blacklisted</Badge>;
+  if (status === "Revoked")
+    return <Badge className="border-transparent bg-destructive gap-1 text-white"><Ban className="h-3.5 w-3.5" />Revoked</Badge>;
+  if (status === "None")
+    return <Badge className="border-transparent bg-gray-500 gap-1 text-white"><Minus className="h-3.5 w-3.5" />None</Badge>;
+  return <Badge className="border-transparent bg-primary gap-1 text-white">{status}</Badge>;
 }
 
 function VerifiedDocumentDetails({ details }: { details: DocReviewDetails }) {
@@ -435,19 +425,12 @@ export default function PartnersPage() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const [blacklistTarget, setBlacklistTarget] = useState<PartnerTableRow | null>(null);
-  const [unblacklistTarget, setUnblacklistTarget] = useState<PartnerTableRow | null>(null);
-  const [reason, setReason] = useState("");
+  const modal = useIomModalRegistry();
 
   const [legacyUploadOpen, setLegacyUploadOpen] = useState(false);
   const [csvUploadOpen, setCsvUploadOpen] = useState(false);
   const [zipUploadOpen, setZipUploadOpen] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<{ url: string; title: string } | null>(null);
-
-  const [inviteTarget, setInviteTarget] = useState<{
-    companyName: string;
-    email: string;
-  } | null>(null);
 
   // Clean up timer on unmount.
   useEffect(() => () => clearTimeout(timerRef.current), []);
@@ -513,8 +496,6 @@ export default function PartnersPage() {
       }),
     onSuccess: () => {
       refresh();
-      setBlacklistTarget(null);
-      setReason("");
     },
   });
 
@@ -523,7 +504,6 @@ export default function PartnersPage() {
       preconfiguredAxios.delete(`/api/university/blacklist/${companyId}`),
     onSuccess: () => {
       refresh();
-      setUnblacklistTarget(null);
     },
   });
 
@@ -532,7 +512,6 @@ export default function PartnersPage() {
       preconfiguredAxios.post("/api/university/invites", payload),
     onSuccess: () => {
       toast("Invite sent.", toastPresets.success);
-      setInviteTarget(null);
       refresh();
     },
     onError: (e: Error) => {
@@ -687,7 +666,7 @@ export default function PartnersPage() {
         minSize: 120,
         size: 130,
         accessorFn: (row) => (row.isImported ? "Yes" : "—"),
-        cell: ({ row }) => row.original.isImported ? <Badge className="border-transparent bg-primary text-white">Imported</Badge> : <span className="text-muted-foreground">—</span>,
+        cell: ({ row }) => row.original.isImported ? <Badge className="border-transparent bg-primary gap-1 text-white"><Upload className="h-3.5 w-3.5" />Imported</Badge> : <span className="text-muted-foreground">—</span>,
       },
       {
         id: "actions",
@@ -701,9 +680,13 @@ export default function PartnersPage() {
             const email = row.original.isImported
               ? (row.original.contactEmail ?? "")
               : "";
-            setInviteTarget({
+            modal.invitePartner.open({
               companyName: row.original.displayName,
               email,
+              onInvite: (invitedEmail, companyName) => {
+                inviteMutation.mutate({ invitedEmail, companyName: companyName || undefined });
+              },
+              isPending: inviteMutation.isPending,
             });
           };
           return (
@@ -761,7 +744,7 @@ export default function PartnersPage() {
     row.partnerCompany?.id ?? row.blacklistEntry?.company_id ?? "";
 
   return (
-    <PageContainer className="max-w-none">
+    <PageContainer className="max-w-7xl">
       <PageHeader
         title="Partners"
         description="Manage your partners."
@@ -856,7 +839,18 @@ export default function PartnersPage() {
                   </Button>
                   {partnerEntry &&
                     (partnerEntry.isBlacklisted ? (
-                      <Button variant="outline" size="sm" onClick={() => setUnblacklistTarget(partnerEntry)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          modal.confirmAction.open({
+                            title: `Remove ${partnerEntry.displayName} from the blacklist?`,
+                            description: "This re-enables future requests from this company. Previously revoked MOAs will not be restored.",
+                            confirmLabel: "Remove",
+                            onConfirm: () => unblacklistMutation.mutate(getCompanyIdForBlacklist(partnerEntry)),
+                          })
+                        }
+                      >
                         Un-blacklist
                       </Button>
                     ) : (
@@ -864,7 +858,17 @@ export default function PartnersPage() {
                         variant="outline"
                         scheme="destructive"
                         size="sm"
-                        onClick={() => setBlacklistTarget(partnerEntry)}
+                        onClick={() =>
+                          modal.blacklistPartner.open({
+                            companyName: partnerEntry.displayName,
+                            onBlacklist: (reason) =>
+                              blacklistMutation.mutate({
+                                companyId: getCompanyIdForBlacklist(partnerEntry),
+                                reason,
+                              }),
+                            isPending: blacklistMutation.isPending,
+                          })
+                        }
                       >
                         Blacklist
                       </Button>
@@ -986,153 +990,6 @@ export default function PartnersPage() {
           </div>
         )}
       </div>
-
-      {/* ── Invite dialog ────────────────────────────────────────────────── */}
-      <Dialog
-        open={!!inviteTarget}
-        onOpenChange={(o) => !o && setInviteTarget(null)}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Invite company</DialogTitle>
-            {inviteTarget && (
-              <DialogDescription>{inviteTarget.companyName}</DialogDescription>
-            )}
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="invite-company-name">Company name</Label>
-              <Input
-                id="invite-company-name"
-                value={inviteTarget?.companyName ?? ""}
-                onChange={(e) =>
-                  setInviteTarget((prev) =>
-                    prev ? { ...prev, companyName: e.target.value } : null,
-                  )
-                }
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="invite-email">Company email</Label>
-              <Input
-                id="invite-email"
-                type="email"
-                value={inviteTarget?.email ?? ""}
-                onChange={(e) =>
-                  setInviteTarget((prev) =>
-                    prev ? { ...prev, email: e.target.value } : null,
-                  )
-                }
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setInviteTarget(null)}>
-              Cancel
-            </Button>
-            <Button
-              disabled={!inviteTarget?.email.trim() || inviteMutation.isPending}
-              onClick={() => {
-                if (!inviteTarget) return;
-                inviteMutation.mutate({
-                  invitedEmail: inviteTarget.email.trim(),
-                  companyName: inviteTarget.companyName.trim() || undefined,
-                });
-              }}
-            >
-              {inviteMutation.isPending && <Loader2 className="animate-spin" />}
-              {inviteMutation.isPending ? "Sending…" : "Send invite"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Blacklist dialog ─────────────────────────────────────────────── */}
-      <Dialog
-        open={!!blacklistTarget}
-        onOpenChange={(o) => {
-          if (!o) {
-            setBlacklistTarget(null);
-            setReason("");
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Blacklist company</DialogTitle>
-            <DialogDescription>{blacklistTarget?.displayName}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="border-destructive/30 bg-destructive/5 text-destructive space-y-1 rounded-[0.33em] border p-3 text-sm">
-              <p>
-                This immediately <strong>revokes all active MOAs</strong> with this company and
-                blocks new requests.
-              </p>
-              <p className="text-destructive/80 text-xs">
-                Revoked MOAs cannot be restored. The company is not notified. This action is logged
-                under your name.
-              </p>
-            </div>
-            <Textarea
-              rows={2}
-              placeholder="Internal reason (optional — never shown to the company)"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setBlacklistTarget(null);
-                setReason("");
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              scheme="destructive"
-              disabled={blacklistMutation.isPending}
-              onClick={() =>
-                blacklistTarget &&
-                blacklistMutation.mutate({ companyId: getCompanyIdForBlacklist(blacklistTarget), reason })
-              }
-            >
-              {blacklistMutation.isPending && <Loader2 className="animate-spin" />}
-              {blacklistMutation.isPending ? "Blacklisting…" : "Blacklist company"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Un-blacklist dialog ──────────────────────────────────────────── */}
-      <AlertDialog
-        open={!!unblacklistTarget}
-        onOpenChange={(o) => !o && setUnblacklistTarget(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              Remove {unblacklistTarget?.displayName} from the blacklist?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              This re-enables future requests from this company. Previously revoked MOAs will not be
-              restored.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() =>
-                unblacklistTarget &&
-                unblacklistMutation.mutate(getCompanyIdForBlacklist(unblacklistTarget))
-              }
-            >
-              Remove
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* ── Preview document ─────────────────────────────────────────────── */}
       {previewDoc && (

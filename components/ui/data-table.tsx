@@ -173,7 +173,7 @@ export function DataTable<TData, TValue>({
   searchKey,
   enableSearch = true,
   enableColumnVisibility = false,
-  showRowNumbers = true,
+  showRowNumbers = false,
   enableRowSelection = false,
   initialSorting,
   sortingStorageKey,
@@ -361,9 +361,9 @@ export function DataTable<TData, TValue>({
         <div className="flex items-center gap-2">{toolbarActions}</div>
       </div>
 
-      {/* Table + Pagination — share a merged border */}
+      {/* Table + Pagination */}
       <div className="flex flex-col">
-      <div className="relative h-[480px] overflow-hidden rounded-t-sm border border-b-0 border-gray-200 [&_[data-slot=table-container]]:h-full [&_[data-slot=table-container]]:overflow-auto">
+      <div className="min-h-0 flex-1 rounded-[0.1em] border border-gray-200 [&_[data-slot=table-container]]:h-full [&_[data-slot=table-container]]:overflow-auto">
         {showRowNumbers && (
           <>
             <div
@@ -393,12 +393,12 @@ export function DataTable<TData, TValue>({
               <TableRow key={headerGroup.id} className="hover:bg-transparent">
                 {showRowNumbers && (
                   <TableHead
-                    className="sticky top-0 left-0 z-30 bg-gray-200 pr-2 text-right text-gray-700"
+                    className="sticky top-0 left-0 z-30 bg-gray-100 pr-2 text-right text-gray-600 shadow-[inset_-2px_0_0_theme(colors.gray.300),inset_0_-2px_0_theme(colors.gray.300)]"
                     style={indexColumnStyle}
                   ></TableHead>
                 )}
                 {enableRowSelection && (
-                  <TableHead className="sticky top-0 z-20 w-[42px] bg-gray-200">
+                  <TableHead className="sticky top-0 z-20 w-[42px] bg-gray-100 shadow-[inset_0_-2px_0_theme(colors.gray.300)]">
                     <Checkbox
                       checked={
                         table.getIsAllPageRowsSelected() ||
@@ -413,9 +413,9 @@ export function DataTable<TData, TValue>({
                   <TableHead
                     key={header.id}
                     className={cn(
-                      "group font-heading sticky top-0 z-20 max-w-0 bg-gray-200 tracking-tight text-gray-700 transition-colors duration-300",
-                      header.column.getCanSort() && "cursor-pointer select-none hover:bg-gray-300",
-                      header.column.getIsSorted() && "hover:bg-gray-300"
+                      "group font-heading sticky top-0 z-20 max-w-0 bg-gray-100 tracking-tight text-gray-600 shadow-[inset_0_-2px_0_theme(colors.gray.300)] transition-colors duration-300",
+                      header.column.getCanSort() && "cursor-pointer select-none hover:bg-gray-200",
+                      header.column.getIsSorted() && "bg-gray-50 hover:bg-gray-200"
                     )}
                     style={{ width: header.getSize() }}
                   >
@@ -428,24 +428,24 @@ export function DataTable<TData, TValue>({
                           <span
                             className={cn(
                               "font-semibold min-w-0 truncate rounded px-1.5 py-0.5 transition-colors duration-300",
-                              header.column.getIsSorted() && "text-gray-900"
+                              header.column.getIsSorted() && "text-primary"
                             )}
                           >
                             {flexRender(header.column.columnDef.header, header.getContext())}
                           </span>
                           {header.column.getCanSort() && !header.column.getIsSorted() && (
-                            <ChevronsUpDown className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+                            <ChevronsUpDown className="text-muted-foreground/40 mt-0.5 h-4 w-4 shrink-0" />
                           )}
                           {header.column.getIsSorted() === "asc" && (
-                            <ChevronUp className="mt-0.5 h-4 w-4 shrink-0 text-gray-600" />
+                            <ChevronUp className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
                           )}
                           {header.column.getIsSorted() === "desc" && (
-                            <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-gray-600" />
+                            <ChevronDown className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
                           )}
                         </div>
                         <span
                           className={cn(
-                            "mr-2 h-3 w-3 shrink-0 rounded-full bg-gray-500 transition-all duration-300 ease-out",
+                            "bg-primary/85 mr-2 h-3 w-3 shrink-0 rounded-full transition-all duration-300 ease-out",
                             header.column.getIsSorted()
                               ? "scale-100 opacity-100"
                               : "scale-50 opacity-0"
@@ -480,7 +480,7 @@ export function DataTable<TData, TValue>({
                     )}
                   </TableHead>
                 ))}
-                <TableHead className="sticky top-0 z-20 bg-gray-200" />
+                <TableHead className="sticky top-0 z-20 bg-gray-100 shadow-[inset_0_-2px_0_theme(colors.gray.300)]" />
               </TableRow>
             ))}
           </TableHeader>
@@ -505,7 +505,7 @@ export function DataTable<TData, TValue>({
                     onRowClick && "cursor-pointer"
                   )}
                   key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
+                  data-state={row.getIsSelected() ? "selected" : undefined}
                   onClick={onRowClick ? () => onRowClick(row.original) : undefined}
                 >
                   {showRowNumbers && (
@@ -562,7 +562,7 @@ export function DataTable<TData, TValue>({
       </div>
 
       {/* Pagination */}
-      <div className="z-10 flex shrink-0 flex-col items-center justify-between gap-1 rounded-b-sm border border-gray-200 bg-white px-3 py-2 sm:flex-row">
+      <div className="z-10 flex shrink-0 flex-col items-center justify-between gap-1 border-t bg-white py-1 sm:flex-row">
         <div className="text-muted-foreground px-1.5 text-sm">
           {table.getFilteredRowModel().rows.length}{" "}
           {table.getFilteredRowModel().rows.length === 1 ? rowLabelSingular : rowLabelPlural}

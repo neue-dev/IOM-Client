@@ -17,7 +17,7 @@ import {
 import { DataTable } from "@/components/ui/data-table";
 import { LegacyCompanyDetail, formatLegacyLabel, formatLegacyFieldLabel, formatLegacyMoaPeriod, isFilledValue, isLegacyMoaExpired } from "@/components/legacy-companies/legacy-companies-panel";
 import { UploadDialog, CsvUploadDialog, ZipUploadDialog } from "@/components/legacy-companies/legacy-companies-panel";
-import { ArrowLeft, ChevronDown, ChevronRight, CircleAlert, CircleCheck, Eye, Plus, ShieldCheck, Upload } from "lucide-react";
+import { ArrowLeft, Ban, ChevronDown, ChevronRight, CircleAlert, CircleCheck, Clock, Eye, Minus, Plus, ShieldCheck, Upload } from "lucide-react";
 import { formatDateWithoutTime } from "@/lib/utils";
 import { MoaStatusBadge } from "@/components/status-badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -122,11 +122,17 @@ const DOC_LABELS: Record<string, string> = {
 const DOC_TYPES_LIST = Object.entries(DOC_LABELS);
 
 function PartnerStatusBadge({ status }: { status: string }) {
-  if (status === "Active") return <Badge className="border-transparent bg-supportive text-white">Active</Badge>;
-  if (status === "Expired") return <Badge className="border-transparent bg-destructive text-white">Expired</Badge>;
-  if (status === "Blacklisted" || status === "Revoked") return <Badge className="border-transparent bg-destructive text-white">{status}</Badge>;
-  if (status === "None") return <Badge className="border-transparent bg-gray-500 text-white">None</Badge>;
-  return <Badge className="border-transparent bg-primary text-white">{status}</Badge>;
+  if (status === "Active")
+    return <Badge className="border-transparent bg-supportive gap-1 text-white"><CircleCheck className="h-3.5 w-3.5" />Active</Badge>;
+  if (status === "Expired")
+    return <Badge className="border-transparent bg-destructive gap-1 text-white"><Clock className="h-3.5 w-3.5" />Expired</Badge>;
+  if (status === "Blacklisted")
+    return <Badge className="border-transparent bg-destructive gap-1 text-white"><Ban className="h-3.5 w-3.5" />Blacklisted</Badge>;
+  if (status === "Revoked")
+    return <Badge className="border-transparent bg-destructive gap-1 text-white"><Ban className="h-3.5 w-3.5" />Revoked</Badge>;
+  if (status === "None")
+    return <Badge className="border-transparent bg-gray-500 gap-1 text-white"><Minus className="h-3.5 w-3.5" />None</Badge>;
+  return <Badge className="border-transparent bg-primary gap-1 text-white">{status}</Badge>;
 }
 
 function VerifiedDocumentDetails({ details }: { details: DocReviewDetails }) {
@@ -562,7 +568,7 @@ export default function AdminUniversityPartnersPage() {
         minSize: 120,
         size: 130,
         accessorFn: (row) => (row.isImported ? "Yes" : "—"),
-        cell: ({ row }) => row.original.isImported ? <Badge className="border-transparent bg-primary text-white">Imported</Badge> : <span className="text-muted-foreground">—</span>,
+        cell: ({ row }) => row.original.isImported ? <Badge type="primary">Imported</Badge> : <span className="text-muted-foreground">—</span>,
       },
     ],
     [],
@@ -584,7 +590,7 @@ export default function AdminUniversityPartnersPage() {
   }
 
   return (
-    <PageContainer className="max-w-none">
+    <PageContainer className="max-w-7xl">
       <button
         onClick={() => {
           if (showDetail) {
