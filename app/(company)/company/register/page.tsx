@@ -9,14 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { OtpInput } from "@/components/ui/otp-input";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { useModal } from "@/app/providers/modal-provider";
 import { ArrowLeft, Loader2, ShieldCheck } from "lucide-react";
 
 type Step = "details" | "otp";
@@ -31,6 +24,7 @@ interface InvitePeek {
 function RegisterPageContent() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { openModal, closeModal } = useModal();
   const searchParams = useSearchParams();
   const inviteToken = searchParams.get("invite_token") ?? "";
 
@@ -62,6 +56,28 @@ function RegisterPageContent() {
     return () => clearInterval(t);
   }, [resendIn]);
 
+  const showTinTaken = (email: string, isInvite: boolean) => {
+    openModal("tin-taken", (
+      <div className="space-y-4">
+        <div className="space-y-2 text-sm">
+          <p>This TIN is already registered under{' '}<span className="text-foreground font-mono font-medium">{email}</span>.</p>
+          {isInvite ? (
+            <p>If that's your account,{' '}
+              <Link href={`/company/login?invite_token=${encodeURIComponent(inviteToken)}`} className="text-primary font-medium underline">sign in instead</Link>.
+            </p>
+          ) : (
+            <p>Don't recognize this email?{' '}
+              <a href="mailto:hello@betterinternship.com" className="text-primary font-medium underline underline-offset-2">Contact us at hello@betterinternship.com</a>.
+            </p>
+          )}
+        </div>
+        <div className="flex justify-end">
+          <Button onClick={() => { setTinTakenEmail(""); closeModal("tin-taken"); }}>Close</Button>
+        </div>
+      </div>
+    ), { title: "TIN Already Registered", panelClassName: "!w-full sm:!max-w-md" });
+  };
+
   // Standard registration
   const register = useMutation({
     mutationFn: () => preconfiguredAxios.post("/api/auth/company/register", form),
@@ -75,6 +91,7 @@ function RegisterPageContent() {
       const err = e as ApiError;
       if (err.code === "TIN_TAKEN") {
         setTinTakenEmail(err.censoredEmail ?? "");
+        showTinTaken(err.censoredEmail ?? "", false);
         setError("");
       } else {
         setError(e.message);
@@ -109,6 +126,7 @@ function RegisterPageContent() {
       const err = e as ApiError;
       if (err.code === "TIN_TAKEN") {
         setTinTakenEmail(err.censoredEmail ?? "");
+        showTinTaken(err.censoredEmail ?? "", true);
         setError("");
       } else {
         setError(e.message);
@@ -276,38 +294,6 @@ function RegisterPageContent() {
           </Button>
         </form>
 
-        <Dialog
-          open={!!tinTakenEmail}
-          onOpenChange={(open) => !open && setTinTakenEmail("")}
-        >
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>TIN Already Registered</DialogTitle>
-              <DialogDescription asChild>
-                <div className="space-y-2 pt-1 text-sm">
-                  <p>
-                    This TIN is already registered under{" "}
-                    <span className="text-foreground font-mono font-medium">{tinTakenEmail}</span>
-                    .
-                  </p>
-                  <p>
-                    If that&apos;s your account,{" "}
-                    <Link
-                      href={`/company/login?invite_token=${encodeURIComponent(inviteToken)}`}
-                      className="text-primary font-medium underline"
-                    >
-                      sign in instead
-                    </Link>
-                    .
-                  </p>
-                </div>
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button onClick={() => setTinTakenEmail("")}>Close</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </AuthShell>
     );
   }
@@ -491,34 +477,6 @@ function RegisterPageContent() {
         </p>
       </form>
 
-      <Dialog open={!!tinTakenEmail} onOpenChange={(open) => !open && setTinTakenEmail("")}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>TIN Already Registered</DialogTitle>
-            <DialogDescription asChild>
-              <div className="space-y-2 pt-1 text-sm">
-                <p>
-                  This TIN is already registered under the account{" "}
-                  <span className="text-foreground font-mono font-medium">{tinTakenEmail}</span>.
-                </p>
-                <p>
-                  Don&apos;t recognize this email?{" "}
-                  <a
-                    href="mailto:hello@betterinternship.com"
-                    className="text-primary font-medium underline underline-offset-2"
-                  >
-                    Contact us at hello@betterinternship.com
-                  </a>
-                  .
-                </p>
-              </div>
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button onClick={() => setTinTakenEmail("")}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </AuthShell>
   );
 }

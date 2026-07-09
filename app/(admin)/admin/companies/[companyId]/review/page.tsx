@@ -21,26 +21,8 @@ import {
   AccordionItem,
   AccordionContent,
 } from "@/components/ui/accordion";
-import {
-  Dialog,
-  DialogBottomSheet,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogTrigger,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogCancel,
-  AlertDialogAction,
-} from "@/components/ui/alert-dialog";
+import { useModal } from "@/app/providers/modal-provider";
+import { useIomModalRegistry } from "@/components/modal-registry";
 import { formatDateWithoutTime } from "@/lib/utils";
 import { ArrowLeft, Check, Eye, Loader2, X } from "lucide-react";
 
@@ -137,59 +119,29 @@ function buildReviewDetails(values: Record<string, string>): ReviewFieldDetails 
   return out;
 }
 
-function DocumentsReadOnly({ entry }: { entry: HistoryEntry }) {
-  const [previewDoc, setPreviewDoc] = useState<ReviewDoc | null>(null);
+function DocumentsReadOnly({ entry, openPreview }: { entry: HistoryEntry; openPreview: (url: string, title: string) => void }) {
   if (entry.documents.length === 0) return null;
-  const isImage = (filename: string) => /\.(png|jpe?g|gif|webp)$/i.test(filename);
   return (
-    <>
-      <div className="divide-y divide-gray-100 rounded-[0.16em] border border-gray-200 bg-gray-50">
-        {entry.documents.map((doc) => (
+    <div className="divide-y divide-gray-100 rounded-[0.16em] border border-gray-200 bg-gray-50">
+      {entry.documents.map((doc) => {
+        const label = DOC_LABELS[doc.type] ?? doc.type.replace(/_/g, " ");
+        const isImage = /\.(png|jpe?g|gif|webp)$/i.test(doc.filename);
+        return (
           <button
             key={doc.type}
             className="flex w-full cursor-pointer items-center gap-2.5 px-4 py-3 text-left transition-colors hover:bg-gray-100 disabled:cursor-default disabled:opacity-50 bg-gray-50"
-            onClick={() => setPreviewDoc(doc)}
+            onClick={() => doc.url && openPreview(doc.url, label)}
             disabled={!doc.url}
           >
             <Eye className="text-muted-foreground h-3.5 w-3.5 flex-shrink-0" />
-            <span className="text-sm font-medium text-gray-900">
-              View {DOC_LABELS[doc.type] ?? doc.type.replace(/_/g, " ")}
-            </span>
+            <span className="text-sm font-medium text-gray-900">View {label}</span>
             {!doc.url && (
               <span className="text-muted-foreground ml-auto text-xs">Unavailable</span>
             )}
           </button>
-        ))}
-      </div>
-
-      <Dialog open={!!previewDoc} onOpenChange={(o) => !o && setPreviewDoc(null)}>
-        <DialogBottomSheet className="flex h-[88vh] flex-col p-0">
-          <div className="flex items-center border-b border-gray-100 px-5 py-3.5 pr-14">
-            <DialogTitle className="text-sm font-medium text-gray-900">
-              {previewDoc
-                ? (DOC_LABELS[previewDoc.type] ?? previewDoc.type.replace(/_/g, " "))
-                : ""}
-            </DialogTitle>
-          </div>
-          <div className="min-h-0 flex-1 overflow-hidden">
-            {previewDoc?.url &&
-              (isImage(previewDoc.filename) ? (
-                <img
-                  src={previewDoc.url}
-                  alt={DOC_LABELS[previewDoc.type] ?? previewDoc.type}
-                  className="h-full w-full object-contain"
-                />
-              ) : (
-                <iframe
-                  src={previewDoc.url}
-                  className="h-full w-full border-none"
-                  title={DOC_LABELS[previewDoc.type] ?? previewDoc.type}
-                />
-              ))}
-          </div>
-        </DialogBottomSheet>
-      </Dialog>
-    </>
+        );
+      })}
+    </div>
   );
 }
 
@@ -251,11 +203,20 @@ const pastColumns: ColumnDef<HistoryEntry>[] = [
   },
 ];
 
+function DocPreviewContent({ url, title }: { url: string; title: string }) {
+  const isImage = /\.(png|jpe?g|gif|webp)$/i.test(url);
+  if (isImage) {
+    return <img src={url} alt={title} className="h-full w-full object-contain" />;
+  }
+  return <iframe src={url} className="h-full w-full border-none" title={title} />;
+}
+
 export default function AdminCompanyReviewPage() {
   const { companyId } = useParams<{ companyId: string }>();
   const queryClient = useQueryClient();
   const router = useRouter();
-  const [showReject, setShowReject] = useState(false);
+  const { openModal, closeModal } = useModal();
+  const { confirmAction } = useIomModalRegistry();
   const [reason, setReason] = useState("");
   const [reviewValues, setReviewValues] = useState<Record<string, string>>({});
   const [approvalExpiresAt, setApprovalExpiresAt] = useState("");
@@ -310,7 +271,7 @@ export default function AdminCompanyReviewPage() {
       }),
     onSuccess: () => {
       toast.success("Company review rejected");
-      setShowReject(false);
+      closeModal("reject-company");
       setReason("");
       invalidate();
     },
@@ -382,7 +343,7 @@ export default function AdminCompanyReviewPage() {
       {/* Pending review */}
       {openEntry ? (
         <>
-          <DocumentsReadOnly entry={openEntry} />
+          <DocumentsReadOnly entry={openEntry} openPreview={(url, title) => openModal("preview-doc", <DocPreviewContent url={url} title={title} />, { title, panelClassName: "!w-full sm:!max-w-4xl", contentClassName: "min-h-0 flex-1 overflow-hidden p-0 sm:p-0", showHeaderDivider: true })} />
           <br />
           <ReviewFieldsEditor values={reviewValues} onChange={setReviewValues} />
           <div className="space-y-1.5">
@@ -398,41 +359,48 @@ export default function AdminCompanyReviewPage() {
             />
           </div>
           <div className="flex gap-3 border-t border-gray-100 pt-4">
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  scheme="supportive"
-                  className="flex-1"
-                  disabled={approve.isPending || !canApprove}
-                >
-                  {approve.isPending ? <Loader2 className="animate-spin" /> : <Check />}
-                  Approve
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Verify {company.registered_name}?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    The company will be able to request MOAs from any university and is emailed a
-                    confirmation.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    className="bg-supportive text-supportive-foreground hover:bg-supportive/90"
-                    onClick={() => approve.mutate()}
-                  >
-                    Approve
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <Button
+              scheme="supportive"
+              className="flex-1"
+              disabled={approve.isPending || !canApprove}
+              onClick={() =>
+                confirmAction.open({
+                  title: `Verify ${company.registered_name}?`,
+                  description: "The company will be able to request MOAs from any university and is emailed a confirmation.",
+                  confirmLabel: "Approve",
+                  onConfirm: () => approve.mutate(),
+                  isPending: approve.isPending,
+                })
+              }
+            >
+              {approve.isPending ? <Loader2 className="animate-spin" /> : <Check />}
+              Approve
+            </Button>
             <Button
               variant="outline"
               scheme="destructive"
               className="flex-1"
-              onClick={() => setShowReject(true)}
+              onClick={() =>
+                openModal("reject-company", (
+                  <div className="space-y-4">
+                    <p className="text-sm text-muted-foreground">{company.registered_name} will be asked to update their details. The reason is emailed to the company.</p>
+                    <textarea
+                      rows={3}
+                      placeholder="Reason (optional — emailed to the company)"
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                      className="w-full rounded-[0.33em] border border-gray-200 p-2 text-sm"
+                    />
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" onClick={() => closeModal("reject-company")}>Cancel</Button>
+                      <Button scheme="destructive" disabled={reject.isPending} onClick={() => reject.mutate()}>
+                        {reject.isPending && <Loader2 className="animate-spin" />}
+                        {reject.isPending ? "Rejecting…" : "Reject"}
+                      </Button>
+                    </div>
+                  </div>
+                ), { title: "Reject verification", panelClassName: "!w-full sm:!max-w-md" })
+              }
             >
               <X /> Reject
             </Button>
@@ -464,88 +432,34 @@ export default function AdminCompanyReviewPage() {
                 enableSearch={false}
                 rowLabelSingular="request"
                 rowLabelPlural="requests"
-                onRowClick={(entry) => setSelectedPast(entry)}
+                onRowClick={(entry) => {
+                  setSelectedPast(entry);
+                  const label = entry.status === "approved" ? "Approved" : "Reviewed";
+                  openModal("past-review", (
+                    <div className="space-y-4">
+                      {entry.rejection_reason && (
+                        <p className="text-destructive text-xs">Reason: {entry.rejection_reason}</p>
+                      )}
+                      {entry.approval_expires_at && (
+                        <p className="text-muted-foreground text-xs">Approval expires: {formatDateWithoutTime(entry.approval_expires_at)}</p>
+                      )}
+                      <MaterialFields entry={entry} />
+                      <DocumentsReadOnly entry={entry} openPreview={(url, title) => openModal("preview-doc", <DocPreviewContent url={url} title={title} />, { title, panelClassName: "!w-full sm:!max-w-4xl", contentClassName: "min-h-0 flex-1 overflow-hidden p-0 sm:p-0", showHeaderDivider: true })} />
+                      <ReviewFieldsReadOnly details={entry.document_review_details ?? {}} />
+                    </div>
+                  ), {
+                    title: <div className="flex items-center gap-2"><ReviewStatusBadge status={entry.status} /><span>Request — {formatDateWithoutTime(entry.created_at)}</span></div>,
+                    description: entry.reviewed_at ? `${label} by ${entry.reviewer_email ?? "—"} on ${formatDateWithoutTime(entry.reviewed_at)}` : undefined,
+                    panelClassName: "!w-full sm:!max-w-lg",
+                  });
+                }}
               />
             </AccordionContent>
           </AccordionItem>
         </Accordion>
       )}
 
-      {/* Past request detail modal */}
-      <Dialog open={!!selectedPast} onOpenChange={(o) => !o && setSelectedPast(null)}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ReviewStatusBadge status={selectedPast?.status ?? null} />
-              <span>
-                Request — {selectedPast ? formatDateWithoutTime(selectedPast.created_at) : ""}
-              </span>
-            </DialogTitle>
-            {selectedPast?.reviewed_at && (
-              <DialogDescription>
-                {selectedPast.status === "approved" ? "Approved" : "Reviewed"} by{" "}
-                {selectedPast.reviewer_email ?? "—"} on{" "}
-                {formatDateWithoutTime(selectedPast.reviewed_at)}
-              </DialogDescription>
-            )}
-          </DialogHeader>
-          {selectedPast && (
-            <div className="space-y-4">
-              {selectedPast.rejection_reason && (
-                <p className="text-destructive text-xs">
-                  Reason: {selectedPast.rejection_reason}
-                </p>
-              )}
-              {selectedPast.approval_expires_at && (
-                <p className="text-muted-foreground text-xs">
-                  Approval expires: {formatDateWithoutTime(selectedPast.approval_expires_at)}
-                </p>
-              )}
-              <MaterialFields entry={selectedPast} />
-              <DocumentsReadOnly entry={selectedPast} />
-              <ReviewFieldsReadOnly details={selectedPast.document_review_details ?? {}} />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Reject dialog */}
-      <Dialog
-        open={showReject}
-        onOpenChange={(o) => {
-          setShowReject(o);
-          if (!o) setReason("");
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Reject verification</DialogTitle>
-            <DialogDescription>
-              {company.registered_name} will be asked to update their details. The reason is emailed to
-              the company.
-            </DialogDescription>
-          </DialogHeader>
-          <Textarea
-            rows={3}
-            placeholder="Reason (optional — emailed to the company)"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowReject(false)}>
-              Cancel
-            </Button>
-            <Button
-              scheme="destructive"
-              disabled={reject.isPending}
-              onClick={() => reject.mutate()}
-            >
-              {reject.isPending && <Loader2 className="animate-spin" />}
-              {reject.isPending ? "Rejecting…" : "Reject"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      
     </PageContainer>
   );
 }

@@ -29,22 +29,8 @@ import {
   AccordionTrigger,
   AccordionContent,
 } from "@/components/ui/accordion";
-import {
-  Dialog,
-  DialogBottomSheet,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogCancel,
-  AlertDialogAction,
-} from "@/components/ui/alert-dialog";
+import { useModal } from "@/app/providers/modal-provider";
+import { useIomModalRegistry } from "@/components/modal-registry";
 import {
   Building2,
   CircleAlert,
@@ -83,9 +69,40 @@ interface CompanyDoc {
   uploaded_at: string;
 }
 
+function DocPreviewContent({ docId, filename }: { docId: string; filename: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    resolveFile("company_document", docId).then((resolved) => {
+      setUrl(resolved);
+      setLoading(false);
+      if (!resolved) toast.error("Couldn't load that document");
+    });
+  }, [docId]);
+
+  return (
+    <>
+      {loading ? (
+        <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
+        </div>
+      ) : url ? (
+        <iframe src={url} className="h-full w-full border-none" title={filename} />
+      ) : (
+        <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
+          Couldn&apos;t load that document.
+        </div>
+      )}
+    </>
+  );
+}
+
 function ProfileContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { openModal, closeModal } = useModal();
+  const { confirmAction } = useIomModalRegistry();
   const inviteUniId = searchParams.get("invite_uni");
   const inviteTemplateId = searchParams.get("invite_template");
   const inviteId = searchParams.get("invite_id");
@@ -97,10 +114,6 @@ function ProfileContent() {
   const [editing, setEditing] = useState<SectionKey | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
 
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewName, setPreviewName] = useState("");
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
   const [uploadingType, setUploadingType] = useState<string | null>(null);
 
   const { data: docsData, refetch: refetchDocs } = useQuery({
@@ -123,9 +136,6 @@ function ProfileContent() {
     if (inviteId) params.set("invite_id", inviteId);
     router.replace(`/company/dashboard?${params}`);
   }, [inviteUniId, isLoading, vLoading, company, verification, inviteTemplateId, inviteId, router]);
-
-  // When set, a re-verification confirm dialog is shown; running it performs the edit.
-  const [pendingConfirm, setPendingConfirm] = useState<(() => void) | null>(null);
 
   const save = useMutation({
     mutationFn: () => {
@@ -201,7 +211,13 @@ function ProfileContent() {
     const matKeys = MATERIAL_KEYS_BY_SECTION[sectionKey] ?? [];
     const changedMaterial = matKeys.some((k) => k in draft && draft[k] !== persisted(k));
     if (verified && changedMaterial) {
-      setPendingConfirm(() => () => save.mutate());
+      confirmAction.open({
+        title: "This change requires re-verification",
+        description: "Changing this will require re-verification by the platform team. You won't be able to request new MOAs until you're re-approved. Your existing MOAs stay valid.",
+        confirmLabel: "Save anyway",
+        onConfirm: () => save.mutate(),
+        isPending: save.isPending,
+      });
     } else {
       save.mutate();
     }
@@ -210,21 +226,25 @@ function ProfileContent() {
   function attemptUploadDoc(file: File, type: string) {
     setUploadingType(type);
     if (verified) {
-      setPendingConfirm(() => () => uploadDoc.mutate({ file, type }));
+      confirmAction.open({
+        title: "This change requires re-verification",
+        description: "Changing this will require re-verification by the platform team. You won't be able to request new MOAs until you're re-approved. Your existing MOAs stay valid.",
+        confirmLabel: "Upload anyway",
+        onConfirm: () => uploadDoc.mutate({ file, type }),
+        isPending: uploadDoc.isPending,
+      });
     } else {
       uploadDoc.mutate({ file, type });
     }
   }
 
-  async function preview(doc: CompanyDoc) {
-    setPreviewName(doc.filename);
-    setPreviewUrl(null);
-    setPreviewLoading(true);
-    setPreviewOpen(true);
-    const url = await resolveFile("company_document", doc.id);
-    setPreviewUrl(url);
-    setPreviewLoading(false);
-    if (!url) toast.error("Couldn't load that document");
+  function preview(doc: CompanyDoc) {
+    openModal("preview-doc", <DocPreviewContent docId={doc.id} filename={doc.filename} />, {
+      title: doc.filename,
+      panelClassName: "!w-full sm:!max-w-4xl",
+      contentClassName: "min-h-0 flex-1 overflow-hidden p-0 sm:p-0",
+      showHeaderDivider: true,
+    });
   }
 
   const docs = (docsData?.documents ?? []) as CompanyDoc[];
@@ -495,62 +515,6 @@ function ProfileContent() {
           </AccordionContent>
         </AccordionItem>
       </Accordion>
-
-      {/* Document preview */}
-      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogBottomSheet className="flex h-[88vh] flex-col p-0">
-          <div className="flex items-center border-b border-gray-100 px-5 py-3.5 pr-14">
-            <DialogTitle className="truncate text-sm font-medium text-gray-900">
-              {previewName}
-            </DialogTitle>
-          </div>
-          <div className="min-h-0 flex-1 overflow-hidden">
-            {previewLoading ? (
-              <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
-              </div>
-            ) : previewUrl ? (
-              <iframe
-                src={previewUrl}
-                className="h-full w-full border-none"
-                title={previewName}
-              />
-            ) : (
-              <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-                Couldn&apos;t load that document.
-              </div>
-            )}
-          </div>
-        </DialogBottomSheet>
-      </Dialog>
-
-      {/* Re-verification warning (only when currently verified) */}
-      <AlertDialog
-        open={!!pendingConfirm}
-        onOpenChange={(o) => { if (!o) { setPendingConfirm(null); setUploadingType(null); } }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>This change requires re-verification</AlertDialogTitle>
-            <AlertDialogDescription>
-              Changing this will require re-verification by the platform team. You
-              won&apos;t be able to request new MOAs until you&apos;re re-approved.
-              Your existing MOAs stay valid.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                pendingConfirm?.();
-                setPendingConfirm(null);
-              }}
-            >
-              Save anyway
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </PageContainer>
   );
 }
