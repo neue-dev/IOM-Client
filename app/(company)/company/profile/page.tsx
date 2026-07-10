@@ -1,6 +1,8 @@
 "use client";
 import { Suspense, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -11,6 +13,7 @@ import {
 import { preconfiguredAxios } from "@/app/api/preconfig.axios";
 import { resolveFile } from "@/app/lib/resolve-file";
 import { cn } from "@/lib/utils";
+import { companyProfileSchema, type CompanyProfileDraft } from "@/lib/profile-validation";
 import { PageContainer, PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -113,6 +116,19 @@ function ProfileContent() {
   const [openSections, setOpenSections] = useState<string[]>(["company"]);
   const [editing, setEditing] = useState<SectionKey | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
+  const form = useForm<CompanyProfileDraft>({
+    resolver: zodResolver(companyProfileSchema),
+    mode: "onChange",
+    defaultValues: {
+      registered_name: "",
+      registered_address: "",
+      company_type: "",
+      description: "",
+      website: "",
+      phone: "",
+      industry: "",
+    },
+  });
 
   const [uploadingType, setUploadingType] = useState<string | null>(null);
 
@@ -139,7 +155,8 @@ function ProfileContent() {
 
   const save = useMutation({
     mutationFn: () => {
-      const g = (k: string) => (k in draft ? draft[k] : persisted(k));
+      const values = form.getValues();
+      const g = (k: keyof CompanyProfileDraft) => values[k] ?? persisted(k);
       return preconfiguredAxios.patch("/api/company/profile", {
         registered_name: g("registered_name"),
         registered_address: g("registered_address"),
@@ -190,16 +207,20 @@ function ProfileContent() {
   }
   function setField(key: string, value: string) {
     setDraft((d) => ({ ...d, [key]: value }));
+    form.setValue(key as keyof CompanyProfileDraft, value, { shouldDirty: true, shouldValidate: true });
   }
   function startEdit(section: SectionKey, keys: string[]) {
     const seed: Record<string, string> = {};
-    keys.forEach((k) => (seed[k] = persisted(k)));
+    (Object.keys(companyProfileSchema.shape) as string[]).forEach((k) => (seed[k] = persisted(k)));
     setDraft(seed);
+    form.reset(seed as CompanyProfileDraft);
+    void form.trigger();
     setEditing(section);
   }
   function cancelEdit() {
     setEditing(null);
     setDraft({});
+    form.reset();
   }
 
   // Material fields whose change forces re-verification (the hash inputs).
@@ -208,6 +229,7 @@ function ProfileContent() {
   };
 
   function attemptSave(sectionKey: SectionKey) {
+    if (!form.formState.isValid) return;
     const matKeys = MATERIAL_KEYS_BY_SECTION[sectionKey] ?? [];
     const changedMaterial = matKeys.some((k) => k in draft && draft[k] !== persisted(k));
     if (verified && changedMaterial) {
@@ -221,6 +243,10 @@ function ProfileContent() {
     } else {
       save.mutate();
     }
+  }
+
+  function fieldError(field: string) {
+    return form.formState.errors[field as keyof CompanyProfileDraft]?.message;
   }
 
   function attemptUploadDoc(file: File, type: string) {
@@ -260,14 +286,16 @@ function ProfileContent() {
   ) => {
     const isEditing = editing === sectionKey;
     return (
-      <div className="flex items-center gap-4">
-        <Label htmlFor={field} className="w-44 flex-shrink-0 truncate text-gray-400">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-4">
+        <Label htmlFor={field} className="sm:w-44 sm:flex-shrink-0 sm:truncate text-gray-400">
           {label}
         </Label>
         <div className="min-w-0 flex-1 space-y-1">
           {isEditing ? (
             <Input
               id={field}
+              aria-invalid={!!fieldError(field)}
+              aria-describedby={fieldError(field) ? `${field}-error` : undefined}
               value={draftVal(field)}
               onChange={(e) => setField(field, e.target.value)}
             />
@@ -277,6 +305,9 @@ function ProfileContent() {
                 <span className="text-muted-foreground font-normal">Not set</span>
               )}
             </p>
+          )}
+          {isEditing && fieldError(field) && (
+            <p id={`${field}-error`} className="text-destructive text-xs">{fieldError(field)}</p>
           )}
           {help && <p className="text-muted-foreground text-xs">{help}</p>}
         </div>
@@ -295,7 +326,7 @@ function ProfileContent() {
         >
           Cancel
         </Button>
-        <Button size="sm" onClick={() => attemptSave(sectionKey)} disabled={save.isPending}>
+        <Button size="sm" onClick={() => attemptSave(sectionKey)} disabled={save.isPending || !form.formState.isValid}>
           {save.isPending && <Loader2 className="animate-spin" />}
           Save
         </Button>
@@ -378,33 +409,43 @@ function ProfileContent() {
         <AccordionItem value="company" className="">
           {sectionTrigger(Building2, "Company Profile")}
           <AccordionContent className="space-y-4 px-5 pb-5">
-            <div className="flex items-center gap-4">
-              <Label className="w-44 flex-shrink-0 truncate text-gray-400">Account email</Label>
+            {editing === "company" && !form.formState.isValid && (
+              <p className="rounded-[0.33em] border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Complete the highlighted fields before saving this section.
+              </p>
+            )}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+              <Label className="sm:w-44 sm:flex-shrink-0 sm:truncate text-gray-400">Account email</Label>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-gray-900">{company.email}</p>
               </div>
             </div>
             {textField("company", "registered_name", "Legal / registered name")}
             {textField("company", "registered_address", "Registered address")}
-            <div className="flex items-center gap-4">
-              <Label className="w-44 flex-shrink-0 truncate text-gray-400">Company type</Label>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+              <Label className="sm:w-44 sm:flex-shrink-0 sm:truncate text-gray-400">Company type</Label>
               <div className="min-w-0 flex-1">
                 {editing === "company" ? (
-                  <Select
-                    value={draftVal("company_type") || undefined}
-                    onValueChange={(v) => setField("company_type", v)}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select a type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {COMPANY_TYPES.map((t) => (
-                        <SelectItem key={t.value} value={t.value}>
-                          {t.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <>
+                    <Select
+                      value={draftVal("company_type") || undefined}
+                      onValueChange={(v) => setField("company_type", v)}
+                    >
+                      <SelectTrigger className="w-full" aria-invalid={!!fieldError("company_type")}>
+                        <SelectValue placeholder="Select a type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {COMPANY_TYPES.map((t) => (
+                          <SelectItem key={t.value} value={t.value}>
+                            {t.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {fieldError("company_type") && (
+                      <p className="text-destructive mt-1 text-xs">{fieldError("company_type")}</p>
+                    )}
+                  </>
                 ) : (
                   <p className="truncate text-sm font-medium text-gray-900">
                     {COMPANY_TYPE_LABELS[persisted("company_type")] || (

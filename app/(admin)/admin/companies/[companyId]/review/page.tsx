@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -96,7 +97,7 @@ function ReviewFieldsEditor({
             </Label>
             <Input
               type={field.type}
-              className="h-7 text-xs"
+              className="h-8 text-xs"
               value={values[field.key] ?? ""}
               onChange={(e) => onChange({ ...values, [field.key]: e.target.value })}
             />
@@ -350,12 +351,11 @@ export default function AdminCompanyReviewPage() {
             <Label htmlFor="approval-expires" className="text-md">
               Approval expires on
             </Label>
-            <Input
+            <DatePicker
               id="approval-expires"
-              type="date"
               className="h-8 text-xs"
               value={approvalExpiresAt}
-              onChange={(e) => setApprovalExpiresAt(e.target.value)}
+              onChange={setApprovalExpiresAt}
             />
           </div>
           <div className="flex gap-3 border-t border-gray-100 pt-4">

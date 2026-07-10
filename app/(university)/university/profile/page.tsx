@@ -1,6 +1,8 @@
 "use client";
 import { useState, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { useUniversityProfile } from "@/app/providers/university-profile.provider";
 import { preconfiguredAxios } from "@/app/api/preconfig.axios";
@@ -25,6 +27,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { universityProfileSchema, type UniversityProfileDraft } from "@/lib/profile-validation";
 
 type SectionKey = "university" | "representative";
 
@@ -47,6 +50,11 @@ export default function UniversityProfilePage() {
   const [openSections, setOpenSections] = useState<string[]>(["university"]);
   const [editing, setEditing] = useState<SectionKey | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
+  const form = useForm<UniversityProfileDraft>({
+    resolver: zodResolver(universityProfileSchema),
+    mode: "onChange",
+    defaultValues: { registered_name: "", address: "", rep_name: "", rep_title: "" },
+  });
   const [sigPreviewUrl, setSigPreviewUrl] = useState<string | null>(null);
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
 
@@ -64,7 +72,7 @@ export default function UniversityProfilePage() {
   const displaySigUrl = sigPreviewUrl ?? uni?.rep_signature_url ?? null;
 
   const save = useMutation({
-    mutationFn: () => preconfiguredAxios.patch("/api/university/profile", draft),
+    mutationFn: () => preconfiguredAxios.patch("/api/university/profile", form.getValues()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["university-profile"] });
       queryClient.invalidateQueries({ queryKey: ["university-me"] });
@@ -116,31 +124,41 @@ export default function UniversityProfilePage() {
   }
   function setField(key: string, value: string) {
     setDraft((d) => ({ ...d, [key]: value }));
+    form.setValue(key as keyof UniversityProfileDraft, value, { shouldDirty: true, shouldValidate: true });
   }
   function startEdit(section: SectionKey, keys: string[]) {
     const seed: Record<string, string> = {};
-    keys.forEach((k) => (seed[k] = persisted(k)));
+    (Object.keys(universityProfileSchema.shape) as string[]).forEach((k) => (seed[k] = persisted(k)));
     setDraft(seed);
+    form.reset(seed as UniversityProfileDraft);
+    void form.trigger();
     setEditing(section);
   }
   function cancelEdit() {
     setEditing(null);
     setDraft({});
+    form.reset();
   }
 
   const signatoryComplete = uni?.rep_name && uni?.rep_title && uni?.rep_signature_url;
 
+  function fieldError(field: string) {
+    return form.formState.errors[field as keyof UniversityProfileDraft]?.message;
+  }
+
   const textField = (sectionKey: SectionKey, field: string, label: string) => {
     const isEditing = editing === sectionKey;
     return (
-      <div className="flex items-center gap-4">
-        <Label htmlFor={field} className="w-44 flex-shrink-0 truncate text-gray-400">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-4">
+        <Label htmlFor={field} className="sm:w-44 sm:flex-shrink-0 sm:truncate text-gray-400">
           {label}
         </Label>
         <div className="min-w-0 flex-1">
           {isEditing ? (
             <Input
               id={field}
+              aria-invalid={!!fieldError(field)}
+              aria-describedby={fieldError(field) ? `${field}-error` : undefined}
               value={draftVal(field)}
               onChange={(e) => setField(field, e.target.value)}
             />
@@ -150,6 +168,9 @@ export default function UniversityProfilePage() {
                 <span className="text-muted-foreground font-normal">Not set</span>
               )}
             </p>
+          )}
+          {isEditing && fieldError(field) && (
+            <p id={`${field}-error`} className="text-destructive text-xs">{fieldError(field)}</p>
           )}
         </div>
       </div>
@@ -163,7 +184,7 @@ export default function UniversityProfilePage() {
         <Button variant="ghost" size="sm" onClick={cancelEdit} disabled={save.isPending}>
           Cancel
         </Button>
-        <Button size="sm" onClick={() => save.mutate()} disabled={save.isPending}>
+        <Button size="sm" onClick={() => save.mutate()} disabled={save.isPending || !form.formState.isValid}>
           {save.isPending && <Loader2 className="animate-spin" />}
           Save
         </Button>
@@ -264,6 +285,11 @@ export default function UniversityProfilePage() {
         <AccordionItem value="university">
           {sectionTrigger(Building2, "University Details")}
           <AccordionContent className="space-y-4 px-5 pb-5">
+            {editing === "university" && !form.formState.isValid && (
+              <p className="rounded-[0.33em] border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Complete the highlighted fields before saving this section.
+              </p>
+            )}
             {textField("university", "registered_name", "Registered name")}
             {textField("university", "address", "Address (used in MOAs)")}
             {editControls("university", ["registered_name", "address"])}
@@ -274,6 +300,11 @@ export default function UniversityProfilePage() {
         <AccordionItem value="representative">
           {sectionTrigger(UserRound, "Representative Details")}
           <AccordionContent className="space-y-4 px-5 pb-5">
+            {editing === "representative" && !form.formState.isValid && (
+              <p className="rounded-[0.33em] border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Complete the highlighted fields before saving this section.
+              </p>
+            )}
             <p className="text-muted-foreground text-xs">
               The representative&apos;s details will be used on all approved MOAs.
             </p>
