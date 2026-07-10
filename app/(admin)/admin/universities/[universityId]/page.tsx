@@ -67,7 +67,7 @@ interface PartnerMoaEntry {
   status: string;
   created_at: string;
   effective_date: string;
-  expiry_date: string;
+  expiry_date: string | null;
   is_expired: boolean | null;
   template: { name: string } | null;
 }
@@ -534,9 +534,9 @@ export default function AdminUniversityPartnersPage() {
             }
             return "—";
           }
-          if (row.effectiveDate || row.expiryDate) {
-            const from = row.effectiveDate ? formatDateWithoutTime(row.effectiveDate) : "—";
-            const to = row.expiryDate ? formatDateWithoutTime(row.expiryDate) : "—";
+          if (row.effectiveDate) {
+            const from = formatDateWithoutTime(row.effectiveDate);
+            const to = row.expiryDate ? formatDateWithoutTime(row.expiryDate) : "Perpetual";
             return `${from} – ${to}`;
           }
           return "—";
@@ -791,7 +791,7 @@ export default function AdminUniversityPartnersPage() {
                     </td>
                     <td className="py-2.5 text-gray-600">
                       {moa.effective_date
-                        ? `${formatDateWithoutTime(moa.effective_date)} – ${formatDateWithoutTime(moa.expiry_date)}`
+                        ? `${formatDateWithoutTime(moa.effective_date)} – ${moa.expiry_date ? formatDateWithoutTime(moa.expiry_date) : "Perpetual"}`
                         : "—"}
                     </td>
                   </tr>

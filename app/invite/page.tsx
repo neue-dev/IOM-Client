@@ -13,7 +13,7 @@ interface InviteData {
   company_name: string | null;
   email_status: "not_registered" | "registered_unverified" | "registered_verified";
   university: { id: string; registered_name: string; address: string | null; logo_url: string | null };
-  template: { id: string; name: string; description: string | null; term_months: number } | null;
+  template: { id: string; name: string; description: string | null; term_months: number | null } | null;
   invite: { personal_message: string | null; expires_at: string };
 }
 
@@ -130,7 +130,7 @@ function InvitePageContent() {
                       <p className="text-muted-foreground mt-0.5 text-xs">{template.description}</p>
                     )}
                     <p className="text-muted-foreground mt-0.5 text-xs">
-                      Term: {template.term_months} months
+                      Term: {template.term_months == null ? "Perpetual (no expiry)" : `${template.term_months} months`}
                     </p>
                   </div>
                   <button

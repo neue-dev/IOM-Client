@@ -11,7 +11,10 @@ export type AdminControllerCreateTemplateBody = {
   name: string;
   description?: string;
   field_schema?: string;
-  term_months: number;
+  /** Whether the template has no expiry */
+  is_perpetual?: boolean;
+  /** Required unless is_perpetual is true */
+  term_months?: number;
   page_count: number;
   page_w: number;
   page_h: number;

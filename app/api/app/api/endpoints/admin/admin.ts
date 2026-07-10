@@ -47,6 +47,7 @@ import type {
   AdminUniversityDetailResponse,
   AdminUniversityPartnersResponse,
   AdminVerifyTinResponse,
+  AppendLegacyMoasDto,
   ApproveCompanyReviewDto,
   BaseResponse,
   CreateCompanyAdminDto,
@@ -3841,6 +3842,124 @@ export const useAdminControllerAppendUniversityLegacyCompanyDocuments = <
 
   return useMutation(mutationOptions, queryClient);
 };
+export const adminControllerAppendUniversityLegacyCompanyMoas = (
+  universityId: string | undefined | null,
+  legacyCompanyId: string | undefined | null,
+  appendLegacyMoasDto: AppendLegacyMoasDto,
+  signal?: AbortSignal,
+) => {
+  const formData = new FormData();
+  formData.append(`moas`, appendLegacyMoasDto.moas);
+
+  return preconfiguredAxiosFunction<void>({
+    url: `/api/admin/universities/${universityId}/legacy-companies/${legacyCompanyId}/moas`,
+    method: "POST",
+    headers: { "Content-Type": "multipart/form-data" },
+    data: formData,
+    signal,
+  });
+};
+
+export const getAdminControllerAppendUniversityLegacyCompanyMoasMutationOptions =
+  <TError = unknown, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof adminControllerAppendUniversityLegacyCompanyMoas>
+      >,
+      TError,
+      {
+        universityId: string | undefined | null;
+        legacyCompanyId: string | undefined | null;
+        data: AppendLegacyMoasDto;
+      },
+      TContext
+    >;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<typeof adminControllerAppendUniversityLegacyCompanyMoas>
+    >,
+    TError,
+    {
+      universityId: string | undefined | null;
+      legacyCompanyId: string | undefined | null;
+      data: AppendLegacyMoasDto;
+    },
+    TContext
+  > => {
+    const mutationKey = ["adminControllerAppendUniversityLegacyCompanyMoas"];
+    const { mutation: mutationOptions } = options
+      ? options.mutation &&
+        "mutationKey" in options.mutation &&
+        options.mutation.mutationKey
+        ? options
+        : { ...options, mutation: { ...options.mutation, mutationKey } }
+      : { mutation: { mutationKey } };
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<typeof adminControllerAppendUniversityLegacyCompanyMoas>
+      >,
+      {
+        universityId: string | undefined | null;
+        legacyCompanyId: string | undefined | null;
+        data: AppendLegacyMoasDto;
+      }
+    > = (props) => {
+      const { universityId, legacyCompanyId, data } = props ?? {};
+
+      return adminControllerAppendUniversityLegacyCompanyMoas(
+        universityId,
+        legacyCompanyId,
+        data,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type AdminControllerAppendUniversityLegacyCompanyMoasMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof adminControllerAppendUniversityLegacyCompanyMoas>>
+  >;
+export type AdminControllerAppendUniversityLegacyCompanyMoasMutationBody =
+  AppendLegacyMoasDto;
+export type AdminControllerAppendUniversityLegacyCompanyMoasMutationError =
+  unknown;
+
+export const useAdminControllerAppendUniversityLegacyCompanyMoas = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof adminControllerAppendUniversityLegacyCompanyMoas>
+      >,
+      TError,
+      {
+        universityId: string | undefined | null;
+        legacyCompanyId: string | undefined | null;
+        data: AppendLegacyMoasDto;
+      },
+      TContext
+    >;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof adminControllerAppendUniversityLegacyCompanyMoas>>,
+  TError,
+  {
+    universityId: string | undefined | null;
+    legacyCompanyId: string | undefined | null;
+    data: AppendLegacyMoasDto;
+  },
+  TContext
+> => {
+  const mutationOptions =
+    getAdminControllerAppendUniversityLegacyCompanyMoasMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
 export const adminControllerBulkCreateLegacyCompaniesFromCsv = (
   universityId: string | undefined | null,
   adminControllerBulkCreateLegacyCompaniesFromCsvBody: AdminControllerBulkCreateLegacyCompaniesFromCsvBody,
@@ -5599,10 +5718,18 @@ export const adminControllerCreateTemplate = (
       adminControllerCreateTemplateBody.field_schema,
     );
   }
-  formData.append(
-    `term_months`,
-    adminControllerCreateTemplateBody.term_months.toString(),
-  );
+  if (adminControllerCreateTemplateBody.is_perpetual !== undefined) {
+    formData.append(
+      `is_perpetual`,
+      adminControllerCreateTemplateBody.is_perpetual.toString(),
+    );
+  }
+  if (adminControllerCreateTemplateBody.term_months !== undefined) {
+    formData.append(
+      `term_months`,
+      adminControllerCreateTemplateBody.term_months.toString(),
+    );
+  }
   formData.append(
     `page_count`,
     adminControllerCreateTemplateBody.page_count.toString(),

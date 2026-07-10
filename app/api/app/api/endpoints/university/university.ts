@@ -24,6 +24,7 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AppendLegacyMoasDto,
   BaseResponse,
   BlacklistCompanyDto,
   CreateCompanyInviteDto,
@@ -2525,6 +2526,92 @@ export const useUniversityControllerAppendLegacyCompanyDocuments = <
 > => {
   const mutationOptions =
     getUniversityControllerAppendLegacyCompanyDocumentsMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+export const universityControllerAppendLegacyCompanyMoas = (
+  legacyCompanyId: string | undefined | null,
+  appendLegacyMoasDto: AppendLegacyMoasDto,
+  signal?: AbortSignal,
+) => {
+  const formData = new FormData();
+  formData.append(`moas`, appendLegacyMoasDto.moas);
+
+  return preconfiguredAxiosFunction<void>({
+    url: `/api/university/legacy-companies/${legacyCompanyId}/moas`,
+    method: "POST",
+    headers: { "Content-Type": "multipart/form-data" },
+    data: formData,
+    signal,
+  });
+};
+
+export const getUniversityControllerAppendLegacyCompanyMoasMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof universityControllerAppendLegacyCompanyMoas>>,
+    TError,
+    { legacyCompanyId: string | undefined | null; data: AppendLegacyMoasDto },
+    TContext
+  >;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof universityControllerAppendLegacyCompanyMoas>>,
+  TError,
+  { legacyCompanyId: string | undefined | null; data: AppendLegacyMoasDto },
+  TContext
+> => {
+  const mutationKey = ["universityControllerAppendLegacyCompanyMoas"];
+  const { mutation: mutationOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey } };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof universityControllerAppendLegacyCompanyMoas>>,
+    { legacyCompanyId: string | undefined | null; data: AppendLegacyMoasDto }
+  > = (props) => {
+    const { legacyCompanyId, data } = props ?? {};
+
+    return universityControllerAppendLegacyCompanyMoas(legacyCompanyId, data);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UniversityControllerAppendLegacyCompanyMoasMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof universityControllerAppendLegacyCompanyMoas>>
+  >;
+export type UniversityControllerAppendLegacyCompanyMoasMutationBody =
+  AppendLegacyMoasDto;
+export type UniversityControllerAppendLegacyCompanyMoasMutationError = unknown;
+
+export const useUniversityControllerAppendLegacyCompanyMoas = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof universityControllerAppendLegacyCompanyMoas>>,
+      TError,
+      { legacyCompanyId: string | undefined | null; data: AppendLegacyMoasDto },
+      TContext
+    >;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof universityControllerAppendLegacyCompanyMoas>>,
+  TError,
+  { legacyCompanyId: string | undefined | null; data: AppendLegacyMoasDto },
+  TContext
+> => {
+  const mutationOptions =
+    getUniversityControllerAppendLegacyCompanyMoasMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };

@@ -688,6 +688,22 @@ function createEmptyMoaRecord(): MoaRecordInput {
   };
 }
 
+// A row the user has started filling in (as opposed to a blank, never-touched row,
+// which is fine to silently drop since MOAs are optional on these forms).
+function isMoaRowTouched(m: MoaRecordInput): boolean {
+  return !!m.file || !!m.effectiveDate || !!m.expiryDate || m.isPerpetual || !!m.name.trim();
+}
+
+function isMoaRowComplete(m: MoaRecordInput): boolean {
+  if (!m.effectiveDate) return false;
+  if (!m.isPerpetual && !m.expiryDate) return false;
+  return true;
+}
+
+function hasIncompleteMoa(moas: MoaRecordInput[]): boolean {
+  return moas.some((m) => isMoaRowTouched(m) && !isMoaRowComplete(m));
+}
+
 function buildMoaFormData(moas: MoaRecordInput[]) {
   const formData = new FormData();
   const moaPayload: {
@@ -701,8 +717,7 @@ function buildMoaFormData(moas: MoaRecordInput[]) {
 
   for (const m of moas) {
     const isPerpetual = m.isPerpetual;
-    const hasDates = !!m.effectiveDate && !!m.expiryDate;
-    if (!isPerpetual && !hasDates) continue;
+    if (!isMoaRowComplete(m)) continue;
     let document_file_index: number | null = null;
     if (m.file) {
       document_file_index = moaFiles.length;
@@ -742,7 +757,8 @@ function MoaUploadDialog({
   const removeMoa = (id: string) => {
     setMoas((prev) => prev.filter((m) => m.id !== id));
   };
-  const hasValidMoa = moas.some((m) => m.isPerpetual || (m.effectiveDate && m.expiryDate));
+  const incompleteMoa = hasIncompleteMoa(moas);
+  const hasValidMoa = moas.some(isMoaRowComplete) && !incompleteMoa;
 
   return (
     <>
@@ -781,7 +797,7 @@ function MoaUploadDialog({
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">{moa.isPerpetual ? "Effective Date (optional)" : "Effective Date *"}</Label>
+                  <Label className="text-xs">Effective Date *</Label>
                   <DatePicker
                     className="h-8"
                     value={moa.effectiveDate}
@@ -964,7 +980,8 @@ export function UploadDialog({
     },
   });
 
-  const isValid = companyName.trim();
+  const incompleteMoa = hasIncompleteMoa(moas);
+  const isValid = !!companyName.trim() && !incompleteMoa;
 
   return (
     <>
@@ -1025,7 +1042,7 @@ export function UploadDialog({
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <Label className="text-xs">{moa.isPerpetual ? "Effective Date (optional)" : "Effective Date *"}</Label>
+                    <Label className="text-xs">Effective Date *</Label>
                     <DatePicker
                       className="h-8"
                       value={moa.effectiveDate}

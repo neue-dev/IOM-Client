@@ -55,7 +55,7 @@ const MAX_SCALE = 2;
 export interface TemplateEditorInitial {
   name: string;
   description: string;
-  term_months: number;
+  term_months: number | null;
   field_schema: unknown;
   pdfUrl: string;
 }
@@ -78,6 +78,7 @@ export function TemplateEditor({ mode, templateId, initial }: TemplateEditorProp
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [termMonths, setTermMonths] = useState<number>(initial?.term_months ?? 12);
+  const [isPerpetual, setIsPerpetual] = useState(mode === "edit" && initial?.term_months === null);
   const [placements, setPlacements] = useState<Placement[]>(() =>
     initial ? fromFieldSchema(initial.field_schema) : [],
   );
@@ -196,7 +197,8 @@ export function TemplateEditor({ mode, templateId, initial }: TemplateEditorProp
             pdf: file,
             name: name.trim(),
             ...(description.trim() ? { description: description.trim() } : {}),
-            term_months: termMonths,
+            is_perpetual: isPerpetual,
+            ...(isPerpetual ? {} : { term_months: termMonths }),
             page_count: pageCount,
             page_w: Math.round(dims.w),
             page_h: Math.round(dims.h),
@@ -209,8 +211,10 @@ export function TemplateEditor({ mode, templateId, initial }: TemplateEditorProp
         data: {
           name: name.trim(),
           description: description.trim(),
-          term_months: termMonths,
           field_schema: fieldSchema,
+          ...(isPerpetual
+            ? { is_perpetual: true }
+            : { is_perpetual: false, term_months: termMonths }),
         },
       });
     },
@@ -223,11 +227,12 @@ export function TemplateEditor({ mode, templateId, initial }: TemplateEditorProp
   });
 
   const ready = !!pdfDoc && !!dims;
+  const hasExpiryField = placements.some((p) => p.field === "expiry_date");
   const canSave =
     ready &&
     !!name.trim() &&
-    Number.isFinite(termMonths) &&
-    termMonths >= 1 &&
+    (isPerpetual || (Number.isFinite(termMonths) && termMonths >= 1)) &&
+    !(isPerpetual && hasExpiryField) &&
     !save.isPending &&
     !createTemplate.isPending &&
     !patchTemplate.isPending;
@@ -354,9 +359,27 @@ export function TemplateEditor({ mode, templateId, initial }: TemplateEditorProp
               type="number"
               min={1}
               value={termMonths}
+              disabled={isPerpetual}
               onChange={(e) => setTermMonths(parseInt(e.target.value, 10) || 0)}
             />
           </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="tmpl-perpetual"
+              className="h-4 w-4"
+              checked={isPerpetual}
+              onChange={(e) => setIsPerpetual(e.target.checked)}
+            />
+            <Label htmlFor="tmpl-perpetual" className="text-xs cursor-pointer">
+              Perpetual (no expiry)
+            </Label>
+          </div>
+          {isPerpetual && hasExpiryField && (
+            <p className="text-destructive text-xs">
+              Remove the Expiry date field — this template is perpetual.
+            </p>
+          )}
           {mode === "edit" && (
             <p className="text-muted-foreground text-xs">
               The PDF can’t be replaced when editing. To use a different file, create a new template.
@@ -374,7 +397,9 @@ export function TemplateEditor({ mode, templateId, initial }: TemplateEditorProp
                 {group.label}
               </p>
               <div className="flex flex-wrap gap-1.5">
-                {group.fields.map((f) => (
+                {group.fields
+                  .filter((f) => !isPerpetual || f.key !== "expiry_date")
+                  .map((f) => (
                   <span
                     key={f.key}
                     draggable={ready}
