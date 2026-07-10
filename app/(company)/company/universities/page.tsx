@@ -1,29 +1,29 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
   useCompanyProfile,
   useCompanyVerification,
 } from "@/app/providers/company-profile.provider";
-import { useCompanyControllerListUniversities, type CompanyUniversityDirectoryItemDto } from "@/app/api";
+import {
+  useCompanyControllerListUniversities,
+  type CompanyUniversityDirectoryItemDto,
+} from "@/app/api";
 import { PageContainer, PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DataTable } from "@/components/ui/data-table";
 import { RequestDialog } from "@/components/moa-request-dialog";
+import { useModal } from "@/app/providers/modal-provider";
 import Link from "next/link";
-
-interface DialogState {
-  universityId: string;
-}
 
 export default function UniversityDirectoryPage() {
   const { company, isLoading } = useCompanyProfile();
-  const { data: verification, isLoading: vLoading } = useCompanyVerification(!!company);
+  const { data: verification, isLoading: vLoading } =
+    useCompanyVerification(!!company);
   const verified = verification?.status === "verified";
-
-  const [dialogState, setDialogState] = useState<DialogState | null>(null);
+  const { openModal, closeModal } = useModal();
 
   const { data, isLoading: uniLoading } = useCompanyControllerListUniversities({
     query: {
@@ -39,9 +39,13 @@ export default function UniversityDirectoryPage() {
         accessorFn: (row) => row.registered_name,
         cell: ({ row }) => (
           <div className="min-w-0">
-            <p className="font-medium text-gray-900">{row.original.registered_name}</p>
+            <p className="font-medium text-gray-900">
+              {row.original.registered_name}
+            </p>
             {row.original.address && (
-              <p className="text-muted-foreground truncate text-xs">{row.original.address}</p>
+              <p className="text-muted-foreground truncate text-xs">
+                {row.original.address}
+              </p>
             )}
           </div>
         ),
@@ -53,9 +57,33 @@ export default function UniversityDirectoryPage() {
         enableResizing: false,
         size: 140,
         cell: ({ row }) => (
-          <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="flex justify-end"
+            onClick={(e) => e.stopPropagation()}
+          >
             {row.original.requestable ? (
-              <Button size="sm" onClick={() => setDialogState({ universityId: row.original.id })}>
+              <Button
+                size="sm"
+                onClick={() =>
+                  openModal(
+                    "request-moa",
+                    <RequestDialog
+                      universityId={row.original.id}
+                      verified={verified}
+                      onClose={() => closeModal("request-moa")}
+                    />,
+                    {
+                      title: (
+                        <h2 className="text-2xl leading-snug font-semibold tracking-tight">
+                          Requesting a MOA with{" "}
+                          <span className="text-primary">{row.original.registered_name}</span>
+                        </h2>
+                      ),
+                      panelClassName: "sm:!w-[min(92vw,64rem)] sm:!max-w-none",
+                    },
+                  )
+                }
+              >
                 Request MOA
               </Button>
             ) : (
@@ -65,7 +93,7 @@ export default function UniversityDirectoryPage() {
         ),
       },
     ],
-    [],
+    [closeModal, openModal, verified],
   );
 
   if (isLoading || vLoading) {
@@ -124,14 +152,6 @@ export default function UniversityDirectoryPage() {
           searchPlaceholder="Search universities..."
           rowLabelSingular="university"
           rowLabelPlural="universities"
-        />
-      )}
-
-      {dialogState && (
-        <RequestDialog
-          universityId={dialogState.universityId}
-          verified={verified}
-          onClose={() => setDialogState(null)}
         />
       )}
     </PageContainer>

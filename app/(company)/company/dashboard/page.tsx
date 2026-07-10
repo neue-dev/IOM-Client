@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DataTable } from "@/components/ui/data-table";
 import { MoaStatusBadge } from "@/components/status-badge";
+import { useModal } from "@/app/providers/modal-provider";
 import { formatDateWithoutTime, cn } from "@/lib/utils";
 import { AlertCircle, ArrowLeft, ArrowUpRight, ClipboardList, Clock, Plus } from "lucide-react";
 import { RequestDialog } from "@/components/moa-request-dialog";
@@ -220,6 +221,7 @@ function CompanyDashboardContent() {
   const { company, isLoading } = useCompanyProfile();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { openModal, closeModal } = useModal();
   const openUniversityId = searchParams.get("open_university_id");
   const inviteTemplateId = searchParams.get("template_id");
   const inviteId = searchParams.get("invite_id");
@@ -243,16 +245,39 @@ function CompanyDashboardContent() {
 
   const { data: verification, isLoading: vLoading } = useCompanyVerification(!!company);
   const verified = verification?.status === "verified";
+  const openUniversityName = (invitesData?.invites ?? []).find(
+    (invite) =>
+      (inviteId && invite.id === inviteId) || invite.university?.id === openUniversityId,
+  )?.university?.registered_name;
 
-  const inviteDialog = openUniversityId ? (
-    <RequestDialog
-      universityId={openUniversityId}
-      defaultTemplateId={inviteTemplateId}
-      inviteId={inviteId}
-      verified={verified}
-      onClose={() => router.replace("/company/dashboard")}
-    />
-  ) : null;
+  useEffect(() => {
+    if (!openUniversityId) {
+      closeModal("request-moa");
+      return;
+    }
+
+    openModal(
+      "request-moa",
+      <RequestDialog
+        universityId={openUniversityId}
+        defaultTemplateId={inviteTemplateId}
+        inviteId={inviteId}
+        verified={verified}
+        onClose={() => closeModal("request-moa")}
+      />,
+      {
+        title: (
+          <h2 className="text-2xl leading-snug font-semibold tracking-tight">
+            Requesting a MOA with{" "}
+            <span className="text-primary">{openUniversityName ?? "this university"}</span>
+          </h2>
+        ),
+        description: "Choose a university template, then add the representative and signature details.",
+        panelClassName: "sm:!w-[min(92vw,64rem)] sm:!max-w-none",
+        onClose: () => router.replace("/company/dashboard"),
+      },
+    );
+  }, [closeModal, inviteId, inviteTemplateId, openModal, openUniversityId, openUniversityName, router, verified]);
 
   // Clean up timer on unmount.
   useEffect(() => () => clearTimeout(timerRef.current), []);
@@ -285,7 +310,6 @@ function CompanyDashboardContent() {
             <Skeleton className="h-20 w-full" />
           </div>
         </PageContainer>
-        {inviteDialog}
       </>
     );
   }
@@ -389,7 +413,6 @@ function CompanyDashboardContent() {
 
   return (
     <>
-    {inviteDialog}
     <PageContainer>
       {/* overflow-hidden clips the sliding panels; relative enables absolute children */}
       <div className="relative overflow-hidden">
