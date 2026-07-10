@@ -18,6 +18,7 @@ type ModalOptions = {
   backdropClassName?: string;
   showHeaderDivider?: boolean;
   useCustomPanel?: boolean;
+  exitAnimation?: "default" | "fade";
   onClose?: () => void;
 };
 
@@ -26,7 +27,7 @@ type OpenModalCallback = (
   contentNode: React.ReactNode,
   options?: ModalOptions
 ) => void;
-type CloseModalCallback = (name?: string) => void;
+type CloseModalCallback = (name?: string, options?: { skipOnClose?: boolean }) => void;
 
 const ModalCtx = createContext<{ openModal: OpenModalCallback; closeModal: CloseModalCallback }>({
   openModal: () => {},
@@ -41,24 +42,31 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
   const [activeModalRegistry, setActiveModalRegistry] = useState<
     Record<string, ActiveModalRegistryEntry>
   >({});
+  const [portalActive, setPortalActive] = useState(false);
 
   const openModal = useCallback<OpenModalCallback>((name, content, opts = {}) => {
     setActiveModalRegistry((m) => ({ ...m, [name]: { contentNode: content, options: opts } }));
   }, []);
 
-  const closeModal = useCallback<CloseModalCallback>((name) => {
+  const closeModal = useCallback<CloseModalCallback>((name, closeOptions) => {
     setActiveModalRegistry((m) => {
       if (!name) {
-        Object.values(m).forEach((e) => e.options.onClose?.());
+        if (!closeOptions?.skipOnClose) {
+          Object.values(m).forEach((e) => e.options.onClose?.());
+        }
         return {};
       }
 
       const entry = m[name];
-      entry?.options.onClose?.();
+      if (!closeOptions?.skipOnClose) entry?.options.onClose?.();
       const { [name]: _removed, ...rest } = m;
       return rest;
     });
   }, []);
+
+  useEffect(() => {
+    if (Object.keys(activeModalRegistry).length > 0) setPortalActive(true);
+  }, [activeModalRegistry]);
 
   useEffect(() => {
     const count = Object.keys(activeModalRegistry).length;
@@ -86,10 +94,14 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
 
   const portals = useMemo(() => {
     const entries = Object.entries(activeModalRegistry);
-    if (!entries.length) return null;
+    if (!portalActive) return null;
 
     return createPortal(
-      <AnimatePresence>
+      <AnimatePresence
+        onExitComplete={() => {
+          if (Object.keys(activeModalRegistry).length === 0) setPortalActive(false);
+        }}
+      >
         {entries.map(([name, { contentNode, options }]) => (
           <ModalWrapper key={name} name={name} options={options} close={closeModal}>
             {contentNode}
@@ -98,7 +110,7 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
       </AnimatePresence>,
       document.body
     );
-  }, [activeModalRegistry, closeModal]);
+  }, [activeModalRegistry, closeModal, portalActive]);
 
   return (
     <ModalCtx.Provider value={{ openModal, closeModal }}>
@@ -120,6 +132,7 @@ const ModalWrapper = ({
   close: (name?: string) => void;
 }) => {
   const backdropRef = React.createRef<HTMLDivElement>();
+  const fadeExit = options.exitAnimation === "fade";
 
   const handleBackdropClick = (e: React.MouseEvent | React.TouchEvent) => {
     if (options.allowBackdropClick === false) return;
@@ -132,6 +145,7 @@ const ModalWrapper = ({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
+      transition={fadeExit ? { duration: 0.5, ease: [0.22, 1, 0.36, 1] } : undefined}
       className={cn(
         "fixed inset-0 z-[1000] bg-black/10 backdrop-blur-sm",
         "flex items-end justify-center p-0",
@@ -146,15 +160,19 @@ const ModalWrapper = ({
     >
       {!options?.useCustomPanel ? (
         <motion.div
-          initial={{ opacity: 0, y: 24, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 16, scale: 0.98 }}
-          transition={{
-            type: "spring",
-            stiffness: 320,
-            damping: 28,
-            mass: 0.8,
-          }}
+          initial={fadeExit ? { opacity: 0, y: 8, scale: 0.98, filter: "blur(4px)" } : { opacity: 0, y: 24, scale: 0.98 }}
+          animate={fadeExit ? { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" } : { opacity: 1, y: 0, scale: 1 }}
+          exit={fadeExit ? { opacity: 0, y: -10, scale: 0.985, filter: "blur(8px)" } : { opacity: 0, y: 16, scale: 0.98 }}
+          transition={
+            fadeExit
+              ? { duration: 0.58, ease: [0.16, 1, 0.3, 1] }
+              : {
+                  type: "spring",
+                  stiffness: 320,
+                  damping: 28,
+                  mass: 0.8,
+                }
+          }
           className={[
             "relative overflow-hidden border bg-white shadow-2xl",
             "w-full max-w-full min-w-[100svw] rounded-t-[0.33em] rounded-b-none",
