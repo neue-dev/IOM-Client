@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import type { PDFDocumentProxy } from "pdfjs-dist";
@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FormError } from "@/components/auth-shell";
+import { MoaSignatureInput, type MoaSignatureMode } from "@/components/moa-signature-input";
 import { useResolvedFile } from "@/app/lib/resolve-file";
 import { toast } from "sonner";
 import { toastPresets } from "@/components/sonner-toaster";
@@ -34,7 +35,6 @@ import {
   FileText,
   Loader2,
   PenLine,
-  Upload,
 } from "lucide-react";
 
 interface Template {
@@ -174,11 +174,10 @@ export function RequestDialog({
   );
   const [repName, setRepName] = useState("");
   const [repTitle, setRepTitle] = useState("");
-  const [sigMode, setSigMode] = useState<"type" | "upload">("type");
+  const [sigMode, setSigMode] = useState<MoaSignatureMode>("type");
   const [sigText, setSigText] = useState("");
   const [sigFile, setSigFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   const { data, isLoading } =
     useCompanyControllerGetRequestableTemplates(universityId);
@@ -241,7 +240,7 @@ export function RequestDialog({
       templateId: selectedTemplate!,
       repName,
       repTitle,
-      ...(sigMode === "upload" && sigFile
+      ...(sigMode !== "type" && sigFile
         ? { signature: sigFile }
         : { repSignatureText: sigText }),
       ...(inviteId ? { invite_id: inviteId } : {}),
@@ -263,7 +262,7 @@ export function RequestDialog({
 
   const templates = data?.templates ?? [];
   const universityName = data?.university?.registered_name ?? "";
-  const sigReady = sigMode === "upload" ? !!sigFile : !!sigText.trim();
+  const sigReady = sigMode === "type" ? !!sigText.trim() : !!sigFile;
   const step2Ready = !!repName.trim() && !!repTitle.trim() && sigReady;
   const currentStepIndex = step - 1;
 
@@ -348,10 +347,6 @@ export function RequestDialog({
       </div>
     ) : (
       <div className="space-y-4">
-        <p className="text-muted-foreground text-xs">
-          These details will appear on the MOA document. They are not stored
-          after generation.
-        </p>
         <div className="space-y-1.5">
           <Label htmlFor="rep-name">Representative name</Label>
           <Input
@@ -371,73 +366,19 @@ export function RequestDialog({
           />
         </div>
 
-        <div className="space-y-2">
-          <Label>Signature</Label>
-          <div className="flex gap-1 rounded-[0.33em] border border-gray-200 p-0.5">
-            <Button
-              variant={sigMode === "type" ? "default" : "ghost"}
-              size="sm"
-              className="flex-1"
-              onClick={() => setSigMode("type")}
-            >
-              Type
-            </Button>
-            <Button
-              variant={sigMode === "upload" ? "default" : "ghost"}
-              size="sm"
-              className="flex-1"
-              onClick={() => setSigMode("upload")}
-            >
-              Upload image
-            </Button>
-          </div>
+        <MoaSignatureInput
+          mode={sigMode}
+          onModeChange={setSigMode}
+          text={sigText}
+          onTextChange={setSigText}
+          file={sigFile}
+          onFileChange={setSigFile}
+        />
 
-          {sigMode === "type" ? (
-            <Input
-              value={sigText}
-              onChange={(e) => setSigText(e.target.value)}
-              placeholder="Type your signature"
-              className="font-serif italic"
-            />
-          ) : (
-            <div className="space-y-2">
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/png,image/jpeg"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0] ?? null;
-                  setSigFile(f);
-                  e.target.value = "";
-                }}
-              />
-              {sigFile ? (
-                <div className="flex items-center justify-between rounded-[0.33em] border border-gray-200 px-3 py-2">
-                  <span className="truncate text-xs text-gray-700">
-                    {sigFile.name}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    className="ml-2 flex-shrink-0"
-                    onClick={() => setSigFile(null)}
-                  >
-                    Remove
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => fileRef.current?.click()}
-                >
-                  <Upload className="h-4 w-4" /> Choose image (PNG or JPEG)
-                </Button>
-              )}
-            </div>
-          )}
-        </div>
+        <p className="text-muted-foreground text-sm">
+          These details will appear on the MOA document. They are not stored
+          after generation.
+        </p>
 
         {error && <FormError>{error}</FormError>}
       </div>
