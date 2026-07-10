@@ -5,6 +5,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { preconfiguredAxios } from "@/app/api/preconfig.axios";
 import { useModal } from "@/app/providers/modal-provider";
 import { Button } from "@/components/ui/button";
+import { FileUpload } from "@/components/ui/file-upload";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
@@ -797,14 +798,12 @@ function MoaUploadDialog({
                   />
                 </div>
               </div>
-              <div className="mt-2 space-y-1.5">
-                <Label className="text-xs">MOA Document (PDF, optional, max 2.5MB)</Label>
-                <Input
-                  type="file"
-                  className="h-8"
+              <div className="mt-2">
+                <FileUpload
+                  label="MOA Document (PDF, optional, max 2.5MB)"
+                  name={`moa-document-${moa.id}`}
                   accept=".pdf,application/pdf"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0] ?? null;
+                  onFileSelect={(file) => {
                     updateMoa(moa.id, { file, name: file?.name || "" });
                   }}
                 />
@@ -842,14 +841,14 @@ function AddDocumentsForm({
 
   return (
     <div className="space-y-4">
-      <Input
-        type="file"
+      <FileUpload
+        label="Company documents"
+        name="company-documents"
         multiple
         accept=".pdf,application/pdf"
-        onChange={(e) => {
-          const files = e.target.files;
-          if (!files) return;
-          const newInputs = Array.from(files).map((f) => ({
+        placeholder="Click to upload PDF files"
+        onFilesSelect={(files) => {
+          const newInputs = files.map((f) => ({
             id: crypto.randomUUID(),
             file: f,
             type: "other",
@@ -1043,16 +1042,12 @@ export function UploadDialog({
                     />
                   </div>
                 </div>
-                <div className="mt-2 space-y-1.5">
-                  <Label className="text-xs">
-                    MOA Document (PDF, optional, max 2.5MB)
-                  </Label>
-                  <Input
-                    type="file"
-                    className="h-8"
+                <div className="mt-2">
+                  <FileUpload
+                    label="MOA Document (PDF, optional, max 2.5MB)"
+                    name={`moa-document-${moa.id}`}
                     accept=".pdf,application/pdf"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0] ?? null;
+                    onFileSelect={(file) => {
                       updateMoa(moa.id, { file, name: file?.name || "" });
                     }}
                   />
@@ -1139,19 +1134,15 @@ export function UploadDialog({
               Company documents (optional)
             </summary>
             <div className="mt-3 space-y-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">
-                  Company Documents (PDF, optional, max 2.5MB each, max 10)
-                </Label>
-                <Input
-                  type="file"
+              <div className="space-y-3">
+                <FileUpload
+                  label="Company Documents (PDF, optional, max 2.5MB each, max 10)"
+                  name="company-documents"
                   multiple
-                  className="h-8"
                   accept=".pdf,application/pdf"
-                  onChange={(e) => {
-                    const files = e.target.files;
-                    if (!files) return;
-                    const newInputs = Array.from(files).map((f) => ({
+                  placeholder="Click to upload PDF files"
+                  onFilesSelect={(files) => {
+                    const newInputs = files.map((f) => ({
                       id: crypto.randomUUID(),
                       file: f,
                       type: "other",
@@ -1503,12 +1494,12 @@ export function CsvUploadDialog({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="csv-file">CSV File</Label>
-                <Input
-                  id="csv-file"
-                  type="file"
+                <FileUpload
+                  label="CSV File"
+                  name="csv-file"
                   accept=".csv,text/csv"
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  placeholder="Click to upload CSV file"
+                  onFileSelect={setFile}
                 />
               </div>
 
@@ -1899,12 +1890,12 @@ company-documents/acme-mayor.pdf`}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="zip-file">ZIP File</Label>
-                <Input
-                  id="zip-file"
-                  type="file"
+                <FileUpload
+                  label="ZIP File"
+                  name="zip-file"
                   accept=".zip,application/zip"
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  placeholder="Click to upload ZIP file"
+                  onFileSelect={setFile}
                 />
               </div>
 
