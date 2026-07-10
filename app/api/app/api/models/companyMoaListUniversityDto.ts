@@ -11,4 +11,6 @@ export interface CompanyMoaListUniversityDto {
   registered_name: string;
   /** @nullable */
   logo_url: string | null;
+  /** @nullable */
+  address: string | null;
 }

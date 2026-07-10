@@ -8,8 +8,11 @@
 
 export interface UniversityLegacyCompanyMoaDto {
   id: string;
-  effective_date: string;
-  expiry_date: string;
+  /** @nullable */
+  effective_date: string | null;
+  /** @nullable */
+  expiry_date: string | null;
+  is_perpetual: boolean;
   /** @nullable */
   document_url: string | null;
   /** @nullable */
