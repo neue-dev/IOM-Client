@@ -1,7 +1,9 @@
 "use client";
-import { useParams } from "next/navigation";
+import { useEffect } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useCompanyControllerGetMoa } from "@/app/api";
+import { useModal } from "@/app/providers/modal-provider";
 import { PageContainer } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,12 +26,25 @@ interface CompanyMoaDetail {
 
 export default function CompanyMoaDetailPage() {
   const { moaId } = useParams<{ moaId: string }>();
+  const searchParams = useSearchParams();
+  const { closeModal } = useModal();
+  const justIssued = searchParams.get("issued") === "1";
 
   const { data, isLoading } = useCompanyControllerGetMoa(moaId, {
     query: { refetchInterval: 25 * 60 * 1000 },
   });
 
   const detail = data as unknown as CompanyMoaDetail | undefined;
+
+  useEffect(() => {
+    if (!justIssued || isLoading || !data) return;
+
+    const timer = window.setTimeout(() => {
+      closeModal("request-moa", { skipOnClose: true });
+    }, 650);
+
+    return () => window.clearTimeout(timer);
+  }, [closeModal, data, isLoading, justIssued]);
 
   if (isLoading) {
     return (

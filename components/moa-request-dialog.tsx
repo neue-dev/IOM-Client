@@ -37,6 +37,74 @@ import {
   PenLine,
 } from "lucide-react";
 
+function AnimatedCheck() {
+  return (
+    <svg width="72" height="72" viewBox="0 0 52 52" fill="none" className="text-supportive">
+      <path
+        d="M14 27 L22 35 L38 18"
+        stroke="currentColor"
+        strokeWidth="5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        pathLength="1"
+        className="check-path"
+      />
+    </svg>
+  );
+}
+
+function MoaIssuedSuccess() {
+  return (
+    <div className="mx-auto flex min-h-[20rem] w-full flex-col items-center justify-center px-4 py-10 text-center sm:w-[30rem]">
+      <style>{`
+        .request-moa-header {
+          display: none;
+        }
+
+        .check-path {
+          stroke-dasharray: 1;
+          stroke-dashoffset: 1;
+          animation: drawCheck 300ms ease-out forwards;
+        }
+
+        @keyframes drawCheck {
+          to {
+            stroke-dashoffset: 0;
+          }
+        }
+      `}</style>
+      <div className="mb-5 rounded-full bg-supportive/10 p-6">
+        <AnimatedCheck />
+      </div>
+      <h2 className="text-3xl font-semibold tracking-tight text-foreground">MOA issued</h2>
+      <p className="text-muted-foreground mt-2 text-sm">Opening your MOA...</p>
+    </div>
+  );
+}
+
+function MoaIssuingState() {
+  return (
+    <div className="mx-auto flex min-h-[20rem] w-full flex-col items-center justify-center px-4 py-10 text-center sm:w-[30rem]">
+      <style>{`
+        .request-moa-header {
+          display: none;
+        }
+      `}</style>
+      <div className="relative mb-6 flex h-28 w-28 items-center justify-center">
+        <span className="absolute h-full w-full animate-ping rounded-full bg-primary/10" />
+        <span className="absolute h-20 w-20 animate-pulse rounded-full bg-primary/10" />
+        <FileText className="text-primary relative h-12 w-12" />
+      </div>
+      <h2 className="text-3xl font-semibold tracking-tight text-foreground">Issuing your MOA</h2>
+      <p className="text-muted-foreground mt-2 max-w-sm text-sm">
+        We&apos;re generating the agreement and preparing the signed document.
+      </p>
+    </div>
+  );
+}
+
+type RequestPhase = "form" | "issuing" | "issued";
+
 interface Template {
   id: string;
   name: string;
@@ -134,8 +202,8 @@ export function TemplatePreviewContent({
   return (
     <>
       {isLoading ? (
-        <div className="flex h-full items-center justify-center">
-          <Loader2 className="text-muted-foreground h-5 w-5 animate-spin" />
+        <div className="flex h-full items-center justify-center bg-slate-100">
+          <Loader2 className="text-primary h-6 w-6 animate-spin" />
         </div>
       ) : pdfUrl ? (
         <TemplatePdfViewer
@@ -178,6 +246,7 @@ export function RequestDialog({
   const [sigText, setSigText] = useState("");
   const [sigFile, setSigFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [requestPhase, setRequestPhase] = useState<RequestPhase>("form");
 
   const { data, isLoading } =
     useCompanyControllerGetRequestableTemplates(universityId);
@@ -200,9 +269,10 @@ export function RequestDialog({
       queryKey: getCompanyControllerListPendingInvitesQueryKey(),
     });
     if (verified && res.moa) {
-      toast("MOA Issued", toastPresets.success);
-      onClose();
-      router.push(`/company/moas/${res.moa.id}`);
+      setRequestPhase("issued");
+      window.setTimeout(() => {
+        router.push(`/company/moas/${res.moa!.id}?issued=1`);
+      }, 550);
     } else {
       toast(
         "MOA request submitted — it will be issued automatically once your company is verified.",
@@ -214,6 +284,7 @@ export function RequestDialog({
   };
 
   const handleError = (e: unknown) => {
+    setRequestPhase("form");
     const err = e as ApiError;
     const code = err.response?.data?.code || err.code || "";
     if (code === "AT_ACTIVE_MOA_CAP") {
@@ -235,6 +306,8 @@ export function RequestDialog({
   };
 
   const submitRequest = () => {
+    setError(null);
+    setRequestPhase("issuing");
     const requestData = {
       universityId,
       templateId: selectedTemplate!,
@@ -265,6 +338,14 @@ export function RequestDialog({
   const sigReady = sigMode === "type" ? !!sigText.trim() : !!sigFile;
   const step2Ready = !!repName.trim() && !!repTitle.trim() && sigReady;
   const currentStepIndex = step - 1;
+
+  if (requestPhase === "issuing") {
+    return <MoaIssuingState />;
+  }
+
+  if (requestPhase === "issued") {
+    return <MoaIssuedSuccess />;
+  }
 
   const content =
     step === 1 ? (
@@ -422,7 +503,7 @@ export function RequestDialog({
     );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 sm:w-[min(92vw,64rem)]">
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
         {requestSteps.map((requestStep, index) => {
           const Icon = requestStep.icon;

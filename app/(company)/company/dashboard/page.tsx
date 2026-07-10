@@ -273,7 +273,9 @@ function CompanyDashboardContent() {
           </h2>
         ),
         description: "Choose a university template, then add the representative and signature details.",
-        panelClassName: "sm:!w-[min(92vw,64rem)] sm:!max-w-none",
+        panelClassName: "sm:!max-w-none",
+        headerClassName: "request-moa-header",
+        exitAnimation: "fade",
         onClose: () => router.replace("/company/dashboard"),
       },
     );

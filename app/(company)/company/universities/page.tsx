@@ -79,7 +79,9 @@ export default function UniversityDirectoryPage() {
                           <span className="text-primary">{row.original.registered_name}</span>
                         </h2>
                       ),
-                      panelClassName: "sm:!w-[min(92vw,64rem)] sm:!max-w-none",
+                      panelClassName: "sm:!max-w-none",
+                      headerClassName: "request-moa-header",
+                      exitAnimation: "fade",
                     },
                   )
                 }
