@@ -1,14 +1,9 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useUniversityProfile } from "@/app/providers/university-profile.provider";
-import {
-  useUniversityControllerListRegisteredCompanies,
-  useUniversityControllerListTemplates,
-  useUniversityControllerListInvites,
-  useUniversityControllerSendInvite,
-} from "@/app/api";
+import { preconfiguredAxios } from "@/app/api/preconfig.axios";
 import { PageContainer, PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,14 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DataTable } from "@/components/ui/data-table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { useModal } from "@/app/providers/modal-provider";
 import { formatDateWithoutTime } from "@/lib/utils";
 import { toast } from "sonner";
 import { toastPresets } from "@/components/sonner-toaster";
@@ -54,7 +42,7 @@ interface AvailableTemplate {
 interface RegisteredCompany {
   id: string;
   registered_name: string;
-  email: string | null;
+  email: string;
 }
 
 function InviteStatusBadge({ status }: { status: CompanyInvite["status"] }) {
@@ -111,7 +99,7 @@ function MorphHeight({ children }: { children: React.ReactNode }) {
   );
 }
 
-function InviteModal({
+function InviteForm({
   onClose,
   onSent,
 }: {
@@ -139,10 +127,21 @@ function InviteModal({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  const { data: companiesData, isLoading: companiesLoading } =
-    useUniversityControllerListRegisteredCompanies();
+  const { data: companiesData, isLoading: companiesLoading } = useQuery({
+    queryKey: ["university-registered-companies"],
+    queryFn: () =>
+      preconfiguredAxios
+        .get("/api/university/companies")
+        .then((r) => r.data as { companies: RegisteredCompany[] }),
+  });
 
-  const { data: templatesData } = useUniversityControllerListTemplates();
+  const { data: templatesData } = useQuery({
+    queryKey: ["university-templates-for-invite"],
+    queryFn: () =>
+      preconfiguredAxios
+        .get("/api/university/templates")
+        .then((r) => r.data as { templates: AvailableTemplate[] }),
+  });
 
   const availableTemplates = (templatesData?.templates ?? []).filter((t) => t.is_available);
 
@@ -155,69 +154,42 @@ function InviteModal({
   const invitedName =
     mode === "registered" ? selectedCompany?.registered_name : companyName.trim() || undefined;
 
-  const send = useUniversityControllerSendInvite({
-    mutation: {
-      onSuccess: () => {
-        toast("Invite sent.", toastPresets.success);
-        onSent();
-        onClose();
-      },
-      onError: (e: Error) => setError(e.message),
+  const send = useMutation({
+    mutationFn: () =>
+      preconfiguredAxios
+        .post("/api/university/invites", {
+          invitedEmail,
+          companyName: invitedName,
+          templateId: templateId || undefined,
+          personalMessage: message.trim() || undefined,
+        })
+        .then((r) => r.data as { superseded: boolean; message: string }),
+    onSuccess: (res) => {
+      toast(
+        res.superseded
+          ? "Invite sent. A previous pending invite to this email was superseded."
+          : "Invite sent.",
+        toastPresets.success,
+      );
+      onSent();
+      onClose();
     },
+    onError: (e: Error) => setError(e.message),
   });
 
   const step1CanNext =
-    mode === "registered" ? !!selectedCompany?.email : !!companyName.trim() && !!email.trim();
+    mode === "registered" ? !!selectedCompany : !!companyName.trim() && !!email.trim();
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Invite a company</DialogTitle>
-          <DialogDescription>Step {step} of 2</DialogDescription>
-        </DialogHeader>
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">Step {step} of 2</p>
 
-        <MorphHeight>
-        {step === 1 && (
-          <div className={`relative ${transitioningFrom !== null ? "overflow-hidden" : ""}`}>
-            {transitioningFrom !== null && (
-              <div className="animate-out fade-out-0 slide-out-to-bottom-2 fill-mode-forwards pointer-events-none absolute inset-x-0 top-0 space-y-3 duration-200">
-                {transitioningFrom === "registered" ? (
-                  <>
-                    {companiesLoading ? (
-                      <Skeleton className="h-9 w-full" />
-                    ) : (
-                      <Autocomplete
-                        options={companyOptions}
-                        value={selectedCompany?.id ?? null}
-                        onChange={() => {}}
-                        placeholder="Search companies…"
-                      />
-                    )}
-                    <button type="button" className="text-primary text-sm">
-                      Company not listed? Invite by email
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <div className="space-y-1.5">
-                      <Label>Company name</Label>
-                      <Input value={companyName} readOnly placeholder="Acme Corporation" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Company email</Label>
-                      <Input value={email} readOnly placeholder="rep@company.com" />
-                    </div>
-                    <button type="button" className="text-primary text-sm">
-                      ← Search registered companies
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-
-            <div className={transitioningFrom !== null ? "animate-in fade-in-0 slide-in-from-top-2 duration-200 space-y-3" : "space-y-3"}>
-              {mode === "registered" ? (
+      <MorphHeight>
+      {step === 1 && (
+        <div className={`relative ${transitioningFrom !== null ? "overflow-hidden" : ""}`}>
+          {transitioningFrom !== null && (
+            <div className="animate-out fade-out-0 slide-out-to-bottom-2 fill-mode-forwards pointer-events-none absolute inset-x-0 top-0 space-y-3 duration-200">
+              {transitioningFrom === "registered" ? (
                 <>
                   {companiesLoading ? (
                     <Skeleton className="h-9 w-full" />
@@ -225,173 +197,182 @@ function InviteModal({
                     <Autocomplete
                       options={companyOptions}
                       value={selectedCompany?.id ?? null}
-                      onChange={(id) => {
-                        const company = id
-                          ? (companiesData?.companies ?? []).find((c) => c.id === id) ?? null
-                          : null;
-                        setSelectedCompany(company as RegisteredCompany | null);
-                      }}
+                      onChange={() => {}}
                       placeholder="Search companies…"
                     />
                   )}
-                  <button
-                    type="button"
-                    className="text-primary cursor-pointer text-sm hover:underline"
-                    onClick={() => {
-                      setSelectedCompany(null);
-                      switchMode("new");
-                    }}
-                  >
+                  <button type="button" className="text-primary text-sm">
                     Company not listed? Invite by email
                   </button>
                 </>
               ) : (
                 <>
                   <div className="space-y-1.5">
-                    <Label htmlFor="invite-company-name">Company name</Label>
-                    <Input
-                      id="invite-company-name"
-                      placeholder="Acme Corporation"
-                      value={companyName}
-                      onChange={(e) => setCompanyName(e.target.value)}
-                      autoFocus
-                    />
+                    <Label>Company name</Label>
+                    <Input value={companyName} readOnly placeholder="Acme Corporation" />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="invite-email">Company email</Label>
-                    <Input
-                      id="invite-email"
-                      type="email"
-                      autoComplete="off"
-                      spellCheck={false}
-                      placeholder="rep@company.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                    />
+                    <Label>Company email</Label>
+                    <Input value={email} readOnly placeholder="rep@company.com" />
                   </div>
-                  <button
-                    type="button"
-                    className="text-primary cursor-pointer text-sm hover:underline"
-                    onClick={() => {
-                      setCompanyName("");
-                      setEmail("");
-                      switchMode("registered");
-                    }}
-                  >
+                  <button type="button" className="text-primary text-sm">
                     ← Search registered companies
                   </button>
                 </>
               )}
             </div>
-          </div>
-        )}
-
-        {step === 2 && (
-          <div className="space-y-4">
-            <div className="rounded-[0.33em] border border-gray-200 bg-gray-50 px-3 py-2.5">
-              <p className="text-muted-foreground text-xs">Inviting</p>
-              {mode === "registered" && selectedCompany ? (
-                <>
-                  <p className="text-sm font-medium text-gray-900">
-                    {selectedCompany.registered_name}
-                  </p>
-                  <p className="text-muted-foreground text-xs">{selectedCompany.email}</p>
-                </>
-              ) : (
-                <>
-                  <p className="text-sm font-medium text-gray-900">{companyName}</p>
-                  <p className="text-muted-foreground text-xs">{email}</p>
-                </>
-              )}
-            </div>
-
-            {availableTemplates.length > 0 && (
-              <div className="space-y-1.5">
-                <Label htmlFor="invite-template">MOA template to send (optional)</Label>
-                <div className="relative">
-                  <select
-                    id="invite-template"
-                    value={templateId}
-                    onChange={(e) => setTemplateId(e.target.value)}
-                    className="border-input bg-background focus:ring-ring w-full appearance-none rounded-[0.33em] border py-2 pl-3 pr-8 text-sm focus:outline-none focus:ring-1"
-                  >
-                    <option value="">No specific template</option>
-                    {availableTemplates.map((t) => (
-                      <option key={t.template.id} value={t.template.id}>
-                        {t.template.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-1.5">
-              <Label htmlFor="invite-message">Personal message (optional)</Label>
-              <Textarea
-                id="invite-message"
-                rows={3}
-                placeholder="Add a note to the company…"
-                maxLength={500}
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-              />
-              <p className="text-muted-foreground text-right text-xs">{message.length}/500</p>
-            </div>
-
-            {error && (
-              <p className="text-destructive rounded-[0.33em] bg-red-50 px-3 py-2 text-sm">
-                {error}
-              </p>
-            )}
-          </div>
-        )}
-        </MorphHeight>
-
-        <DialogFooter>
-          {step === 1 ? (
-            <>
-              <Button variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button onClick={() => setStep(2)} disabled={!step1CanNext}>
-                Next
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setStep(1);
-                  setError("");
-                }}
-              >
-                Back
-              </Button>
-              <Button
-                onClick={() => {
-                  setError("");
-                  send.mutate({
-                    data: {
-                      invitedEmail,
-                      companyName: invitedName,
-                      templateId: templateId || undefined,
-                      personalMessage: message.trim() || undefined,
-                    },
-                  });
-                }}
-                disabled={send.isPending}
-              >
-                {send.isPending && <Loader2 className="animate-spin" />}
-                {send.isPending ? "Sending…" : "Send invite"}
-              </Button>
-            </>
           )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+
+          <div className={transitioningFrom !== null ? "animate-in fade-in-0 slide-in-from-top-2 duration-200 space-y-3" : "space-y-3"}>
+            {mode === "registered" ? (
+              <>
+                {companiesLoading ? (
+                  <Skeleton className="h-9 w-full" />
+                ) : (
+                  <Autocomplete
+                    options={companyOptions}
+                    value={selectedCompany?.id ?? null}
+                    onChange={(id) => {
+                      const company = id
+                        ? (companiesData?.companies ?? []).find((c) => c.id === id) ?? null
+                        : null;
+                      setSelectedCompany(company);
+                    }}
+                    placeholder="Search companies…"
+                  />
+                )}
+                <button
+                  type="button"
+                  className="text-primary cursor-pointer text-sm hover:underline"
+                  onClick={() => {
+                    setSelectedCompany(null);
+                    switchMode("new");
+                  }}
+                >
+                  Company not listed? Invite by email
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="invite-company-name">Company name</Label>
+                  <Input
+                    id="invite-company-name"
+                    placeholder="Acme Corporation"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="invite-email">Company email</Label>
+                  <Input
+                    id="invite-email"
+                    type="email"
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder="rep@company.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="text-primary cursor-pointer text-sm hover:underline"
+                  onClick={() => {
+                    setCompanyName("");
+                    setEmail("");
+                    switchMode("registered");
+                  }}
+                >
+                  ← Search registered companies
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="space-y-4">
+          <div className="rounded-[0.33em] border border-gray-200 bg-gray-50 px-3 py-2.5">
+            <p className="text-muted-foreground text-xs">Inviting</p>
+            {mode === "registered" && selectedCompany ? (
+              <>
+                <p className="text-sm font-medium text-gray-900">
+                  {selectedCompany.registered_name}
+                </p>
+                <p className="text-muted-foreground text-xs">{selectedCompany.email}</p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-medium text-gray-900">{companyName}</p>
+                <p className="text-muted-foreground text-xs">{email}</p>
+              </>
+            )}
+          </div>
+
+          {availableTemplates.length > 0 && (
+            <div className="space-y-1.5">
+              <Label htmlFor="invite-template">MOA template to send (optional)</Label>
+              <div className="relative">
+                <select
+                  id="invite-template"
+                  value={templateId}
+                  onChange={(e) => setTemplateId(e.target.value)}
+                  className="border-input bg-background focus:ring-ring w-full appearance-none rounded-[0.33em] border py-2 pl-3 pr-8 text-sm focus:outline-none focus:ring-1"
+                >
+                  <option value="">No specific template</option>
+                  {availableTemplates.map((t) => (
+                    <option key={t.template.id} value={t.template.id}>
+                      {t.template.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <Label htmlFor="invite-message">Personal message (optional)</Label>
+            <Textarea
+              id="invite-message"
+              rows={3}
+              placeholder="Add a note to the company…"
+              maxLength={500}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+            />
+            <p className="text-muted-foreground text-right text-xs">{message.length}/500</p>
+          </div>
+
+          {error && (
+            <p className="text-destructive rounded-[0.33em] bg-red-50 px-3 py-2 text-sm">
+              {error}
+            </p>
+          )}
+        </div>
+      )}
+      </MorphHeight>
+
+      <div className="flex justify-end gap-2 pt-2">
+        {step === 1 ? (
+          <>
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button onClick={() => setStep(2)} disabled={!step1CanNext}>Next</Button>
+          </>
+        ) : (
+          <>
+            <Button variant="outline" onClick={() => { setStep(1); setError(""); }}>Back</Button>
+            <Button onClick={() => { setError(""); send.mutate(); }} disabled={send.isPending}>
+              {send.isPending && <Loader2 className="animate-spin" />}
+              {send.isPending ? "Sending…" : "Send invite"}
+            </Button>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -411,23 +392,40 @@ function resolveDisplayName(invite: CompanyInvite): string {
 
 export default function InvitesPage() {
   const { account } = useUniversityProfile();
-  const [showInviteModal, setShowInviteModal] = useState(false);
-  const [showNoTemplatesPrompt, setShowNoTemplatesPrompt] = useState(false);
+  const { openModal, closeModal } = useModal();
 
-  const { data, isLoading, refetch } = useUniversityControllerListInvites({
-    query: { enabled: !!account },
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ["university-invites"],
+    queryFn: () =>
+      preconfiguredAxios
+        .get("/api/university/invites")
+        .then((r) => r.data as { invites: CompanyInvite[] }),
+    enabled: !!account,
   });
 
-  const { data: templatesData } = useUniversityControllerListTemplates({
-    query: { enabled: !!account },
+  const { data: templatesData } = useQuery({
+    queryKey: ["university-templates-for-invite"],
+    queryFn: () =>
+      preconfiguredAxios
+        .get("/api/university/templates")
+        .then((r) => r.data as { templates: AvailableTemplate[] }),
+    enabled: !!account,
   });
   const availableTemplates = (templatesData?.templates ?? []).filter((t) => t.is_available);
 
   const handleInviteClick = () => {
     if (availableTemplates.length === 0) {
-      setShowNoTemplatesPrompt(true);
+      openModal("no-templates", <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">You need at least one active MOA template before you can invite companies. Go to your templates page to activate one.</p>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={() => closeModal("no-templates")}>Cancel</Button>
+          <Button asChild><Link href="/templates">Go to Templates</Link></Button>
+        </div>
+      </div>, { title: "No active templates", panelClassName: "!w-full sm:!max-w-sm" });
     } else {
-      setShowInviteModal(true);
+      openModal("invite-company", <InviteForm onClose={() => closeModal("invite-company")} onSent={() => refetch()} />, 
+        { title: "Invite a company", panelClassName: "!w-full sm:!max-w-md" }
+      );
     }
   };
 
@@ -505,7 +503,7 @@ export default function InvitesPage() {
         <DataTable
           id="invites"
           columns={columns}
-          data={invites as CompanyInvite[]}
+          data={invites}
           searchKey="company"
           searchPlaceholder="Search by company…"
           rowLabelSingular="invite"
@@ -513,34 +511,6 @@ export default function InvitesPage() {
         />
       )}
 
-      {showInviteModal && (
-        <InviteModal
-          onClose={() => setShowInviteModal(false)}
-          onSent={() => refetch()}
-        />
-      )}
-
-      {showNoTemplatesPrompt && (
-        <Dialog open onOpenChange={(o) => !o && setShowNoTemplatesPrompt(false)}>
-          <DialogContent className="sm:max-w-sm">
-            <DialogHeader>
-              <DialogTitle>No active templates</DialogTitle>
-              <DialogDescription>
-                You need at least one active MOA template before you can invite companies.
-                Go to your templates page to activate one.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowNoTemplatesPrompt(false)}>
-                Cancel
-              </Button>
-              <Button asChild>
-                <Link href="/templates">Go to Templates</Link>
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
     </PageContainer>
   );
 }

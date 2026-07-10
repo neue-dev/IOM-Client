@@ -1,44 +1,36 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { ColumnDef } from "@tanstack/react-table";
-import {
-  getAdminControllerListTemplatesQueryKey,
-  useAdminControllerListTemplates,
-  useAdminControllerDeleteTemplate,
-  type AdminTemplateDto,
-} from "@/app/api";
+import { preconfiguredAxios } from "@/app/api/preconfig.axios";
 import { PageContainer, PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DataTable } from "@/components/ui/data-table";
-import {
-  AlertDialog,
-  AlertDialogTrigger,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogCancel,
-  AlertDialogAction,
-} from "@/components/ui/alert-dialog";
+import { useIomModalRegistry } from "@/components/modal-registry";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 
-function ActionsCell({ template }: { template: AdminTemplateDto }) {
+interface Template {
+  id: string;
+  name: string;
+  description: string | null;
+  term_months: number;
+}
+
+function ActionsCell({ template }: { template: Template }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { confirmAction } = useIomModalRegistry();
 
-  const remove = useAdminControllerDeleteTemplate({
-    mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getAdminControllerListTemplatesQueryKey() });
-        toast.success("Template deleted");
-      },
-      onError: (e: Error) => toast.error(e.message),
+  const remove = useMutation({
+    mutationFn: () => preconfiguredAxios.delete(`/api/admin/templates/${template.id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-templates"] });
+      toast.success("Template deleted");
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   return (
@@ -50,36 +42,27 @@ function ActionsCell({ template }: { template: AdminTemplateDto }) {
       >
         <Pencil className="h-3.5 w-3.5" /> Edit
       </Button>
-      <AlertDialog>
-        <AlertDialogTrigger asChild>
-          <Button variant="outline" scheme="destructive" size="sm">
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-        </AlertDialogTrigger>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete {template.name}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              It will be removed from the catalog and universities can no longer offer it.
-              Existing MOAs are unaffected (their PDFs are frozen). This can&apos;t be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => remove.mutate({ templateId: template.id })}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <Button
+        variant="outline"
+        scheme="destructive"
+        size="sm"
+        onClick={() =>
+          confirmAction.open({
+            title: `Delete ${template.name}?`,
+            description: "It will be removed from the catalog and universities can no longer offer it. Existing MOAs are unaffected (their PDFs are frozen). This can't be undone.",
+            confirmLabel: "Delete",
+            onConfirm: () => remove.mutate(),
+            isPending: remove.isPending,
+          })
+        }
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </Button>
     </div>
   );
 }
 
-const columns: ColumnDef<AdminTemplateDto>[] = [
+const columns: ColumnDef<Template>[] = [
   {
     id: "name",
     header: "Template",
@@ -115,7 +98,13 @@ const columns: ColumnDef<AdminTemplateDto>[] = [
 export default function AdminTemplatesPage() {
   const router = useRouter();
 
-  const { data, isLoading } = useAdminControllerListTemplates();
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin-templates"],
+    queryFn: () =>
+      preconfiguredAxios
+        .get("/api/admin/templates")
+        .then((r) => r.data.templates as Template[]),
+  });
 
   return (
     <PageContainer className="space-y-6">
@@ -137,7 +126,7 @@ export default function AdminTemplatesPage() {
         <DataTable
           id="admin-templates"
           columns={columns}
-          data={data?.templates ?? []}
+          data={data ?? []}
           searchPlaceholder="Search templates..."
           rowLabelSingular="template"
           rowLabelPlural="templates"

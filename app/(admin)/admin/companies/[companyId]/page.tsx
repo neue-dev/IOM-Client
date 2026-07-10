@@ -1,37 +1,17 @@
 "use client";
-import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import {
-  getAdminControllerGetCompanyQueryKey,
-  getAdminControllerListCompaniesQueryKey,
-  useAdminControllerGetCompany,
-  useAdminControllerDeactivateCompany,
-} from "@/app/api";
+import { preconfiguredAxios } from "@/app/api/preconfig.axios";
 import { PageContainer } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Dialog,
-  DialogBottomSheet,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { useModal } from "@/app/providers/modal-provider";
+import { useIomModalRegistry } from "@/components/modal-registry";
 import { formatDateWithoutTime } from "@/lib/utils";
 import { ArrowLeft, CircleAlert, CircleCheck } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogTrigger,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogCancel,
-  AlertDialogAction,
-} from "@/components/ui/alert-dialog";
 
 const COMPANY_TYPE_LABELS: Record<string, string> = {
   corporation: "Corporation",
@@ -115,23 +95,29 @@ function Field({ label, value }: { label: string; value?: string | null }) {
 export default function AdminCompanyProfilePage() {
   const { companyId } = useParams<{ companyId: string }>();
   const router = useRouter();
-  const [previewDoc, setPreviewDoc] = useState<CompanyDoc | null>(null);
+  const { openModal, closeModal } = useModal();
+  const { confirmAction } = useIomModalRegistry();
 
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useAdminControllerGetCompany(companyId, {
-    query: { refetchInterval: 25 * 60 * 1000 },
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin-company", companyId],
+    queryFn: () =>
+      preconfiguredAxios
+        .get(`/api/admin/companies/${companyId}`)
+        .then((r) => r.data as CompanyData),
+    refetchInterval: 25 * 60 * 1000,
   });
 
-  const deactivate = useAdminControllerDeactivateCompany({
-    mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getAdminControllerGetCompanyQueryKey(companyId) });
-        queryClient.invalidateQueries({ queryKey: getAdminControllerListCompaniesQueryKey() });
-        toast.success("Company deactivated");
-      },
-      onError: (e: Error) => toast.error(e.message),
+  const deactivate = useMutation({
+    mutationFn: () =>
+      preconfiguredAxios.patch(`/api/admin/companies/${companyId}/deactivate`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-company", companyId] });
+      queryClient.invalidateQueries({ queryKey: ["admin-companies"] });
+      toast.success("Company deactivated");
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   if (isLoading) {
@@ -173,31 +159,22 @@ export default function AdminCompanyProfilePage() {
             </div>
           </div>
           {!company.is_deactivated && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="outline" scheme="destructive" size="sm">
-                  Deactivate
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Deactivate {company.registered_name}?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    The company will lose access and can no longer request MOAs. This can be
-                    reversed later.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    onClick={() => deactivate.mutate({ companyId })}
-                  >
-                    Deactivate
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <Button
+              variant="outline"
+              scheme="destructive"
+              size="sm"
+              onClick={() =>
+                confirmAction.open({
+                  title: `Deactivate ${company.registered_name}?`,
+                  description: "The company will lose access and can no longer request MOAs. This can be reversed later.",
+                  confirmLabel: "Deactivate",
+                  onConfirm: () => deactivate.mutate(),
+                  isPending: deactivate.isPending,
+                })
+              }
+            >
+              Deactivate
+            </Button>
           )}
         </div>
       </div>
@@ -240,7 +217,12 @@ export default function AdminCompanyProfilePage() {
               <div
                 key={type}
                 className="flex flex-row items-center px-5 duration-200 hover:cursor-pointer hover:bg-gray-50"
-                onClick={() => doc?.url && setPreviewDoc(doc)}
+                onClick={() => doc?.url && openModal("preview-doc", <iframe src={doc.url} className="h-full w-full border-none" title={doc.filename} />, {
+                  title: doc.filename,
+                  panelClassName: "!w-full sm:!max-w-4xl",
+                  contentClassName: "min-h-0 flex-1 overflow-hidden p-0 sm:p-0",
+                  showHeaderDivider: true,
+                })}
               >
                 {doc
                   ? <CircleCheck className="text-supportive flex-shrink-0" />
@@ -301,31 +283,6 @@ export default function AdminCompanyProfilePage() {
           </table>
         )}
       </div>
-
-      {previewDoc && (
-        <Dialog open onOpenChange={(o) => !o && setPreviewDoc(null)}>
-          <DialogBottomSheet className="flex h-[88vh] flex-col p-0">
-            <div className="flex items-center border-b border-gray-100 px-5 py-3.5 pr-14">
-              <DialogTitle className="truncate text-sm font-medium text-gray-900">
-                {previewDoc.filename}
-              </DialogTitle>
-            </div>
-            <div className="min-h-0 flex-1 overflow-hidden">
-              {previewDoc.url ? (
-                <iframe
-                  src={previewDoc.url}
-                  className="h-full w-full border-none"
-                  title={previewDoc.filename}
-                />
-              ) : (
-                <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-                  Couldn&apos;t load that document.
-                </div>
-              )}
-            </div>
-          </DialogBottomSheet>
-        </Dialog>
-      )}
     </PageContainer>
   );
 }

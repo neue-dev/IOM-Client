@@ -2,21 +2,16 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
+import { preconfiguredAxios } from "@/app/api/preconfig.axios";
+import { useModal } from "@/app/providers/modal-provider";
 import { Button } from "@/components/ui/button";
+import { FileUpload } from "@/components/ui/file-upload";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DataTable } from "@/components/ui/data-table";
-import {
-  Dialog,
-  DialogContent,
-  DialogBottomSheet,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import { Card } from "@/components/ui/card";
 import { MoaStatusBadge } from "@/components/status-badge";
 import {
@@ -46,6 +41,13 @@ import {
 import { toast } from "sonner";
 import { toastPresets } from "@/components/sonner-toaster";
 
+const COMPANY_TYPES = [
+  { value: "corporation", label: "Corporation" },
+  { value: "partnership", label: "Partnership" },
+  { value: "sole_proprietorship", label: "Sole Proprietorship" },
+  { value: "government_agency", label: "Government Agency" },
+];
+
 export interface LegacyCompanySummary {
   id: string;
   company_name: string;
@@ -69,8 +71,9 @@ export interface LegacyCompanyDetail {
   }[];
   moas: {
     id: string;
-    effective_date: string;
-    expiry_date: string;
+    effective_date: string | null;
+    expiry_date: string | null;
+    is_perpetual?: boolean;
     document_url: string | null;
     filename: string | null;
     notes: string | null;
@@ -83,6 +86,7 @@ type LegacyCompaniesPanelProps = {
   uploadEndpoint: string;
   detailEndpoint: (legacyCompanyId: string) => string;
   addDocumentsEndpoint: (legacyCompanyId: string) => string;
+  addMoaEndpoint: (legacyCompanyId: string) => string;
   bulkCsvEndpoint?: string;
   bulkZipEndpoint?: string;
   canUpload: boolean;
@@ -115,30 +119,27 @@ const DOCUMENT_TYPE_OPTIONS = [
   { value: "other", label: "Other" },
 ];
 
-export function isLegacyMoaExpired(expiryDate: string) {
+export function isLegacyMoaExpired(expiryDate: string | null, isPerpetual?: boolean) {
+  if (isPerpetual) return false;
+  if (!expiryDate) return false;
   const today = new Date().toISOString().slice(0, 10);
   return expiryDate < today;
 }
 
-function getAPIBase(): string {
-  if (typeof window !== "undefined") {
-    const host = window.location.hostname;
-    if (host.startsWith("dev.")) return "https://dev.api.iom.betterinternship.com";
-    if (host.endsWith(".betterinternship.com")) return "https://api.iom.betterinternship.com";
+export function formatLegacyMoaPeriod(moa: {
+  effective_date: string | null;
+  expiry_date: string | null;
+  is_perpetual?: boolean;
+}) {
+  if (moa.is_perpetual) {
+    return moa.effective_date
+      ? `${formatDateWithoutTime(moa.effective_date)} – Perpetual`
+      : "Effective date unknown – Perpetual";
   }
-  return process.env.NEXT_PUBLIC_IOM_SERVER_URL || "http://localhost:5600";
-}
 
-async function apiFetch<T>(endpoint: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${getAPIBase()}${endpoint}`, {
-    ...init,
-    credentials: "include",
-  });
-  const body = await response.json().catch(() => null);
-  if (!response.ok || body?.success === false) {
-    throw new Error(body?.message || "Request failed");
-  }
-  return body as T;
+  return `${moa.effective_date ? formatDateWithoutTime(moa.effective_date) : "—"} – ${
+    moa.expiry_date ? formatDateWithoutTime(moa.expiry_date) : "—"
+  }`;
 }
 
 export function LegacyCompaniesPanel({
@@ -146,6 +147,7 @@ export function LegacyCompaniesPanel({
   uploadEndpoint,
   detailEndpoint,
   addDocumentsEndpoint,
+  addMoaEndpoint,
   bulkCsvEndpoint,
   bulkZipEndpoint,
   canUpload,
@@ -157,9 +159,7 @@ export function LegacyCompaniesPanel({
   const [internalSelectedId, setInternalSelectedId] = useState<string | null>(
     null,
   );
-  const [uploadOpen, setUploadOpen] = useState(false);
-  const [csvUploadOpen, setCsvUploadOpen] = useState(false);
-  const [zipUploadOpen, setZipUploadOpen] = useState(false);
+  const { openModal, closeModal } = useModal();
   const selectedId =
     controlledSelectedId !== undefined
       ? controlledSelectedId
@@ -171,7 +171,10 @@ export function LegacyCompaniesPanel({
 
   const { data, isLoading } = useQuery({
     queryKey: [queryKeyPrefix],
-    queryFn: () => apiFetch<{ legacyCompanies: LegacyCompanySummary[] }>(listEndpoint),
+    queryFn: () =>
+      preconfiguredAxios
+        .get(listEndpoint)
+        .then((r) => r.data as { legacyCompanies: LegacyCompanySummary[] }),
   });
 
   const legacyCompanies = data?.legacyCompanies ?? [];
@@ -207,6 +210,7 @@ export function LegacyCompaniesPanel({
         legacyCompanyId={selectedId}
         detailEndpoint={detailEndpoint}
         addDocumentsEndpoint={addDocumentsEndpoint}
+        addMoaEndpoint={addMoaEndpoint}
         canUpload={canUpload}
         queryKeyPrefix={queryKeyPrefix}
         showBackButton={showDetailBackButton}
@@ -239,10 +243,22 @@ export function LegacyCompaniesPanel({
             canUpload ? (
               <div className="flex">
                 <Button
-                  onClick={() => setUploadOpen(true)}
+                  onClick={() =>
+                    openModal("legacy-upload", (
+                      <UploadDialog
+                        uploadEndpoint={uploadEndpoint}
+                        queryKeyPrefix={queryKeyPrefix}
+                        onClose={() => closeModal("legacy-upload")}
+                      />
+                    ), {
+                      title: "Add Legacy Company",
+                      description: "Create a legacy company record. You can add MOAs now or later from the company detail view.",
+                      panelClassName: "!w-full sm:!max-w-2xl",
+                    })
+                  }
                   className={(bulkCsvEndpoint || bulkZipEndpoint) ? "rounded-r-none" : undefined}
                 >
-                  <Plus /> Upload Legacy MOA
+                  <Plus /> Add Legacy Company
                 </Button>
                 {(bulkCsvEndpoint || bulkZipEndpoint) && (
                   <DropdownMenu>
@@ -253,13 +269,37 @@ export function LegacyCompaniesPanel({
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       {bulkCsvEndpoint && (
-                        <DropdownMenuItem onSelect={() => setCsvUploadOpen(true)}>
+                        <DropdownMenuItem onSelect={() =>
+                          openModal("csv-upload", (
+                            <CsvUploadDialog
+                              csvEndpoint={bulkCsvEndpoint}
+                              queryKeyPrefix={queryKeyPrefix}
+                              onClose={() => closeModal("csv-upload")}
+                            />
+                          ), {
+                            title: "Bulk Upload Legacy MOAs",
+                            description: "Upload a CSV file to create or append multiple legacy MOAs at once.",
+                            panelClassName: "!w-full sm:!max-w-5xl",
+                          })
+                        }>
                           <Upload className="h-4 w-4" />
                           Bulk upload via CSV
                         </DropdownMenuItem>
                       )}
                       {bulkZipEndpoint && (
-                        <DropdownMenuItem onSelect={() => setZipUploadOpen(true)}>
+                        <DropdownMenuItem onSelect={() =>
+                          openModal("zip-upload", (
+                            <ZipUploadDialog
+                              zipEndpoint={bulkZipEndpoint}
+                              queryKeyPrefix={queryKeyPrefix}
+                              onClose={() => closeModal("zip-upload")}
+                            />
+                          ), {
+                            title: "Bulk Upload Legacy MOAs via ZIP",
+                            description: "Upload a ZIP file containing a legacy-import.csv manifest and referenced PDF files.",
+                            panelClassName: "!w-full sm:!max-w-5xl",
+                          })
+                        }>
                           <Upload className="h-4 w-4" />
                           Bulk upload via ZIP
                         </DropdownMenuItem>
@@ -272,30 +312,6 @@ export function LegacyCompaniesPanel({
           }
         />
       )}
-
-      {uploadOpen && (
-        <UploadDialog
-          uploadEndpoint={uploadEndpoint}
-          queryKeyPrefix={queryKeyPrefix}
-          onClose={() => setUploadOpen(false)}
-        />
-      )}
-
-      {csvUploadOpen && bulkCsvEndpoint && (
-        <CsvUploadDialog
-          csvEndpoint={bulkCsvEndpoint}
-          queryKeyPrefix={queryKeyPrefix}
-          onClose={() => setCsvUploadOpen(false)}
-        />
-      )}
-
-      {zipUploadOpen && bulkZipEndpoint && (
-        <ZipUploadDialog
-          zipEndpoint={bulkZipEndpoint}
-          queryKeyPrefix={queryKeyPrefix}
-          onClose={() => setZipUploadOpen(false)}
-        />
-      )}
     </div>
   );
 }
@@ -304,6 +320,7 @@ function DetailView({
   legacyCompanyId,
   detailEndpoint,
   addDocumentsEndpoint,
+  addMoaEndpoint,
   canUpload,
   queryKeyPrefix,
   showBackButton,
@@ -312,25 +329,21 @@ function DetailView({
   legacyCompanyId: string;
   detailEndpoint: (id: string) => string;
   addDocumentsEndpoint: (id: string) => string;
+  addMoaEndpoint: (id: string) => string;
   canUpload: boolean;
   queryKeyPrefix: string;
   showBackButton: boolean;
   onBack: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [previewDoc, setPreviewDoc] = useState<{
-    url: string;
-    title: string;
-  } | null>(null);
-  const [uploadOpen, setUploadOpen] = useState(false);
-  const [companyDocInputs, setCompanyDocInputs] = useState<
-    { id: string; file: File; type: string }[]
-  >([]);
+  const { openModal, closeModal } = useModal();
 
   const { data, isLoading } = useQuery({
     queryKey: [queryKeyPrefix, "detail", legacyCompanyId],
     queryFn: () =>
-      apiFetch<{ legacyCompany: LegacyCompanyDetail }>(detailEndpoint(legacyCompanyId)),
+      preconfiguredAxios
+        .get(detailEndpoint(legacyCompanyId))
+        .then((r) => r.data as { legacyCompany: LegacyCompanyDetail }),
   });
 
   const company = data?.legacyCompany;
@@ -344,23 +357,42 @@ function DetailView({
         documentTypes.push(type || "other");
       });
       formData.append("documentTypes", JSON.stringify(documentTypes));
-      return apiFetch(addDocumentsEndpoint(legacyCompanyId), {
-        method: "POST",
-        body: formData,
-      });
+      return preconfiguredAxios.post(
+        addDocumentsEndpoint(legacyCompanyId),
+        formData,
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [queryKeyPrefix] });
       queryClient.invalidateQueries({
         queryKey: [queryKeyPrefix, "detail", legacyCompanyId],
       });
-      setUploadOpen(false);
-      setCompanyDocInputs([]);
       toast("Documents uploaded", toastPresets.success);
     },
     onError: (err) => {
       toast(
         err instanceof Error ? err.message : "Failed to upload documents",
+        toastPresets.destructive,
+      );
+    },
+  });
+
+  const moaUploadMutation = useMutation({
+    mutationFn: (inputs: MoaRecordInput[]) => {
+      const formData = buildMoaFormData(inputs);
+      return preconfiguredAxios.post(addMoaEndpoint(legacyCompanyId), formData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [queryKeyPrefix] });
+      queryClient.invalidateQueries({
+        queryKey: [queryKeyPrefix, "detail", legacyCompanyId],
+      });
+      closeModal("moa-upload");
+      toast("Legacy MOA added", toastPresets.success);
+    },
+    onError: (err) => {
+      toast(
+        err instanceof Error ? err.message : "Failed to add legacy MOA",
         toastPresets.destructive,
       );
     },
@@ -474,7 +506,19 @@ function DetailView({
         <div className="flex items-center justify-between px-5">
           <p className="text-sm font-semibold text-gray-900">Documents</p>
           {canUpload && (
-            <Button size="xs" onClick={() => setUploadOpen(true)}>
+            <Button size="xs" onClick={() =>
+              openModal("add-docs-2", (
+                <AddDocumentsForm
+                  isPending={docUploadMutation.isPending}
+                  onSubmit={(inputs) => docUploadMutation.mutate(inputs, { onSuccess: () => closeModal("add-docs-2") })}
+                  onClose={() => closeModal("add-docs-2")}
+                />
+              ), {
+                title: "Add Documents",
+                description: "Upload additional company documents (PDF, max 2.5MB each, max 10 files)",
+                panelClassName: "!w-full sm:!max-w-md",
+              })
+            }>
               <Upload className="mr-1 h-3.5 w-3.5" /> Add
             </Button>
           )}
@@ -492,7 +536,22 @@ function DetailView({
                 )}
                 onClick={() =>
                   doc.url &&
-                  setPreviewDoc({ url: doc.url, title: doc.filename })
+                  openModal("preview-doc", doc.url ? (
+                    <iframe
+                      src={doc.url}
+                      className="h-full w-full border-none"
+                      title={doc.filename}
+                    />
+                  ) : (
+                    <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
+                      Couldn&apos;t load that document.
+                    </div>
+                  ), {
+                    title: doc.filename,
+                    panelClassName: "!w-full sm:!max-w-4xl",
+                    contentClassName: "min-h-0 flex-1 overflow-hidden p-0 sm:p-0",
+                    showHeaderDivider: true,
+                  })
                 }
               >
                 <CircleCheck className="text-supportive flex-shrink-0" />
@@ -519,6 +578,29 @@ function DetailView({
         </div>
       </Card>
 
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold text-gray-900">MOA History</p>
+        {canUpload && (
+          <Button size="xs" onClick={() =>
+            openModal("moa-upload", (
+              <MoaUploadDialog
+                title="Add Legacy MOA"
+                description="Add an MOA record to this legacy company."
+                isPending={moaUploadMutation.isPending}
+                onClose={() => closeModal("moa-upload")}
+                onSubmit={(moas) => moaUploadMutation.mutate(moas)}
+              />
+            ), {
+              title: "Add Legacy MOA",
+              description: "Add an MOA record to this legacy company.",
+              panelClassName: "!w-full sm:!max-w-2xl",
+            })
+          }>
+            <Plus className="mr-1 h-3.5 w-3.5" /> Add MOA
+          </Button>
+        )}
+      </div>
+
       {company.moas.length > 0 ? (
         <table className="w-full text-sm">
           <thead>
@@ -539,16 +621,24 @@ function DetailView({
                 )}
                 onClick={() =>
                   moa.document_url &&
-                  setPreviewDoc({
-                    url: moa.document_url,
+                  openModal("preview-doc-moa", (
+                    <iframe
+                      src={moa.document_url}
+                      className="h-full w-full border-none"
+                      title={moa.filename ?? "MOA Document"}
+                    />
+                  ), {
                     title: moa.filename ?? "MOA Document",
+                    panelClassName: "!w-full sm:!max-w-4xl",
+                    contentClassName: "min-h-0 flex-1 overflow-hidden p-0 sm:p-0",
+                    showHeaderDivider: true,
                   })
                 }
               >
                 <td className="py-2.5 pr-4 text-gray-600">
                   <MoaStatusBadge
                     status="active"
-                    isExpired={isLegacyMoaExpired(moa.expiry_date)}
+                    isExpired={isLegacyMoaExpired(moa.expiry_date, moa.is_perpetual)}
                   />
                 </td>
                 <td className="py-2.5 pr-4 text-gray-600">
@@ -565,8 +655,7 @@ function DetailView({
                   {formatDateWithoutTime(moa.created_at)}
                 </td>
                 <td className="py-2.5 text-gray-600">
-                  {formatDateWithoutTime(moa.effective_date)} –{" "}
-                  {formatDateWithoutTime(moa.expiry_date)}
+                  {formatLegacyMoaPeriod(moa)}
                 </td>
               </tr>
             ))}
@@ -575,152 +664,6 @@ function DetailView({
       ) : (
         <p className="text-muted-foreground text-sm">No MOA history.</p>
       )}
-
-      <Dialog
-        open={!!previewDoc}
-        onOpenChange={(o) => {
-          if (!o) setPreviewDoc(null);
-        }}
-      >
-        <DialogBottomSheet className="flex h-[88vh] flex-col p-0">
-          <div className="flex items-center border-b border-gray-100 px-5 py-3.5 pr-14">
-            <DialogTitle className="text-sm font-medium text-gray-900">
-              {previewDoc?.title ?? "Document"}
-            </DialogTitle>
-          </div>
-          <div className="min-h-0 flex-1 overflow-hidden">
-            {previewDoc?.url ? (
-              <iframe
-                src={previewDoc.url}
-                className="h-full w-full border-none"
-                title={previewDoc?.title}
-              />
-            ) : (
-              <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-                Couldn&apos;t load that document.
-              </div>
-            )}
-          </div>
-        </DialogBottomSheet>
-      </Dialog>
-
-      <Dialog
-        open={uploadOpen}
-        onOpenChange={(o) => {
-          if (!o) {
-            setUploadOpen(false);
-            setCompanyDocInputs([]);
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add Documents</DialogTitle>
-            <DialogDescription>
-              Upload additional company documents (PDF, max 2.5MB each, max 10
-              files)
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Input
-              type="file"
-              multiple
-              accept=".pdf,application/pdf"
-              onChange={(e) => {
-                const files = e.target.files;
-                if (!files) return;
-                const newInputs = Array.from(files).map((f) => ({
-                  id: crypto.randomUUID(),
-                  file: f,
-                  type: "other",
-                }));
-                setCompanyDocInputs((prev) => [...prev, ...newInputs]);
-              }}
-            />
-            {companyDocInputs.length > 0 && (
-              <div className="space-y-3">
-                {companyDocInputs.map((input) => (
-                  <div
-                    key={input.id}
-                    className="rounded-[0.33em] border border-gray-200 p-3"
-                  >
-                    <div className="mb-2 flex items-center justify-between">
-                      <p className="text-xs font-medium text-gray-500">
-                        Document
-                      </p>
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        scheme="destructive"
-                        onClick={() =>
-                          setCompanyDocInputs((prev) =>
-                            prev.filter((i) => i.id !== input.id),
-                          )
-                        }
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Type</Label>
-                      <Select
-                        value={input.type}
-                        onValueChange={(val) =>
-                          setCompanyDocInputs((prev) =>
-                            prev.map((i) =>
-                              i.id === input.id ? { ...i, type: val } : i,
-                            ),
-                          )
-                        }
-                      >
-                        <SelectTrigger className="h-7 text-xs">
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {DOCUMENT_TYPE_OPTIONS.map((opt) => (
-                            <SelectItem
-                              key={opt.value}
-                              value={opt.value}
-                              className="text-xs"
-                            >
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setUploadOpen(false);
-                setCompanyDocInputs([]);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() =>
-                companyDocInputs.length > 0 &&
-                docUploadMutation.mutate(companyDocInputs)
-              }
-              disabled={
-                companyDocInputs.length === 0 || docUploadMutation.isPending
-              }
-            >
-              {docUploadMutation.isPending && (
-                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-              )}
-              Upload
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
@@ -729,6 +672,7 @@ interface MoaRecordInput {
   id: string;
   effectiveDate: string;
   expiryDate: string;
+  isPerpetual: boolean;
   file: File | null;
   name: string;
 }
@@ -738,12 +682,219 @@ function createEmptyMoaRecord(): MoaRecordInput {
     id: crypto.randomUUID(),
     effectiveDate: "",
     expiryDate: "",
+    isPerpetual: false,
     file: null,
     name: "",
   };
 }
 
-function UploadDialog({
+function buildMoaFormData(moas: MoaRecordInput[]) {
+  const formData = new FormData();
+  const moaPayload: {
+    effective_date: string | null;
+    expiry_date: string | null;
+    is_perpetual: boolean;
+    name: string | null;
+    document_file_index: number | null;
+  }[] = [];
+  const moaFiles: File[] = [];
+
+  for (const m of moas) {
+    const isPerpetual = m.isPerpetual;
+    const hasDates = !!m.effectiveDate && !!m.expiryDate;
+    if (!isPerpetual && !hasDates) continue;
+    let document_file_index: number | null = null;
+    if (m.file) {
+      document_file_index = moaFiles.length;
+      moaFiles.push(m.file);
+    }
+    moaPayload.push({
+      effective_date: m.effectiveDate || null,
+      expiry_date: isPerpetual ? null : (m.expiryDate || null),
+      is_perpetual: isPerpetual,
+      name: m.name || null,
+      document_file_index,
+    });
+  }
+
+  formData.append("moas", JSON.stringify(moaPayload));
+  moaFiles.forEach((f) => formData.append("moaDocuments", f));
+  return formData;
+}
+
+function MoaUploadDialog({
+  title,
+  description,
+  isPending,
+  onClose,
+  onSubmit,
+}: {
+  title: string;
+  description: string;
+  isPending: boolean;
+  onClose: () => void;
+  onSubmit: (moas: MoaRecordInput[]) => void;
+}) {
+  const [moas, setMoas] = useState<MoaRecordInput[]>([createEmptyMoaRecord()]);
+  const updateMoa = (id: string, patch: Partial<MoaRecordInput>) => {
+    setMoas((prev) => prev.map((m) => (m.id === id ? { ...m, ...patch } : m)));
+  };
+  const removeMoa = (id: string) => {
+    setMoas((prev) => prev.filter((m) => m.id !== id));
+  };
+  const hasValidMoa = moas.some((m) => m.isPerpetual || (m.effectiveDate && m.expiryDate));
+
+  return (
+    <>
+      <div className="max-h-[65vh] space-y-3 overflow-y-auto">
+        <div className="flex items-center justify-between">
+          <Label>MOA Records</Label>
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={() => setMoas((prev) => [...prev, createEmptyMoaRecord()])}
+            >
+              <Plus /> Add MOA
+            </Button>
+          </div>
+          {moas.map((moa, index) => (
+            <div key={moa.id} className="rounded-[0.33em] border border-gray-200 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-medium text-gray-500">MOA {index + 1}</p>
+                {moas.length > 1 && (
+                  <Button size="xs" variant="ghost" scheme="destructive" onClick={() => removeMoa(moa.id)}>
+                    Remove
+                  </Button>
+                )}
+              </div>
+              <div className="mb-2 flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id={`perpetual-${moa.id}`}
+                  className="h-4 w-4"
+                  checked={moa.isPerpetual}
+                  onChange={(e) => updateMoa(moa.id, { isPerpetual: e.target.checked, expiryDate: "" })}
+                />
+                <Label htmlFor={`perpetual-${moa.id}`} className="text-xs cursor-pointer">
+                  Perpetual MOA
+                </Label>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">{moa.isPerpetual ? "Effective Date (optional)" : "Effective Date *"}</Label>
+                  <DatePicker
+                    className="h-8"
+                    value={moa.effectiveDate}
+                    onChange={(value) => updateMoa(moa.id, { effectiveDate: value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">{moa.isPerpetual ? "N/A" : "Expiry Date *"}</Label>
+                  <DatePicker
+                    className="h-8"
+                    value={moa.expiryDate}
+                    disabled={moa.isPerpetual}
+                    onChange={(value) => updateMoa(moa.id, { expiryDate: value })}
+                  />
+                </div>
+              </div>
+              <div className="mt-2">
+                <FileUpload
+                  label="MOA Document (PDF, optional, max 2.5MB)"
+                  name={`moa-document-${moa.id}`}
+                  accept=".pdf,application/pdf"
+                  onFileSelect={(file) => {
+                    updateMoa(moa.id, { file, name: file?.name || "" });
+                  }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="flex justify-end gap-2 pt-4">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={() => onSubmit(moas)} disabled={!hasValidMoa || isPending}>
+            {isPending && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+            Save
+          </Button>
+        </div>
+    </>
+  );
+}
+
+interface DocInput {
+  id: string;
+  file: File;
+  type: string;
+}
+
+function AddDocumentsForm({
+  isPending,
+  onSubmit,
+  onClose,
+}: {
+  isPending: boolean;
+  onSubmit: (inputs: DocInput[]) => void;
+  onClose: () => void;
+}) {
+  const [inputs, setInputs] = useState<DocInput[]>([]);
+
+  return (
+    <div className="space-y-4">
+      <FileUpload
+        label="Company documents"
+        name="company-documents"
+        multiple
+        accept=".pdf,application/pdf"
+        placeholder="Click to upload PDF files"
+        onFilesSelect={(files) => {
+          const newInputs = files.map((f) => ({
+            id: crypto.randomUUID(),
+            file: f,
+            type: "other",
+          }));
+          setInputs((prev) => [...prev, ...newInputs]);
+        }}
+      />
+      {inputs.length > 0 && (
+        <div className="space-y-3">
+          {inputs.map((input) => (
+            <div key={input.id} className="rounded-[0.33em] border border-gray-200 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-medium text-gray-500">Document</p>
+                <Button size="xs" variant="ghost" scheme="destructive" onClick={() => setInputs((prev) => prev.filter((i) => i.id !== input.id))}>
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Type</Label>
+                <Select value={input.type} onValueChange={(val) => setInputs((prev) => prev.map((i) => i.id === input.id ? { ...i, type: val } : i))}>
+                  <SelectTrigger className="h-8">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DOCUMENT_TYPE_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value} className="text-xs">{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex justify-end gap-2 pt-2">
+        <Button variant="outline" onClick={onClose}>Cancel</Button>
+        <Button onClick={() => onSubmit(inputs)} disabled={inputs.length === 0 || isPending}>
+          {isPending && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+          Upload
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+export function UploadDialog({
   uploadEndpoint,
   queryKeyPrefix,
   onClose,
@@ -778,31 +929,10 @@ function UploadDialog({
       const formData = new FormData();
       formData.append("company_name", companyName);
 
-      const moaPayload: {
-        effective_date: string;
-        expiry_date: string;
-        name: string | null;
-        document_file_index: number | null;
-      }[] = [];
-      const moaFiles: File[] = [];
-
-      for (const m of moas) {
-        if (!m.effectiveDate || !m.expiryDate) continue;
-        let document_file_index: number | null = null;
-        if (m.file) {
-          document_file_index = moaFiles.length;
-          moaFiles.push(m.file);
-        }
-        moaPayload.push({
-          effective_date: m.effectiveDate,
-          expiry_date: m.expiryDate,
-          name: m.name || null,
-          document_file_index,
-        });
-      }
-
-      formData.append("moas", JSON.stringify(moaPayload));
-      moaFiles.forEach((f) => formData.append("moaDocuments", f));
+      const moaFormData = buildMoaFormData(moas);
+      const moasValue = moaFormData.get("moas");
+      if (typeof moasValue === "string") formData.append("moas", moasValue);
+      moaFormData.getAll("moaDocuments").forEach((f) => formData.append("moaDocuments", f));
 
       if (tin) formData.append("tin", tin);
       if (companyType) formData.append("company_type", companyType);
@@ -819,45 +949,29 @@ function UploadDialog({
         });
         formData.append("documentTypes", JSON.stringify(documentTypes));
       }
-      return apiFetch(uploadEndpoint, {
-        method: "POST",
-        body: formData,
-      });
+      return preconfiguredAxios.post(uploadEndpoint, formData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [queryKeyPrefix] });
       onClose();
-      toast("Legacy MOA created", toastPresets.success);
+      toast("Legacy company saved", toastPresets.success);
     },
     onError: (err) => {
       toast(
-        err instanceof Error ? err.message : "Failed to create legacy MOA",
+        err instanceof Error ? err.message : "Failed to save legacy company",
         toastPresets.destructive,
       );
     },
   });
 
-  const hasValidMoa = moas.some((m) => m.effectiveDate && m.expiryDate);
-  const isValid = companyName.trim() && hasValidMoa;
+  const isValid = companyName.trim();
 
   return (
-    <Dialog
-      open
-      onOpenChange={(o) => {
-        if (!o) onClose();
-      }}
-    >
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Upload Legacy MOA</DialogTitle>
-          <DialogDescription>
-            Record one or more pre-existing MOA partnerships with a company.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="max-h-[65vh] space-y-4 overflow-y-auto">
-          <div className="space-y-2">
-            <Label>Company Name *</Label>
-            <Input
+    <>
+      <div className="max-h-[65vh] space-y-4 overflow-y-auto">
+        <div className="space-y-2">
+          <Label>Company Name *</Label>
+          <Input
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
               placeholder="Acme Corp"
@@ -866,7 +980,7 @@ function UploadDialog({
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label>MOA Records</Label>
+              <Label>MOA Records (optional)</Label>
               <Button
                 size="xs"
                 variant="outline"
@@ -897,40 +1011,43 @@ function UploadDialog({
                     </Button>
                   )}
                 </div>
+                <div className="mb-2 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id={`perpetual-${moa.id}`}
+                    className="h-4 w-4"
+                    checked={moa.isPerpetual}
+                    onChange={(e) => updateMoa(moa.id, { isPerpetual: e.target.checked, expiryDate: "" })}
+                  />
+                  <Label htmlFor={`perpetual-${moa.id}`} className="text-xs cursor-pointer">
+                    Perpetual MOA
+                  </Label>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Effective Date *</Label>
-                    <Input
-                      type="date"
-                      className="h-8 text-xs"
+                    <Label className="text-xs">{moa.isPerpetual ? "Effective Date (optional)" : "Effective Date *"}</Label>
+                    <DatePicker
+                      className="h-8"
                       value={moa.effectiveDate}
-                      onChange={(e) =>
-                        updateMoa(moa.id, { effectiveDate: e.target.value })
-                      }
+                      onChange={(value) => updateMoa(moa.id, { effectiveDate: value })}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Expiry Date *</Label>
-                    <Input
-                      type="date"
-                      className="h-8 text-xs"
+                    <Label className="text-xs">{moa.isPerpetual ? "N/A" : "Expiry Date *"}</Label>
+                    <DatePicker
+                      className="h-8"
                       value={moa.expiryDate}
-                      onChange={(e) =>
-                        updateMoa(moa.id, { expiryDate: e.target.value })
-                      }
+                      disabled={moa.isPerpetual}
+                      onChange={(value) => updateMoa(moa.id, { expiryDate: value })}
                     />
                   </div>
                 </div>
-                <div className="mt-2 space-y-1.5">
-                  <Label className="text-xs">
-                    MOA Document (PDF, optional, max 2.5MB)
-                  </Label>
-                  <Input
-                    type="file"
-                    className="h-8 text-xs"
+                <div className="mt-2">
+                  <FileUpload
+                    label="MOA Document (PDF, optional, max 2.5MB)"
+                    name={`moa-document-${moa.id}`}
                     accept=".pdf,application/pdf"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0] ?? null;
+                    onFileSelect={(file) => {
                       updateMoa(moa.id, { file, name: file?.name || "" });
                     }}
                   />
@@ -948,7 +1065,7 @@ function UploadDialog({
                 <div className="space-y-1.5">
                   <Label className="text-xs">TIN</Label>
                   <Input
-                    className="h-8 text-xs"
+                    className="h-8"
                     value={tin}
                     onChange={(e) => setTin(e.target.value)}
                     placeholder="123-456-789"
@@ -956,18 +1073,24 @@ function UploadDialog({
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Company Type</Label>
-                  <Input
-                    className="h-8 text-xs"
-                    value={companyType}
-                    onChange={(e) => setCompanyType(e.target.value)}
-                    placeholder="corporation"
-                  />
+                  <Select value={companyType || undefined} onValueChange={setCompanyType}>
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder="Select a type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COMPANY_TYPES.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Registered Address</Label>
                 <Input
-                  className="h-8 text-xs"
+                  className="h-8"
                   value={registeredAddress}
                   onChange={(e) => setRegisteredAddress(e.target.value)}
                   placeholder="Makati City"
@@ -977,7 +1100,7 @@ function UploadDialog({
                 <div className="space-y-1.5">
                   <Label className="text-xs">Contact Person</Label>
                   <Input
-                    className="h-8 text-xs"
+                    className="h-8"
                     value={contactPerson}
                     onChange={(e) => setContactPerson(e.target.value)}
                     placeholder="Juan Dela Cruz"
@@ -987,7 +1110,7 @@ function UploadDialog({
                   <Label className="text-xs">Contact Email</Label>
                   <Input
                     type="email"
-                    className="h-8 text-xs"
+                    className="h-8"
                     value={contactEmail}
                     onChange={(e) => setContactEmail(e.target.value)}
                     placeholder="juan@example.com"
@@ -997,8 +1120,8 @@ function UploadDialog({
               <div className="space-y-1.5">
                 <Label className="text-xs">Contact Phone</Label>
                 <Input
-                  className="h-8 text-xs"
-                  value={contactPhone}
+                    className="h-8"
+                    value={contactPhone}
                   onChange={(e) => setContactPhone(e.target.value)}
                   placeholder="09171234567"
                 />
@@ -1011,19 +1134,15 @@ function UploadDialog({
               Company documents (optional)
             </summary>
             <div className="mt-3 space-y-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">
-                  Company Documents (PDF, optional, max 2.5MB each, max 10)
-                </Label>
-                <Input
-                  type="file"
+              <div className="space-y-3">
+                <FileUpload
+                  label="Company Documents (PDF, optional, max 2.5MB each, max 10)"
+                  name="company-documents"
                   multiple
-                  className="h-8 text-xs"
                   accept=".pdf,application/pdf"
-                  onChange={(e) => {
-                    const files = e.target.files;
-                    if (!files) return;
-                    const newInputs = Array.from(files).map((f) => ({
+                  placeholder="Click to upload PDF files"
+                  onFilesSelect={(files) => {
+                    const newInputs = files.map((f) => ({
                       id: crypto.randomUUID(),
                       file: f,
                       type: "other",
@@ -1068,7 +1187,7 @@ function UploadDialog({
                                 )
                               }
                             >
-                              <SelectTrigger className="h-7 text-xs">
+                              <SelectTrigger className="h-8">
                                 <SelectValue placeholder="Select type" />
                               </SelectTrigger>
                               <SelectContent>
@@ -1093,7 +1212,7 @@ function UploadDialog({
             </div>
           </details>
         </div>
-        <DialogFooter>
+        <div className="flex justify-end gap-2 pt-4">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
@@ -1106,16 +1225,15 @@ function UploadDialog({
             )}
             Save
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+    </>
   );
 }
 
 interface BulkCsvRowResult {
   row: number;
   company_name: string;
-  status: "created_company" | "appended_moa" | "invalid" | "failed";
+  status: "created_company" | "appended_moa" | "updated_company" | "invalid" | "failed";
   message?: string;
 }
 
@@ -1125,7 +1243,7 @@ interface CsvUploadDialogProps {
   onClose: () => void;
 }
 
-function CsvUploadDialog({
+export function CsvUploadDialog({
   csvEndpoint,
   queryKeyPrefix,
   onClose,
@@ -1147,7 +1265,10 @@ function CsvUploadDialog({
       if (!file) return;
       const formData = new FormData();
       formData.append("file", file);
-      return apiFetch<{
+      const r = await preconfiguredAxios.post(csvEndpoint, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return r.data as {
         summary: {
           createdCompanies: number;
           appendedMoas: number;
@@ -1155,17 +1276,12 @@ function CsvUploadDialog({
           failed: number;
         };
         results: BulkCsvRowResult[];
-      }>(csvEndpoint, {
-        method: "POST",
-        body: formData,
-      });
+      };
     },
     onSuccess: (data) => {
       if (!data) return;
       setResult(data);
-      if (data.summary.createdCompanies + data.summary.appendedMoas > 0) {
-        queryClient.invalidateQueries({ queryKey: [queryKeyPrefix] });
-      }
+      queryClient.invalidateQueries({ queryKey: [queryKeyPrefix] });
     },
     onError: () => {
       toast("CSV upload failed", toastPresets.destructive);
@@ -1181,15 +1297,21 @@ function CsvUploadDialog({
     },
     {
       name: "effective_date",
-      required: true,
-      description: "MOA start date (YYYY-MM-DD)",
+      required: false,
+      description: "MOA start date (YYYY-MM-DD). Required when adding a normal MOA",
       example: "2023-01-15",
     },
     {
       name: "expiry_date",
-      required: true,
-      description: "MOA expiry date (YYYY-MM-DD)",
+      required: false,
+      description: "MOA expiry date (YYYY-MM-DD). Required when adding a normal MOA",
       example: "2025-01-15",
+    },
+    {
+      name: "is_perpetual",
+      required: false,
+      description: 'Set to "true"/"yes"/"1" for a perpetual MOA (no expiry)',
+      example: "true",
     },
     {
       name: "tin",
@@ -1233,6 +1355,7 @@ function CsvUploadDialog({
     company_name: "Acme Corporation",
     effective_date: "2023-01-15",
     expiry_date: "2025-01-15",
+    is_perpetual: "false",
     tin: "123-456-789",
     company_type: "Corporation",
     registered_address: "Makati City",
@@ -1257,29 +1380,14 @@ function CsvUploadDialog({
   };
 
   return (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-    >
-      <DialogContent className="sm:max-w-5xl">
-        <DialogHeader>
-          <DialogTitle>Bulk Upload Legacy MOAs</DialogTitle>
-          <DialogDescription>
-            Upload a CSV file to create or append multiple legacy MOAs at once.
-            Each row represents one legacy MOA. Rows with the same company name
-            append MOAs to the same legacy partner.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="overflow-y-auto max-h-[60vh] -mx-6 px-6 space-y-4">
+    <>
+      <div className="overflow-y-auto max-h-[60vh] space-y-4 -mx-6 px-6">
           {!result && (
             <>
               <p className="text-sm font-medium">
                 Required columns:{" "}
                 <span className="font-normal text-muted-foreground">
-                  company_name, effective_date, expiry_date
+                  company_name
                 </span>
               </p>
 
@@ -1372,8 +1480,9 @@ function CsvUploadDialog({
                   </table>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Each row is one MOA. At least company_name, effective_date,
-                  and expiry_date are required. Wrap values containing commas in
+                  Each row creates or updates one legacy company. To add a normal MOA, include both effective_date
+                  and expiry_date. To add a perpetual MOA (no expiry), set is_perpetual to "true" (effective_date is optional).
+                  Wrap values containing commas in
                   double quotes (e.g.{" "}
                   <code className="text-xs">&quot;Acme, Inc.&quot;</code>). Use
                   two double quotes to escape a literal quote (e.g.{" "}
@@ -1385,12 +1494,12 @@ function CsvUploadDialog({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="csv-file">CSV File</Label>
-                <Input
-                  id="csv-file"
-                  type="file"
+                <FileUpload
+                  label="CSV File"
+                  name="csv-file"
                   accept=".csv,text/csv"
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  placeholder="Click to upload CSV file"
+                  onFileSelect={setFile}
                 />
               </div>
 
@@ -1437,7 +1546,7 @@ function CsvUploadDialog({
 
               {result.results.filter(
                 (r) =>
-                  r.status !== "created_company" && r.status !== "appended_moa",
+                  r.status !== "created_company" && r.status !== "appended_moa" && r.status !== "updated_company",
               ).length > 0 && (
                 <div>
                   <p className="font-medium mb-2">Row details</p>
@@ -1451,7 +1560,8 @@ function CsvUploadDialog({
                         <span
                           className={
                             r.status === "created_company" ||
-                            r.status === "appended_moa"
+                            r.status === "appended_moa" ||
+                            r.status === "updated_company"
                               ? "text-green-700"
                               : "text-red-700"
                           }
@@ -1472,7 +1582,7 @@ function CsvUploadDialog({
           )}
         </div>
 
-        <DialogFooter>
+        <div className="flex justify-end gap-2 pt-4">
           {result ? (
             <Button onClick={onClose}>Done</Button>
           ) : (
@@ -1480,9 +1590,8 @@ function CsvUploadDialog({
               Cancel
             </Button>
           )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+    </>
   );
 }
 
@@ -1492,7 +1601,7 @@ interface ZipUploadDialogProps {
   onClose: () => void;
 }
 
-function ZipUploadDialog({
+export function ZipUploadDialog({
   zipEndpoint,
   queryKeyPrefix,
   onClose,
@@ -1514,7 +1623,10 @@ function ZipUploadDialog({
       if (!file) return;
       const formData = new FormData();
       formData.append("file", file);
-      return apiFetch<{
+      const r = await preconfiguredAxios.post(zipEndpoint, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return r.data as {
         summary: {
           createdCompanies: number;
           appendedMoas: number;
@@ -1522,17 +1634,12 @@ function ZipUploadDialog({
           failed: number;
         };
         results: BulkCsvRowResult[];
-      }>(zipEndpoint, {
-        method: "POST",
-        body: formData,
-      });
+      };
     },
     onSuccess: (data) => {
       if (!data) return;
       setResult(data);
-      if (data.summary.createdCompanies + data.summary.appendedMoas > 0) {
-        queryClient.invalidateQueries({ queryKey: [queryKeyPrefix] });
-      }
+      queryClient.invalidateQueries({ queryKey: [queryKeyPrefix] });
     },
     onError: () => {
       toast("ZIP upload failed", toastPresets.destructive);
@@ -1548,20 +1655,26 @@ function ZipUploadDialog({
     },
     {
       name: "effective_date",
-      required: true,
-      description: "MOA start date (YYYY-MM-DD)",
+      required: false,
+      description: "MOA start date (YYYY-MM-DD). Required when adding a normal MOA",
       example: "2023-01-15",
     },
     {
       name: "expiry_date",
-      required: true,
-      description: "MOA expiry date (YYYY-MM-DD)",
+      required: false,
+      description: "MOA expiry date (YYYY-MM-DD). Required when adding a normal MOA",
       example: "2025-01-15",
+    },
+    {
+      name: "is_perpetual",
+      required: false,
+      description: 'Set to "true"/"yes"/"1" for a perpetual MOA (no expiry)',
+      example: "true",
     },
     {
       name: "moa_file",
       required: false,
-      description: "Path to MOA PDF inside ZIP",
+      description: "Path to MOA PDF inside ZIP. Requires normal MOA dates or is_perpetual=true",
       example: "moas/acme-2024.pdf",
     },
     {
@@ -1624,6 +1737,7 @@ function ZipUploadDialog({
     company_name: "Acme Corporation",
     effective_date: "2023-01-15",
     expiry_date: "2025-01-15",
+    is_perpetual: "false",
     moa_file: "moas/acme-2024.pdf",
     business_permit_file: "company-documents/acme-permit.pdf",
     mayor_permit_file: "company-documents/acme-mayor.pdf",
@@ -1652,29 +1766,14 @@ function ZipUploadDialog({
   };
 
   return (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-    >
-      <DialogContent className="sm:max-w-5xl">
-        <DialogHeader>
-          <DialogTitle>Bulk Upload Legacy MOAs via ZIP</DialogTitle>
-          <DialogDescription>
-            Upload a ZIP file containing a{" "}
-            <code className="text-xs">legacy-import.csv</code> manifest and
-            referenced PDF files. Each CSV row represents one legacy MOA.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="overflow-y-auto max-h-[60vh] -mx-6 px-6 space-y-4">
+    <>
+      <div className="overflow-y-auto max-h-[60vh] space-y-4 -mx-6 px-6">
           {!result && (
             <>
               <p className="text-sm font-medium">
                 Required columns:{" "}
                 <span className="font-normal text-muted-foreground">
-                  company_name, effective_date, expiry_date
+                  company_name
                 </span>
               </p>
 
@@ -1782,20 +1881,21 @@ company-documents/acme-mayor.pdf`}
                   </table>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Each row is one MOA. At least company_name, effective_date,
-                  and expiry_date are required. File columns reference paths
-                  inside the ZIP. Invalid rows are skipped; valid rows are still
+                  Each row creates or updates one legacy company. To add a normal MOA, include both effective_date
+                  and expiry_date. To add a perpetual MOA (no expiry), set is_perpetual to "true" (effective_date is optional).
+                  A moa_file requires a normal MOA (dates) or is_perpetual=true.
+                  File columns reference paths inside the ZIP. Invalid rows are skipped; valid rows are still
                   uploaded. Wrap values containing commas in double quotes.
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="zip-file">ZIP File</Label>
-                <Input
-                  id="zip-file"
-                  type="file"
+                <FileUpload
+                  label="ZIP File"
+                  name="zip-file"
                   accept=".zip,application/zip"
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  placeholder="Click to upload ZIP file"
+                  onFileSelect={setFile}
                 />
               </div>
 
@@ -1842,7 +1942,7 @@ company-documents/acme-mayor.pdf`}
 
               {result.results.filter(
                 (r) =>
-                  r.status !== "created_company" && r.status !== "appended_moa",
+                  r.status !== "created_company" && r.status !== "appended_moa" && r.status !== "updated_company",
               ).length > 0 && (
                 <div>
                   <p className="font-medium mb-2">Row details</p>
@@ -1856,7 +1956,8 @@ company-documents/acme-mayor.pdf`}
                         <span
                           className={
                             r.status === "created_company" ||
-                            r.status === "appended_moa"
+                            r.status === "appended_moa" ||
+                            r.status === "updated_company"
                               ? "text-green-700"
                               : "text-red-700"
                           }
@@ -1877,7 +1978,7 @@ company-documents/acme-mayor.pdf`}
           )}
         </div>
 
-        <DialogFooter>
+        <div className="flex justify-end gap-2 pt-4">
           {result ? (
             <Button onClick={onClose}>Done</Button>
           ) : (
@@ -1885,8 +1986,7 @@ company-documents/acme-mayor.pdf`}
               Cancel
             </Button>
           )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+    </>
   );
 }

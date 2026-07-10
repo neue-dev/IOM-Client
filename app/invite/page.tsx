@@ -5,11 +5,7 @@ import Link from "next/link";
 import { useInviteControllerResolveCompanyInvite, useCompanyAuthControllerLoginViaInvite } from "@/app/api";
 import { useResolvedFile } from "@/app/lib/resolve-file";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogBottomSheet,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { useModal } from "@/app/providers/modal-provider";
 import { Loader2 } from "lucide-react";
 
 interface InviteData {
@@ -27,49 +23,30 @@ interface Template {
   description: string | null;
 }
 
-function TemplatePreviewSheet({
-  template,
-  onClose,
-}: {
-  template: Template;
-  onClose: () => void;
-}) {
+function TemplatePreviewContent({ template, close }: { template: Template; close: () => void }) {
   const { url: pdfUrl, loading: isLoading } = useResolvedFile("template_pdf", template.id);
-
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogBottomSheet showCloseButton={false} className="flex h-[85vh] flex-col overflow-hidden">
-        <div className="flex flex-shrink-0 items-center justify-between border-b px-4 py-3">
-          <div className="min-w-0">
-            <DialogTitle className="text-sm font-medium text-gray-900">{template.name}</DialogTitle>
-            {template.description && (
-              <p className="text-muted-foreground truncate text-xs">{template.description}</p>
-            )}
-          </div>
+    <>
+      {isLoading ? (
+        <div className="flex h-full items-center justify-center">
+          <Loader2 className="text-muted-foreground h-5 w-5 animate-spin" />
         </div>
-        <div className="min-h-0 flex-1">
-          {isLoading ? (
-            <div className="flex h-full items-center justify-center">
-              <Loader2 className="text-muted-foreground h-5 w-5 animate-spin" />
-            </div>
-          ) : pdfUrl ? (
-            <iframe src={pdfUrl} className="h-full w-full border-0" title={template.name} />
-          ) : (
-            <div className="flex h-full items-center justify-center">
-              <p className="text-muted-foreground text-sm">Couldn&apos;t load the template PDF.</p>
-            </div>
-          )}
+      ) : pdfUrl ? (
+        <iframe src={pdfUrl} className="h-full w-full border-0" title={template.name} />
+      ) : (
+        <div className="flex h-full items-center justify-center">
+          <p className="text-muted-foreground text-sm">Couldn&apos;t load the template PDF.</p>
         </div>
-      </DialogBottomSheet>
-    </Dialog>
+      )}
+    </>
   );
 }
 
 function InvitePageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { openModal, closeModal } = useModal();
   const token = searchParams.get("token") ?? "";
-  const [showPreview, setShowPreview] = useState(false);
   const [loginError, setLoginError] = useState("");
 
   const loginViaInvite = useCompanyAuthControllerLoginViaInvite({
@@ -157,7 +134,14 @@ function InvitePageContent() {
                     </p>
                   </div>
                   <button
-                    onClick={() => setShowPreview(true)}
+                    onClick={() =>
+                      openModal("template-preview", <TemplatePreviewContent template={template} close={() => closeModal("template-preview")} />, {
+                        title: template.name,
+                        panelClassName: "!w-full sm:!max-w-4xl",
+                        contentClassName: "min-h-0 flex-1 overflow-hidden p-0 sm:p-0",
+                        showHeaderDivider: true,
+                      })
+                    }
                     className="text-muted-foreground flex cursor-pointer items-center border-l border-gray-200 bg-gray-50 px-4 text-sm duration-200 hover:bg-gray-200"
                   >
                     Preview
@@ -214,9 +198,6 @@ function InvitePageContent() {
 
       </div>
 
-      {template && showPreview && (
-        <TemplatePreviewSheet template={template} onClose={() => setShowPreview(false)} />
-      )}
     </div>
   );
 }

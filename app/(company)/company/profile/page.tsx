@@ -1,6 +1,8 @@
 "use client";
 import { Suspense, useEffect, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -8,16 +10,10 @@ import {
   useCompanyProfile,
   useCompanyVerification,
 } from "@/app/providers/company-profile.provider";
-import {
-  getCompanyControllerGetVerificationQueryKey,
-  getCompanyControllerMeQueryKey,
-  type PatchCompanyProfileDtoCompanyType,
-  useCompanyControllerGetDocuments,
-  useCompanyControllerPatchProfile,
-  useCompanyControllerUploadDocument,
-} from "@/app/api";
+import { preconfiguredAxios } from "@/app/api/preconfig.axios";
 import { resolveFile } from "@/app/lib/resolve-file";
 import { cn } from "@/lib/utils";
+import { companyProfileSchema, type CompanyProfileDraft } from "@/lib/profile-validation";
 import { PageContainer, PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,22 +32,8 @@ import {
   AccordionTrigger,
   AccordionContent,
 } from "@/components/ui/accordion";
-import {
-  Dialog,
-  DialogBottomSheet,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogCancel,
-  AlertDialogAction,
-} from "@/components/ui/alert-dialog";
+import { useModal } from "@/app/providers/modal-provider";
+import { useIomModalRegistry } from "@/components/modal-registry";
 import {
   Building2,
   CircleAlert,
@@ -90,9 +72,40 @@ interface CompanyDoc {
   uploaded_at: string;
 }
 
+function DocPreviewContent({ docId, filename }: { docId: string; filename: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    resolveFile("company_document", docId).then((resolved) => {
+      setUrl(resolved);
+      setLoading(false);
+      if (!resolved) toast.error("Couldn't load that document");
+    });
+  }, [docId]);
+
+  return (
+    <>
+      {loading ? (
+        <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
+        </div>
+      ) : url ? (
+        <iframe src={url} className="h-full w-full border-none" title={filename} />
+      ) : (
+        <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
+          Couldn&apos;t load that document.
+        </div>
+      )}
+    </>
+  );
+}
+
 function ProfileContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { openModal, closeModal } = useModal();
+  const { confirmAction } = useIomModalRegistry();
   const inviteUniId = searchParams.get("invite_uni");
   const inviteTemplateId = searchParams.get("invite_template");
   const inviteId = searchParams.get("invite_id");
@@ -103,15 +116,27 @@ function ProfileContent() {
   const [openSections, setOpenSections] = useState<string[]>(["company"]);
   const [editing, setEditing] = useState<SectionKey | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
+  const form = useForm<CompanyProfileDraft>({
+    resolver: zodResolver(companyProfileSchema),
+    mode: "onChange",
+    defaultValues: {
+      registered_name: "",
+      registered_address: "",
+      company_type: "",
+      description: "",
+      website: "",
+      phone: "",
+      industry: "",
+    },
+  });
 
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewName, setPreviewName] = useState("");
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
   const [uploadingType, setUploadingType] = useState<string | null>(null);
 
-  const { data: docsData, refetch: refetchDocs } = useCompanyControllerGetDocuments({
-    query: { enabled: !!company },
+  const { data: docsData, refetch: refetchDocs } = useQuery({
+    queryKey: ["company-docs"],
+    queryFn: () =>
+      preconfiguredAxios.get("/api/company/documents").then((r) => r.data),
+    enabled: !!company,
   });
 
   const { data: verification, isLoading: vLoading } = useCompanyVerification(!!company);
@@ -128,33 +153,45 @@ function ProfileContent() {
     router.replace(`/company/dashboard?${params}`);
   }, [inviteUniId, isLoading, vLoading, company, verification, inviteTemplateId, inviteId, router]);
 
-  // When set, a re-verification confirm dialog is shown; running it performs the edit.
-  const [pendingConfirm, setPendingConfirm] = useState<(() => void) | null>(null);
-
-  const save = useCompanyControllerPatchProfile({
-    mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getCompanyControllerMeQueryKey() });
-        queryClient.invalidateQueries({ queryKey: getCompanyControllerGetVerificationQueryKey() });
-        toast.success("Profile saved");
-        cancelEdit();
-      },
-      onError: (e: Error) => toast.error(e.message),
+  const save = useMutation({
+    mutationFn: () => {
+      const values = form.getValues();
+      const g = (k: keyof CompanyProfileDraft) => values[k] ?? persisted(k);
+      return preconfiguredAxios.patch("/api/company/profile", {
+        registered_name: g("registered_name"),
+        registered_address: g("registered_address"),
+        company_type: g("company_type") || undefined,
+        description: g("description"),
+        website: g("website"),
+        phone: g("phone"),
+        industry: g("industry"),
+      });
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["company-me"] });
+      queryClient.invalidateQueries({ queryKey: ["company-verification"] });
+      toast.success("Profile saved");
+      cancelEdit();
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
-  const uploadDoc = useCompanyControllerUploadDocument({
-    mutation: {
-      onSuccess: () => {
-        setUploadingType(null);
-        refetchDocs();
-        queryClient.invalidateQueries({ queryKey: getCompanyControllerGetVerificationQueryKey() });
-        toast.success("Document uploaded");
-      },
-      onError: (e: Error) => {
-        setUploadingType(null);
-        toast.error(e.message);
-      },
+  const uploadDoc = useMutation({
+    mutationFn: ({ file, type }: { file: File; type: string }) => {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("type", type);
+      return preconfiguredAxios.post("/api/company/documents", fd);
+    },
+    onSuccess: () => {
+      setUploadingType(null);
+      refetchDocs();
+      queryClient.invalidateQueries({ queryKey: ["company-verification"] });
+      toast.success("Document uploaded");
+    },
+    onError: (e: Error) => {
+      setUploadingType(null);
+      toast.error(e.message);
     },
   });
 
@@ -170,16 +207,20 @@ function ProfileContent() {
   }
   function setField(key: string, value: string) {
     setDraft((d) => ({ ...d, [key]: value }));
+    form.setValue(key as keyof CompanyProfileDraft, value, { shouldDirty: true, shouldValidate: true });
   }
   function startEdit(section: SectionKey, keys: string[]) {
     const seed: Record<string, string> = {};
-    keys.forEach((k) => (seed[k] = persisted(k)));
+    (Object.keys(companyProfileSchema.shape) as string[]).forEach((k) => (seed[k] = persisted(k)));
     setDraft(seed);
+    form.reset(seed as CompanyProfileDraft);
+    void form.trigger();
     setEditing(section);
   }
   function cancelEdit() {
     setEditing(null);
     setDraft({});
+    form.reset();
   }
 
   // Material fields whose change forces re-verification (the hash inputs).
@@ -188,44 +229,48 @@ function ProfileContent() {
   };
 
   function attemptSave(sectionKey: SectionKey) {
+    if (!form.formState.isValid) return;
     const matKeys = MATERIAL_KEYS_BY_SECTION[sectionKey] ?? [];
     const changedMaterial = matKeys.some((k) => k in draft && draft[k] !== persisted(k));
-    const g = (k: string) => (k in draft ? draft[k] : persisted(k));
-    const data = {
-      registered_name: g("registered_name"),
-      registered_address: g("registered_address"),
-      company_type: (g("company_type") || undefined) as PatchCompanyProfileDtoCompanyType | undefined,
-      description: g("description"),
-      website: g("website"),
-      phone: g("phone"),
-      industry: g("industry"),
-    };
-    const doSave = () => save.mutate({ data });
     if (verified && changedMaterial) {
-      setPendingConfirm(() => doSave);
+      confirmAction.open({
+        title: "This change requires re-verification",
+        description: "Changing this will require re-verification by the platform team. You won't be able to request new MOAs until you're re-approved. Your existing MOAs stay valid.",
+        confirmLabel: "Save anyway",
+        onConfirm: () => save.mutate(),
+        isPending: save.isPending,
+      });
     } else {
-      doSave();
+      save.mutate();
     }
+  }
+
+  function fieldError(field: string) {
+    return form.formState.errors[field as keyof CompanyProfileDraft]?.message;
   }
 
   function attemptUploadDoc(file: File, type: string) {
     setUploadingType(type);
     if (verified) {
-      setPendingConfirm(() => () => uploadDoc.mutate({ data: { file, type } }));
+      confirmAction.open({
+        title: "This change requires re-verification",
+        description: "Changing this will require re-verification by the platform team. You won't be able to request new MOAs until you're re-approved. Your existing MOAs stay valid.",
+        confirmLabel: "Upload anyway",
+        onConfirm: () => uploadDoc.mutate({ file, type }),
+        isPending: uploadDoc.isPending,
+      });
     } else {
-      uploadDoc.mutate({ data: { file, type } });
+      uploadDoc.mutate({ file, type });
     }
   }
 
-  async function preview(doc: CompanyDoc) {
-    setPreviewName(doc.filename);
-    setPreviewUrl(null);
-    setPreviewLoading(true);
-    setPreviewOpen(true);
-    const url = await resolveFile("company_document", doc.id);
-    setPreviewUrl(url);
-    setPreviewLoading(false);
-    if (!url) toast.error("Couldn't load that document");
+  function preview(doc: CompanyDoc) {
+    openModal("preview-doc", <DocPreviewContent docId={doc.id} filename={doc.filename} />, {
+      title: doc.filename,
+      panelClassName: "!w-full sm:!max-w-4xl",
+      contentClassName: "min-h-0 flex-1 overflow-hidden p-0 sm:p-0",
+      showHeaderDivider: true,
+    });
   }
 
   const docs = (docsData?.documents ?? []) as CompanyDoc[];
@@ -241,14 +286,16 @@ function ProfileContent() {
   ) => {
     const isEditing = editing === sectionKey;
     return (
-      <div className="flex items-center gap-4">
-        <Label htmlFor={field} className="w-44 flex-shrink-0 truncate text-gray-400">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-4">
+        <Label htmlFor={field} className="sm:w-44 sm:flex-shrink-0 sm:truncate text-gray-400">
           {label}
         </Label>
         <div className="min-w-0 flex-1 space-y-1">
           {isEditing ? (
             <Input
               id={field}
+              aria-invalid={!!fieldError(field)}
+              aria-describedby={fieldError(field) ? `${field}-error` : undefined}
               value={draftVal(field)}
               onChange={(e) => setField(field, e.target.value)}
             />
@@ -258,6 +305,9 @@ function ProfileContent() {
                 <span className="text-muted-foreground font-normal">Not set</span>
               )}
             </p>
+          )}
+          {isEditing && fieldError(field) && (
+            <p id={`${field}-error`} className="text-destructive text-xs">{fieldError(field)}</p>
           )}
           {help && <p className="text-muted-foreground text-xs">{help}</p>}
         </div>
@@ -276,7 +326,7 @@ function ProfileContent() {
         >
           Cancel
         </Button>
-        <Button size="sm" onClick={() => attemptSave(sectionKey)} disabled={save.isPending}>
+        <Button size="sm" onClick={() => attemptSave(sectionKey)} disabled={save.isPending || !form.formState.isValid}>
           {save.isPending && <Loader2 className="animate-spin" />}
           Save
         </Button>
@@ -359,33 +409,43 @@ function ProfileContent() {
         <AccordionItem value="company" className="">
           {sectionTrigger(Building2, "Company Profile")}
           <AccordionContent className="space-y-4 px-5 pb-5">
-            <div className="flex items-center gap-4">
-              <Label className="w-44 flex-shrink-0 truncate text-gray-400">Account email</Label>
+            {editing === "company" && !form.formState.isValid && (
+              <p className="rounded-[0.33em] border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Complete the highlighted fields before saving this section.
+              </p>
+            )}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+              <Label className="sm:w-44 sm:flex-shrink-0 sm:truncate text-gray-400">Account email</Label>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-gray-900">{company.email}</p>
               </div>
             </div>
             {textField("company", "registered_name", "Legal / registered name")}
             {textField("company", "registered_address", "Registered address")}
-            <div className="flex items-center gap-4">
-              <Label className="w-44 flex-shrink-0 truncate text-gray-400">Company type</Label>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+              <Label className="sm:w-44 sm:flex-shrink-0 sm:truncate text-gray-400">Company type</Label>
               <div className="min-w-0 flex-1">
                 {editing === "company" ? (
-                  <Select
-                    value={draftVal("company_type") || undefined}
-                    onValueChange={(v) => setField("company_type", v)}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select a type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {COMPANY_TYPES.map((t) => (
-                        <SelectItem key={t.value} value={t.value}>
-                          {t.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <>
+                    <Select
+                      value={draftVal("company_type") || undefined}
+                      onValueChange={(v) => setField("company_type", v)}
+                    >
+                      <SelectTrigger className="w-full" aria-invalid={!!fieldError("company_type")}>
+                        <SelectValue placeholder="Select a type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {COMPANY_TYPES.map((t) => (
+                          <SelectItem key={t.value} value={t.value}>
+                            {t.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {fieldError("company_type") && (
+                      <p className="text-destructive mt-1 text-xs">{fieldError("company_type")}</p>
+                    )}
+                  </>
                 ) : (
                   <p className="truncate text-sm font-medium text-gray-900">
                     {COMPANY_TYPE_LABELS[persisted("company_type")] || (
@@ -496,62 +556,6 @@ function ProfileContent() {
           </AccordionContent>
         </AccordionItem>
       </Accordion>
-
-      {/* Document preview */}
-      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogBottomSheet className="flex h-[88vh] flex-col p-0">
-          <div className="flex items-center border-b border-gray-100 px-5 py-3.5 pr-14">
-            <DialogTitle className="truncate text-sm font-medium text-gray-900">
-              {previewName}
-            </DialogTitle>
-          </div>
-          <div className="min-h-0 flex-1 overflow-hidden">
-            {previewLoading ? (
-              <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
-              </div>
-            ) : previewUrl ? (
-              <iframe
-                src={previewUrl}
-                className="h-full w-full border-none"
-                title={previewName}
-              />
-            ) : (
-              <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-                Couldn&apos;t load that document.
-              </div>
-            )}
-          </div>
-        </DialogBottomSheet>
-      </Dialog>
-
-      {/* Re-verification warning (only when currently verified) */}
-      <AlertDialog
-        open={!!pendingConfirm}
-        onOpenChange={(o) => { if (!o) { setPendingConfirm(null); setUploadingType(null); } }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>This change requires re-verification</AlertDialogTitle>
-            <AlertDialogDescription>
-              Changing this will require re-verification by the platform team. You
-              won&apos;t be able to request new MOAs until you&apos;re re-approved.
-              Your existing MOAs stay valid.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                pendingConfirm?.();
-                setPendingConfirm(null);
-              }}
-            >
-              Save anyway
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </PageContainer>
   );
 }

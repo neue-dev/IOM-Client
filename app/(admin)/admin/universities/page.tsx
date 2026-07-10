@@ -1,16 +1,10 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { ColumnDef } from "@tanstack/react-table";
-import {
-  getAdminControllerListUniversitiesQueryKey,
-  useAdminControllerListUniversities,
-  useAdminControllerCreateUniversity,
-  useAdminControllerDeactivateUniversity,
-  type AdminUniversityListItemDto,
-} from "@/app/api";
+import { preconfiguredAxios } from "@/app/api/preconfig.axios";
 import { PageContainer, PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,27 +13,16 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DataTable } from "@/components/ui/data-table";
 import { FormError } from "@/components/auth-shell";
-import {
-  Dialog,
-  DialogTrigger,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogTrigger,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogCancel,
-  AlertDialogAction,
-} from "@/components/ui/alert-dialog";
+import { useModal } from "@/app/providers/modal-provider";
+import { useIomModalRegistry } from "@/components/modal-registry";
 import { Loader2, Plus } from "lucide-react";
+
+interface University {
+  id: string;
+  registered_name: string;
+  is_deactivated: boolean | null;
+  university_accounts: { email: string; display_name: string }[];
+}
 
 const EMPTY_FORM = {
   registered_name: "",
@@ -47,160 +30,115 @@ const EMPTY_FORM = {
   superadmin_display_name: "",
 };
 
-function CreateUniversityDialog() {
+function CreateUniversityForm({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState("");
 
-  const create = useAdminControllerCreateUniversity({
-    mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getAdminControllerListUniversitiesQueryKey() });
-        toast.success("University created");
-        setForm(EMPTY_FORM);
-        setError("");
-        setOpen(false);
-      },
-      onError: (e: Error) => setError(e.message),
+  const create = useMutation({
+    mutationFn: () => preconfiguredAxios.post("/api/admin/universities", form),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-universities"] });
+      toast.success("University created");
+      onClose();
     },
+    onError: (e: Error) => setError(e.message),
   });
 
   const valid = form.registered_name && form.superadmin_email;
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        setOpen(o);
-        if (!o) setError("");
+    <form
+      id="create-university"
+      onSubmit={(e) => {
+        e.preventDefault();
+        setError("");
+        create.mutate();
       }}
+      className="space-y-4"
     >
-      <DialogTrigger asChild>
-        <Button>
-          <Plus /> Add university
+      <FormError>{error}</FormError>
+      <div className="space-y-1.5">
+        <Label htmlFor="registered_name">Registered name</Label>
+        <Input
+          id="registered_name"
+          placeholder="De La Salle University"
+          value={form.registered_name}
+          onChange={(e) => setForm({ ...form, registered_name: e.target.value })}
+          required
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="superadmin_email">Superadmin email</Label>
+        <Input
+          id="superadmin_email"
+          type="email"
+          placeholder="admin@university.edu"
+          value={form.superadmin_email}
+          onChange={(e) => setForm({ ...form, superadmin_email: e.target.value })}
+          required
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="superadmin_display_name">Superadmin name</Label>
+        <Input
+          id="superadmin_display_name"
+          placeholder="Juan Dela Cruz"
+          value={form.superadmin_display_name}
+          onChange={(e) =>
+            setForm({ ...form, superadmin_display_name: e.target.value })
+          }
+        />
+      </div>
+      <div className="flex justify-end gap-2 pt-2">
+        <Button variant="outline" onClick={onClose}>Cancel</Button>
+        <Button type="submit" form="create-university" disabled={!valid || create.isPending}>
+          {create.isPending && <Loader2 className="animate-spin" />}
+          {create.isPending ? "Creating…" : "Create"}
         </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Create university</DialogTitle>
-          <DialogDescription>
-            The superadmin is emailed an invitation to set their password.
-          </DialogDescription>
-        </DialogHeader>
-
-        <form
-          id="create-university"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setError("");
-            create.mutate({ data: form });
-          }}
-          className="space-y-4"
-        >
-          <FormError>{error}</FormError>
-          <div className="space-y-1.5">
-            <Label htmlFor="registered_name">Registered name</Label>
-            <Input
-              id="registered_name"
-              placeholder="De La Salle University"
-              value={form.registered_name}
-              onChange={(e) => setForm({ ...form, registered_name: e.target.value })}
-              required
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="superadmin_email">Superadmin email</Label>
-            <Input
-              id="superadmin_email"
-              type="email"
-              placeholder="admin@university.edu"
-              value={form.superadmin_email}
-              onChange={(e) => setForm({ ...form, superadmin_email: e.target.value })}
-              required
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="superadmin_display_name">Superadmin name</Label>
-            <Input
-              id="superadmin_display_name"
-              placeholder="Juan Dela Cruz"
-              value={form.superadmin_display_name}
-              onChange={(e) =>
-                setForm({ ...form, superadmin_display_name: e.target.value })
-              }
-            />
-          </div>
-        </form>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            form="create-university"
-            disabled={!valid || create.isPending}
-          >
-            {create.isPending && <Loader2 className="animate-spin" />}
-            {create.isPending ? "Creating…" : "Create"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </form>
   );
 }
 
-function DeactivateCell({ uni }: { uni: AdminUniversityListItemDto }) {
+function DeactivateCell({ uni }: { uni: University }) {
   const queryClient = useQueryClient();
+  const { confirmAction } = useIomModalRegistry();
 
-  const deactivate = useAdminControllerDeactivateUniversity({
-    mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getAdminControllerListUniversitiesQueryKey() });
-        toast.success("University deactivated");
-      },
-      onError: (e: Error) => toast.error(e.message),
+  const deactivate = useMutation({
+    mutationFn: () =>
+      preconfiguredAxios.patch(`/api/admin/universities/${uni.id}/deactivate`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-universities"] });
+      toast.success("University deactivated");
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   if (uni.is_deactivated) return null;
 
   return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <Button
-          variant="outline"
-          scheme="destructive"
-          size="sm"
-          onClick={(e) => e.stopPropagation()}
-        >
-          Deactivate
-        </Button>
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Deactivate {uni.registered_name}?</AlertDialogTitle>
-          <AlertDialogDescription>
-            Staff will lose access and the institution can no longer receive new MOA
-            requests. This can be reversed later.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            onClick={() => deactivate.mutate({ universityId: uni.id })}
-          >
-            Deactivate
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <Button
+      variant="outline"
+      scheme="destructive"
+      size="sm"
+      onClick={(e) => {
+        e.stopPropagation();
+        confirmAction.open({
+          title: `Deactivate ${uni.registered_name}?`,
+          description: "Staff will lose access and the institution can no longer receive new MOA requests. This can be reversed later.",
+          confirmLabel: "Deactivate",
+          onConfirm: () => deactivate.mutate(),
+          isPending: deactivate.isPending,
+        });
+      }}
+    >
+      Deactivate
+    </Button>
   );
 }
 
-const columns: ColumnDef<AdminUniversityListItemDto>[] = [
+const columns: ColumnDef<University>[] = [
   {
     id: "name",
     header: "University",
@@ -244,7 +182,14 @@ const columns: ColumnDef<AdminUniversityListItemDto>[] = [
 
 export default function AdminUniversitiesPage() {
   const router = useRouter();
-  const { data, isLoading } = useAdminControllerListUniversities();
+  const { openModal, closeModal } = useModal();
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin-universities"],
+    queryFn: async () => {
+      const res = await preconfiguredAxios.get("/api/admin/universities");
+      return res.data.universities as University[];
+    },
+  });
 
   return (
     <PageContainer className="space-y-6">
@@ -252,7 +197,17 @@ export default function AdminUniversitiesPage() {
         title="Universities"
         description="Onboard institutions and manage their access to the platform."
       >
-        <CreateUniversityDialog />
+        <Button
+          onClick={() =>
+            openModal("create-university", <CreateUniversityForm onClose={() => closeModal("create-university")} />, {
+              title: "Create university",
+              description: "The superadmin is emailed an invitation to set their password.",
+              panelClassName: "!w-full sm:!max-w-md",
+            })
+          }
+        >
+          <Plus /> Add university
+        </Button>
       </PageHeader>
 
       {isLoading ? (
@@ -264,7 +219,7 @@ export default function AdminUniversitiesPage() {
         <DataTable
           id="admin-universities"
           columns={columns}
-          data={data?.universities ?? []}
+          data={data ?? []}
           searchPlaceholder="Search universities..."
           rowLabelSingular="university"
           rowLabelPlural="universities"
