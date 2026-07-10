@@ -14,7 +14,7 @@ interface CompanyMoaDetail {
     university: { registered_name: string };
     template: { name: string };
     effective_date: string;
-    expiry_date: string;
+    expiry_date: string | null;
     status: string;
     is_expired: boolean | null;
     rejection_reason: string | null;
@@ -71,7 +71,7 @@ export default function CompanyMoaDetailPage() {
             <div className="min-w-0">
               <p className="text-sm font-semibold text-supportive">This MOA is signed and in effect</p>
               <p className="text-xs text-supportive/80 mt-0.5">
-                Valid until {formatDateWithoutTime(moa.expiry_date)}
+                {moa.expiry_date ? `Valid until ${formatDateWithoutTime(moa.expiry_date)}` : "Perpetual — no expiry"}
               </p>
             </div>
           </div>
@@ -86,7 +86,7 @@ export default function CompanyMoaDetailPage() {
               <p className="text-muted-foreground mt-0.5 text-sm">{moa.template.name}</p>
               <p className="text-muted-foreground mt-1 text-xs">
                 {formatDateWithoutTime(moa.effective_date)} &ndash;{" "}
-                {formatDateWithoutTime(moa.expiry_date)}
+                {moa.expiry_date ? formatDateWithoutTime(moa.expiry_date) : "Perpetual"}
               </p>
             </div>
             {!isActive && <MoaStatusBadge status={moa.status} isExpired={moa.is_expired} />}

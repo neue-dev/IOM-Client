@@ -24,7 +24,7 @@ interface MoaRecord {
   is_expired: boolean | null;
   created_at: string;
   effective_date: string;
-  expiry_date: string;
+  expiry_date: string | null;
 }
 
 interface CompanyDoc {
@@ -105,7 +105,7 @@ export default function UniversityMoaDetailPage() {
               </h1>
               <p className="text-muted-foreground mt-0.5 text-xs">
                 {formatDateWithoutTime(moa.effective_date)} &ndash;{" "}
-                {formatDateWithoutTime(moa.expiry_date)}
+                {moa.expiry_date ? formatDateWithoutTime(moa.expiry_date) : "Perpetual"}
               </p>
             </div>
             <div className="flex flex-shrink-0 flex-col items-end gap-2">

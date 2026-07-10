@@ -41,7 +41,7 @@ interface Template {
   id: string;
   name: string;
   description: string | null;
-  term_months: number;
+  term_months: number | null;
 }
 
 type ApiError = {
@@ -319,7 +319,10 @@ export function RequestDialog({
                       </span>
                     )}
                     <span className="text-muted-foreground mt-1 block text-xs">
-                      Term: {t.term_months} months
+                      Term:{" "}
+                      {t.term_months == null
+                        ? "Perpetual (no expiry)"
+                        : `${t.term_months} months`}
                     </span>
                   </span>
                 </Button>

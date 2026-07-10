@@ -13,7 +13,7 @@ interface Template {
   id: string;
   name: string;
   description: string | null;
-  term_months: number;
+  term_months: number | null;
   field_schema: unknown;
 }
 

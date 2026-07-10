@@ -48,7 +48,7 @@ interface Moa {
   status: "active" | "rejected";
   is_expired: boolean | null;
   effective_date: string;
-  expiry_date: string;
+  expiry_date: string | null;
   created_at: string;
   rejection_reason: string | null;
   university: { id: string; registered_name: string; logo_url: string | null };
@@ -115,7 +115,7 @@ const moaHistoryColumns: ColumnDef<Moa>[] = [
     cell: ({ row }) => (
       <span className="text-muted-foreground">
         {formatDateWithoutTime(row.original.effective_date)} –{" "}
-        {formatDateWithoutTime(row.original.expiry_date)}
+        {row.original.expiry_date ? formatDateWithoutTime(row.original.expiry_date) : "Perpetual"}
       </span>
     ),
   },
