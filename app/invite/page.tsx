@@ -2,8 +2,7 @@
 import { Suspense, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { preconfiguredAxios } from "@/app/api/preconfig.axios";
+import { useInviteControllerResolveCompanyInvite, useCompanyAuthControllerLoginViaInvite } from "@/app/api";
 import { useResolvedFile } from "@/app/lib/resolve-file";
 import { Button } from "@/components/ui/button";
 import { useModal } from "@/app/providers/modal-provider";
@@ -14,7 +13,7 @@ interface InviteData {
   company_name: string | null;
   email_status: "not_registered" | "registered_unverified" | "registered_verified";
   university: { id: string; registered_name: string; address: string | null; logo_url: string | null };
-  template: { id: string; name: string; description: string | null; term_months: number } | null;
+  template: { id: string; name: string; description: string | null; term_months: number | null } | null;
   invite: { personal_message: string | null; expires_at: string };
 }
 
@@ -50,14 +49,8 @@ function InvitePageContent() {
   const token = searchParams.get("token") ?? "";
   const [loginError, setLoginError] = useState("");
 
-  const loginViaInvite = useMutation({
-    mutationFn: () =>
-      preconfiguredAxios
-        .post("/api/auth/company/login-invite", { token })
-        .then(
-          (r) =>
-            r.data as { university_id: string; template_id: string | null; invite_id: string },
-        ),
+  const loginViaInvite = useCompanyAuthControllerLoginViaInvite({
+    mutation: {
     onSuccess: (res) => {
       const params = new URLSearchParams();
       params.set("open_university_id", res.university_id);
@@ -66,19 +59,17 @@ function InvitePageContent() {
       router.replace(`/company/dashboard?${params}`);
     },
     onError: (e: Error) => setLoginError(e.message),
+    },
   });
 
-  const { data, isLoading, error } = useQuery<InviteData>({
-    queryKey: ["invite-peek", token],
-    queryFn: () =>
-      preconfiguredAxios
-        .get(`/api/invite/company?token=${encodeURIComponent(token)}`)
-        .then((r) => r.data as InviteData),
-    enabled: !!token,
-    retry: false,
-  });
+  const { data, isLoading, error } = useInviteControllerResolveCompanyInvite(
+    { token },
+    { query: { enabled: !!token, retry: false } },
+  );
 
-  if (!token || (!isLoading && (error || !data))) {
+  const inviteData = data as unknown as InviteData | undefined;
+
+  if (!token || (!isLoading && (error || !inviteData))) {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
         <div className="space-y-2 rounded-[0.33em] bg-white/90 px-8 py-6 text-center shadow-lg backdrop-blur-sm">
@@ -103,7 +94,7 @@ function InvitePageContent() {
     );
   }
 
-  const { email, company_name, email_status, university, template, invite } = data!;
+  const { email, company_name, email_status, university, template, invite } = inviteData!;
   const registerHref = `/company/register?invite_token=${encodeURIComponent(token)}`;
 
   return (
@@ -139,7 +130,7 @@ function InvitePageContent() {
                       <p className="text-muted-foreground mt-0.5 text-xs">{template.description}</p>
                     )}
                     <p className="text-muted-foreground mt-0.5 text-xs">
-                      Term: {template.term_months} months
+                      Term: {template.term_months == null ? "Perpetual (no expiry)" : `${template.term_months} months`}
                     </p>
                   </div>
                   <button
@@ -193,7 +184,7 @@ function InvitePageContent() {
                   <Button
                     size="lg"
                     className="w-full"
-                    onClick={() => loginViaInvite.mutate()}
+                    onClick={() => loginViaInvite.mutate({ data: { token } })}
                     disabled={loginViaInvite.isPending}
                   >
                     {loginViaInvite.isPending && <Loader2 className="animate-spin" />}

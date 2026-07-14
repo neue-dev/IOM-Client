@@ -10,5 +10,7 @@ export interface PatchTemplateDto {
   name?: string;
   description?: string;
   field_schema?: string;
+  /** Whether the template has no expiry */
+  is_perpetual?: boolean;
   term_months?: number;
 }

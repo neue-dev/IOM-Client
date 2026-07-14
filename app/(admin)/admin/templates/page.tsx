@@ -16,7 +16,7 @@ interface Template {
   id: string;
   name: string;
   description: string | null;
-  term_months: number;
+  term_months: number | null;
 }
 
 function ActionsCell({ template }: { template: Template }) {
@@ -79,9 +79,11 @@ const columns: ColumnDef<Template>[] = [
   {
     id: "term",
     header: "Term",
-    accessorFn: (row) => row.term_months,
+    accessorFn: (row) => row.term_months ?? Infinity,
     cell: ({ row }) => (
-      <Badge type="default" strength="medium">{row.original.term_months} mo</Badge>
+      <Badge type="default" strength="medium">
+        {row.original.term_months == null ? "Perpetual" : `${row.original.term_months} mo`}
+      </Badge>
     ),
   },
   {
@@ -130,7 +132,6 @@ export default function AdminTemplatesPage() {
           searchPlaceholder="Search templates..."
           rowLabelSingular="template"
           rowLabelPlural="templates"
-          pageSizes={[10, 25, 50]}
           onRowClick={(t) => router.push(`/templates/${t.id}`)}
         />
       )}

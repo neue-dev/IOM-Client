@@ -4,7 +4,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { preconfiguredAxios } from "@/app/api/preconfig.axios";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -28,7 +27,7 @@ import {
   FileText,
   Users,
   LayoutDashboard,
-  FilePlus,
+  FileSignature,
   GraduationCap,
   Building2,
   SearchCheck,
@@ -50,7 +49,7 @@ interface AppHeaderProps {
   nav: NavItem[];
   userPrimary?: string;
   userSecondary?: string;
-  logoutPath: string;
+  logout: () => Promise<unknown>;
   postLogoutPath: string;
   profileHref?: string;
   userAvatarUrl?: string | null;
@@ -67,17 +66,18 @@ function labelIcon(label: string): LucideIcon {
     Universities: GraduationCap,
     Companies: Building2,
     "Company Reviews": SearchCheck,
-    "Request MOA": FilePlus,
+    "Request MOA": FileSignature,
     Dashboard: LayoutDashboard,
   };
   return map[label] ?? Handshake;
 }
 
 export function AppHeader({
+  portal,
   homeHref,
   nav,
   userPrimary,
-  logoutPath,
+  logout: logoutFn,
   postLogoutPath,
   profileHref,
   userAvatarUrl,
@@ -99,7 +99,7 @@ export function AppHeader({
   }, [isDrawerOpen]);
 
   const logout = useMutation({
-    mutationFn: () => preconfiguredAxios.post(logoutPath),
+    mutationFn: logoutFn,
     onSettled: () => {
       queryClient.clear();
       router.replace(postLogoutPath);
@@ -125,9 +125,18 @@ export function AppHeader({
               height={25}
               className="flex-none"
             />
-            <h1 className="font-display flex flex-row items-center space-x-2 text-lg font-bold text-gray-900">
-              Partners
-            </h1>
+            <div className="flex items-center">
+              <h1 className="font-display text-lg font-bold text-gray-900">
+                Partners
+              </h1>
+              <span
+                className="mx-2.5 h-4 w-px bg-gray-300"
+                aria-hidden="true"
+              />
+              <span className="font-display text-gray-500">
+                {portal === "Platform Admin" ? portal : `${portal} Portal`}
+              </span>
+            </div>
           </div>
         </Link>
 
@@ -143,7 +152,7 @@ export function AppHeader({
                   "relative h-auto min-w-0 flex-col items-center justify-center gap-1 rounded-[0.33em] px-3 py-1",
                   isActive(item.href)
                     ? "text-primary"
-                    : "opacity-80 hover:bg-gray-100 hover:opacity-100"
+                    : "opacity-80 hover:bg-gray-100 hover:opacity-100",
                 )}
                 onClick={() => router.push(item.href)}
               >
@@ -185,7 +194,9 @@ export function AppHeader({
             <DropdownMenuContent align="end" className="w-max min-w-44">
               {userPrimary && (
                 <div className="px-2 py-1.5">
-                  <div className="text-center text-sm font-medium">{userPrimary}</div>
+                  <div className="text-center text-sm font-medium">
+                    {userPrimary}
+                  </div>
                 </div>
               )}
               <DropdownMenuSeparator />
@@ -216,7 +227,11 @@ export function AppHeader({
           className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-gray-300 hover:bg-gray-50 md:hidden"
           onClick={() => setIsDrawerOpen(!isDrawerOpen)}
         >
-          {isDrawerOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          {isDrawerOpen ? (
+            <X className="h-5 w-5" />
+          ) : (
+            <Menu className="h-5 w-5" />
+          )}
         </button>
       </div>
 
@@ -232,7 +247,7 @@ export function AppHeader({
         className={cn(
           "fixed top-0 right-0 z-[31] h-[100svh] w-full max-w-[92%] border-l border-gray-200 bg-white shadow-xl sm:max-w-[420px] md:hidden",
           "transition-transform duration-250 ease-out",
-          isDrawerOpen ? "translate-x-0" : "translate-x-full"
+          isDrawerOpen ? "translate-x-0" : "translate-x-full",
         )}
         role="dialog"
         aria-modal="true"
@@ -241,8 +256,17 @@ export function AppHeader({
         <div className="flex h-full flex-col">
           <div className="mt-1 flex items-center justify-between border-b px-4 py-3">
             <div className="flex items-center gap-2">
-              <Image src="/betterinternship-logo.png" alt="" width={25} height={25} className="h-6 w-6 rounded object-contain" />
+              <Image
+                src="/betterinternship-logo.png"
+                alt=""
+                width={25}
+                height={25}
+                className="h-6 w-6 rounded object-contain"
+              />
               <span className="text-sm font-semibold">Partners</span>
+              <span className="rounded border border-gray-200 bg-gray-50 px-1 py-0 text-[10px] font-medium text-gray-400 leading-none">
+                {portal}
+              </span>
             </div>
             <button
               type="button"
@@ -258,7 +282,9 @@ export function AppHeader({
             {userPrimary && (
               <div className="flex items-center gap-2 pb-2">
                 <UserRound className="h-5 w-5 text-gray-500" />
-                <span className="text-sm font-semibold text-gray-900">{userPrimary}</span>
+                <span className="text-sm font-semibold text-gray-900">
+                  {userPrimary}
+                </span>
               </div>
             )}
 
@@ -268,7 +294,11 @@ export function AppHeader({
               {nav.map((item) => {
                 const Icon = item.icon ?? labelIcon(item.label);
                 return (
-                  <Link key={item.href} href={item.href} className="block w-full">
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="block w-full"
+                  >
                     <button className="flex w-full items-center justify-between rounded-md border border-transparent px-3 py-2 text-sm transition-colors hover:border-gray-200 hover:bg-gray-50">
                       <div className="flex items-center gap-2">
                         <Icon className="h-4 w-4 text-gray-500" />

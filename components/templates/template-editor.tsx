@@ -8,7 +8,11 @@ import {
   usePdfDocumentFromFile,
   usePdfDocumentFromUrl,
 } from "@betterinternship/core/pdf-viewer";
-import { preconfiguredAxios } from "@/app/api/preconfig.axios";
+import {
+  getAdminControllerListTemplatesQueryKey,
+  useAdminControllerCreateTemplate,
+  useAdminControllerPatchTemplate,
+} from "@/app/api/app/api/endpoints/admin/admin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,7 +55,7 @@ const MAX_SCALE = 2;
 export interface TemplateEditorInitial {
   name: string;
   description: string;
-  term_months: number;
+  term_months: number | null;
   field_schema: unknown;
   pdfUrl: string;
 }
@@ -67,11 +71,14 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(v, hi
 export function TemplateEditor({ mode, templateId, initial }: TemplateEditorProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const createTemplate = useAdminControllerCreateTemplate();
+  const patchTemplate = useAdminControllerPatchTemplate();
 
   const [file, setFile] = useState<File | null>(null);
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [termMonths, setTermMonths] = useState<number>(initial?.term_months ?? 12);
+  const [isPerpetual, setIsPerpetual] = useState(mode === "edit" && initial?.term_months === null);
   const [placements, setPlacements] = useState<Placement[]>(() =>
     initial ? fromFieldSchema(initial.field_schema) : [],
   );
@@ -185,26 +192,34 @@ export function TemplateEditor({ mode, templateId, initial }: TemplateEditorProp
       const fieldSchema = JSON.stringify(toFieldSchema(placements));
       if (mode === "new") {
         if (!file || !dims) throw new Error("Upload a template PDF first");
-        const fd = new FormData();
-        fd.append("pdf", file);
-        fd.append("name", name.trim());
-        if (description.trim()) fd.append("description", description.trim());
-        fd.append("term_months", String(termMonths));
-        fd.append("page_count", String(pageCount));
-        fd.append("page_w", String(Math.round(dims.w)));
-        fd.append("page_h", String(Math.round(dims.h)));
-        fd.append("field_schema", fieldSchema);
-        return preconfiguredAxios.post("/api/admin/templates", fd);
+        return createTemplate.mutateAsync({
+          data: {
+            pdf: file,
+            name: name.trim(),
+            ...(description.trim() ? { description: description.trim() } : {}),
+            is_perpetual: isPerpetual,
+            ...(isPerpetual ? {} : { term_months: termMonths }),
+            page_count: pageCount,
+            page_w: Math.round(dims.w),
+            page_h: Math.round(dims.h),
+            field_schema: fieldSchema,
+          },
+        });
       }
-      return preconfiguredAxios.patch(`/api/admin/templates/${templateId}`, {
-        name: name.trim(),
-        description: description.trim(),
-        term_months: termMonths,
-        field_schema: fieldSchema,
+      return patchTemplate.mutateAsync({
+        templateId,
+        data: {
+          name: name.trim(),
+          description: description.trim(),
+          field_schema: fieldSchema,
+          ...(isPerpetual
+            ? { is_perpetual: true }
+            : { is_perpetual: false, term_months: termMonths }),
+        },
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-templates"] });
+      queryClient.invalidateQueries({ queryKey: getAdminControllerListTemplatesQueryKey() });
       toast.success(mode === "new" ? "Template created" : "Template saved");
       router.push("/templates");
     },
@@ -212,8 +227,15 @@ export function TemplateEditor({ mode, templateId, initial }: TemplateEditorProp
   });
 
   const ready = !!pdfDoc && !!dims;
+  const hasExpiryField = placements.some((p) => p.field === "expiry_date");
   const canSave =
-    ready && !!name.trim() && Number.isFinite(termMonths) && termMonths >= 1 && !save.isPending;
+    ready &&
+    !!name.trim() &&
+    (isPerpetual || (Number.isFinite(termMonths) && termMonths >= 1)) &&
+    !(isPerpetual && hasExpiryField) &&
+    !save.isPending &&
+    !createTemplate.isPending &&
+    !patchTemplate.isPending;
 
   return (
     <div className="flex flex-col gap-4 p-4 lg:flex-row">
@@ -337,9 +359,27 @@ export function TemplateEditor({ mode, templateId, initial }: TemplateEditorProp
               type="number"
               min={1}
               value={termMonths}
+              disabled={isPerpetual}
               onChange={(e) => setTermMonths(parseInt(e.target.value, 10) || 0)}
             />
           </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="tmpl-perpetual"
+              className="h-4 w-4"
+              checked={isPerpetual}
+              onChange={(e) => setIsPerpetual(e.target.checked)}
+            />
+            <Label htmlFor="tmpl-perpetual" className="text-xs cursor-pointer">
+              Perpetual (no expiry)
+            </Label>
+          </div>
+          {isPerpetual && hasExpiryField && (
+            <p className="text-destructive text-xs">
+              Remove the Expiry date field — this template is perpetual.
+            </p>
+          )}
           {mode === "edit" && (
             <p className="text-muted-foreground text-xs">
               The PDF can’t be replaced when editing. To use a different file, create a new template.
@@ -357,7 +397,9 @@ export function TemplateEditor({ mode, templateId, initial }: TemplateEditorProp
                 {group.label}
               </p>
               <div className="flex flex-wrap gap-1.5">
-                {group.fields.map((f) => (
+                {group.fields
+                  .filter((f) => !isPerpetual || f.key !== "expiry_date")
+                  .map((f) => (
                   <span
                     key={f.key}
                     draggable={ready}

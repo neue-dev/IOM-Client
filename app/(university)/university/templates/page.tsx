@@ -21,7 +21,7 @@ interface TemplateOffer {
     id: string;
     name: string;
     description: string | null;
-    term_months: number;
+    term_months: number | null;
     is_deleted: boolean | null;
   };
 }
@@ -77,9 +77,13 @@ export default function UniversityTemplatesPage() {
       {
         id: "term",
         header: "Term",
-        accessorFn: (row) => row.template.term_months,
+        accessorFn: (row) => row.template.term_months ?? Infinity,
         cell: ({ row }) => (
-          <span className="text-muted-foreground">{row.original.template.term_months} months</span>
+          <span className="text-muted-foreground">
+            {row.original.template.term_months == null
+              ? "Perpetual"
+              : `${row.original.template.term_months} months`}
+          </span>
         ),
       },
       {

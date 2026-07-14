@@ -5,7 +5,9 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { preconfiguredAxios } from "@/app/api/preconfig.axios";
 import { useModal } from "@/app/providers/modal-provider";
 import { Button } from "@/components/ui/button";
+import { FileUpload } from "@/components/ui/file-upload";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -38,6 +40,13 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { toastPresets } from "@/components/sonner-toaster";
+
+const COMPANY_TYPES = [
+  { value: "corporation", label: "Corporation" },
+  { value: "partnership", label: "Partnership" },
+  { value: "sole_proprietorship", label: "Sole Proprietorship" },
+  { value: "government_agency", label: "Government Agency" },
+];
 
 export interface LegacyCompanySummary {
   id: string;
@@ -679,6 +688,22 @@ function createEmptyMoaRecord(): MoaRecordInput {
   };
 }
 
+// A row the user has started filling in (as opposed to a blank, never-touched row,
+// which is fine to silently drop since MOAs are optional on these forms).
+function isMoaRowTouched(m: MoaRecordInput): boolean {
+  return !!m.file || !!m.effectiveDate || !!m.expiryDate || m.isPerpetual || !!m.name.trim();
+}
+
+function isMoaRowComplete(m: MoaRecordInput): boolean {
+  if (!m.effectiveDate) return false;
+  if (!m.isPerpetual && !m.expiryDate) return false;
+  return true;
+}
+
+function hasIncompleteMoa(moas: MoaRecordInput[]): boolean {
+  return moas.some((m) => isMoaRowTouched(m) && !isMoaRowComplete(m));
+}
+
 function buildMoaFormData(moas: MoaRecordInput[]) {
   const formData = new FormData();
   const moaPayload: {
@@ -692,8 +717,7 @@ function buildMoaFormData(moas: MoaRecordInput[]) {
 
   for (const m of moas) {
     const isPerpetual = m.isPerpetual;
-    const hasDates = !!m.effectiveDate && !!m.expiryDate;
-    if (!isPerpetual && !hasDates) continue;
+    if (!isMoaRowComplete(m)) continue;
     let document_file_index: number | null = null;
     if (m.file) {
       document_file_index = moaFiles.length;
@@ -733,7 +757,8 @@ function MoaUploadDialog({
   const removeMoa = (id: string) => {
     setMoas((prev) => prev.filter((m) => m.id !== id));
   };
-  const hasValidMoa = moas.some((m) => m.isPerpetual || (m.effectiveDate && m.expiryDate));
+  const incompleteMoa = hasIncompleteMoa(moas);
+  const hasValidMoa = moas.some(isMoaRowComplete) && !incompleteMoa;
 
   return (
     <>
@@ -772,33 +797,29 @@ function MoaUploadDialog({
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">{moa.isPerpetual ? "Effective Date (optional)" : "Effective Date *"}</Label>
-                  <Input
-                    type="date"
-                    className="h-8 text-xs"
+                  <Label className="text-xs">Effective Date *</Label>
+                  <DatePicker
+                    className="h-8"
                     value={moa.effectiveDate}
-                    onChange={(e) => updateMoa(moa.id, { effectiveDate: e.target.value })}
+                    onChange={(value) => updateMoa(moa.id, { effectiveDate: value })}
                   />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">{moa.isPerpetual ? "N/A" : "Expiry Date *"}</Label>
-                  <Input
-                    type="date"
-                    className="h-8 text-xs"
+                  <DatePicker
+                    className="h-8"
                     value={moa.expiryDate}
                     disabled={moa.isPerpetual}
-                    onChange={(e) => updateMoa(moa.id, { expiryDate: e.target.value })}
+                    onChange={(value) => updateMoa(moa.id, { expiryDate: value })}
                   />
                 </div>
               </div>
-              <div className="mt-2 space-y-1.5">
-                <Label className="text-xs">MOA Document (PDF, optional, max 2.5MB)</Label>
-                <Input
-                  type="file"
-                  className="h-8 text-xs"
+              <div className="mt-2">
+                <FileUpload
+                  label="MOA Document (PDF, optional, max 2.5MB)"
+                  name={`moa-document-${moa.id}`}
                   accept=".pdf,application/pdf"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0] ?? null;
+                  onFileSelect={(file) => {
                     updateMoa(moa.id, { file, name: file?.name || "" });
                   }}
                 />
@@ -836,14 +857,14 @@ function AddDocumentsForm({
 
   return (
     <div className="space-y-4">
-      <Input
-        type="file"
+      <FileUpload
+        label="Company documents"
+        name="company-documents"
         multiple
         accept=".pdf,application/pdf"
-        onChange={(e) => {
-          const files = e.target.files;
-          if (!files) return;
-          const newInputs = Array.from(files).map((f) => ({
+        placeholder="Click to upload PDF files"
+        onFilesSelect={(files) => {
+          const newInputs = files.map((f) => ({
             id: crypto.randomUUID(),
             file: f,
             type: "other",
@@ -864,7 +885,7 @@ function AddDocumentsForm({
               <div className="space-y-1">
                 <Label className="text-xs">Type</Label>
                 <Select value={input.type} onValueChange={(val) => setInputs((prev) => prev.map((i) => i.id === input.id ? { ...i, type: val } : i))}>
-                  <SelectTrigger className="h-7 text-xs">
+                  <SelectTrigger className="h-8">
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -959,7 +980,8 @@ export function UploadDialog({
     },
   });
 
-  const isValid = companyName.trim();
+  const incompleteMoa = hasIncompleteMoa(moas);
+  const isValid = !!companyName.trim() && !incompleteMoa;
 
   return (
     <>
@@ -1020,39 +1042,29 @@ export function UploadDialog({
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <Label className="text-xs">{moa.isPerpetual ? "Effective Date (optional)" : "Effective Date *"}</Label>
-                    <Input
-                      type="date"
-                      className="h-8 text-xs"
+                    <Label className="text-xs">Effective Date *</Label>
+                    <DatePicker
+                      className="h-8"
                       value={moa.effectiveDate}
-                      onChange={(e) =>
-                        updateMoa(moa.id, { effectiveDate: e.target.value })
-                      }
+                      onChange={(value) => updateMoa(moa.id, { effectiveDate: value })}
                     />
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs">{moa.isPerpetual ? "N/A" : "Expiry Date *"}</Label>
-                    <Input
-                      type="date"
-                      className="h-8 text-xs"
+                    <DatePicker
+                      className="h-8"
                       value={moa.expiryDate}
                       disabled={moa.isPerpetual}
-                      onChange={(e) =>
-                        updateMoa(moa.id, { expiryDate: e.target.value })
-                      }
+                      onChange={(value) => updateMoa(moa.id, { expiryDate: value })}
                     />
                   </div>
                 </div>
-                <div className="mt-2 space-y-1.5">
-                  <Label className="text-xs">
-                    MOA Document (PDF, optional, max 2.5MB)
-                  </Label>
-                  <Input
-                    type="file"
-                    className="h-8 text-xs"
+                <div className="mt-2">
+                  <FileUpload
+                    label="MOA Document (PDF, optional, max 2.5MB)"
+                    name={`moa-document-${moa.id}`}
                     accept=".pdf,application/pdf"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0] ?? null;
+                    onFileSelect={(file) => {
                       updateMoa(moa.id, { file, name: file?.name || "" });
                     }}
                   />
@@ -1070,7 +1082,7 @@ export function UploadDialog({
                 <div className="space-y-1.5">
                   <Label className="text-xs">TIN</Label>
                   <Input
-                    className="h-8 text-xs"
+                    className="h-8"
                     value={tin}
                     onChange={(e) => setTin(e.target.value)}
                     placeholder="123-456-789"
@@ -1078,18 +1090,24 @@ export function UploadDialog({
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Company Type</Label>
-                  <Input
-                    className="h-8 text-xs"
-                    value={companyType}
-                    onChange={(e) => setCompanyType(e.target.value)}
-                    placeholder="corporation"
-                  />
+                  <Select value={companyType || undefined} onValueChange={setCompanyType}>
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder="Select a type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COMPANY_TYPES.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Registered Address</Label>
                 <Input
-                  className="h-8 text-xs"
+                  className="h-8"
                   value={registeredAddress}
                   onChange={(e) => setRegisteredAddress(e.target.value)}
                   placeholder="Makati City"
@@ -1099,7 +1117,7 @@ export function UploadDialog({
                 <div className="space-y-1.5">
                   <Label className="text-xs">Contact Person</Label>
                   <Input
-                    className="h-8 text-xs"
+                    className="h-8"
                     value={contactPerson}
                     onChange={(e) => setContactPerson(e.target.value)}
                     placeholder="Juan Dela Cruz"
@@ -1109,7 +1127,7 @@ export function UploadDialog({
                   <Label className="text-xs">Contact Email</Label>
                   <Input
                     type="email"
-                    className="h-8 text-xs"
+                    className="h-8"
                     value={contactEmail}
                     onChange={(e) => setContactEmail(e.target.value)}
                     placeholder="juan@example.com"
@@ -1119,8 +1137,8 @@ export function UploadDialog({
               <div className="space-y-1.5">
                 <Label className="text-xs">Contact Phone</Label>
                 <Input
-                  className="h-8 text-xs"
-                  value={contactPhone}
+                    className="h-8"
+                    value={contactPhone}
                   onChange={(e) => setContactPhone(e.target.value)}
                   placeholder="09171234567"
                 />
@@ -1133,19 +1151,15 @@ export function UploadDialog({
               Company documents (optional)
             </summary>
             <div className="mt-3 space-y-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">
-                  Company Documents (PDF, optional, max 2.5MB each, max 10)
-                </Label>
-                <Input
-                  type="file"
+              <div className="space-y-3">
+                <FileUpload
+                  label="Company Documents (PDF, optional, max 2.5MB each, max 10)"
+                  name="company-documents"
                   multiple
-                  className="h-8 text-xs"
                   accept=".pdf,application/pdf"
-                  onChange={(e) => {
-                    const files = e.target.files;
-                    if (!files) return;
-                    const newInputs = Array.from(files).map((f) => ({
+                  placeholder="Click to upload PDF files"
+                  onFilesSelect={(files) => {
+                    const newInputs = files.map((f) => ({
                       id: crypto.randomUUID(),
                       file: f,
                       type: "other",
@@ -1190,7 +1204,7 @@ export function UploadDialog({
                                 )
                               }
                             >
-                              <SelectTrigger className="h-7 text-xs">
+                              <SelectTrigger className="h-8">
                                 <SelectValue placeholder="Select type" />
                               </SelectTrigger>
                               <SelectContent>
@@ -1497,12 +1511,12 @@ export function CsvUploadDialog({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="csv-file">CSV File</Label>
-                <Input
-                  id="csv-file"
-                  type="file"
+                <FileUpload
+                  label="CSV File"
+                  name="csv-file"
                   accept=".csv,text/csv"
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  placeholder="Click to upload CSV file"
+                  onFileSelect={setFile}
                 />
               </div>
 
@@ -1893,12 +1907,12 @@ company-documents/acme-mayor.pdf`}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="zip-file">ZIP File</Label>
-                <Input
-                  id="zip-file"
-                  type="file"
+                <FileUpload
+                  label="ZIP File"
+                  name="zip-file"
                   accept=".zip,application/zip"
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  placeholder="Click to upload ZIP file"
+                  onFileSelect={setFile}
                 />
               </div>
 
