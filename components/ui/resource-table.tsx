@@ -139,6 +139,7 @@ export function ResourceTable<TData>({
   contentClassName,
   listClassName,
   paginationClassName,
+  toolbarLeading,
   onRowClick,
 }: {
   table: ResourceTableState<TData>;
@@ -152,9 +153,10 @@ export function ResourceTable<TData>({
   contentClassName?: string;
   listClassName?: string;
   paginationClassName?: string;
+  toolbarLeading?: ReactNode;
   onRowClick?: (row: TData) => void;
 }) {
-  const hasToolbar = !!table.search || !!table.filters;
+  const hasToolbar = !!toolbarLeading || !!table.search || !!table.filters;
   const hasRows = table.pagedRows.length > 0;
   const hasAnyData = table.rows.length > 0 || table.totalCount > 0;
   const hasDesktopTable = !!columns?.length;
@@ -214,20 +216,6 @@ export function ResourceTable<TData>({
     <div className={cn("space-y-5", className)}>
       {hasToolbar && (
         <div className="flex items-center gap-2">
-          {table.search && (
-            <div className="relative w-full max-w-xl">
-              <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-4 z-20 h-4 w-4 -translate-y-1/2" />
-              <input
-                type="search"
-                value={table.search.value}
-                onChange={(event) => table.search?.setValue(event.target.value)}
-                placeholder={table.search.placeholder}
-                aria-label={table.search.ariaLabel}
-                className="placeholder:text-muted-foreground/60 focus:border-primary h-11 w-full rounded-[0.33em] border border-gray-200 bg-white pr-4 pl-11 text-sm outline-none transition-colors focus:ring-2 focus:ring-primary/10"
-              />
-            </div>
-          )}
-
           {table.filters && (
             <Popover
               open={table.filters.open}
@@ -235,10 +223,10 @@ export function ResourceTable<TData>({
             >
               <PopoverTrigger asChild>
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="icon"
                   className={cn(
-                    "relative h-11 w-11 shrink-0 text-gray-600 hover:text-primary",
+                    "relative h-11 w-11 shrink-0 border-gray-200 bg-white text-gray-600 hover:text-primary",
                     table.filters.activeCount > 0 && "text-primary",
                   )}
                   aria-label="Filter results"
@@ -253,7 +241,7 @@ export function ResourceTable<TData>({
                 </Button>
               </PopoverTrigger>
               <PopoverContent
-                align="end"
+                align="start"
                 sideOffset={6}
                 className="flex max-h-[70vh] w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-[0.33em] border border-gray-200 bg-white p-0 shadow-lg sm:w-[445px]"
               >
@@ -270,6 +258,22 @@ export function ResourceTable<TData>({
               </PopoverContent>
             </Popover>
           )}
+
+          {table.search && (
+            <div className="relative w-full max-w-xl">
+              <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-4 z-20 h-4 w-4 -translate-y-1/2" />
+              <input
+                type="search"
+                value={table.search.value}
+                onChange={(event) => table.search?.setValue(event.target.value)}
+                placeholder={table.search.placeholder}
+                aria-label={table.search.ariaLabel}
+                className="placeholder:text-muted-foreground/60 focus:border-primary h-11 w-full rounded-[0.33em] border border-gray-200 bg-white pr-4 pl-11 text-sm outline-none transition-colors focus:ring-2 focus:ring-primary/10"
+              />
+            </div>
+          )}
+
+          {toolbarLeading}
         </div>
       )}
 
