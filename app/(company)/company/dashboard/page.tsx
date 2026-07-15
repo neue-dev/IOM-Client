@@ -1,8 +1,7 @@
 "use client";
-import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import type { ColumnDef } from "@tanstack/react-table";
 import {
   useCompanyProfile,
   useCompanyVerification,
@@ -16,7 +15,6 @@ import { PageContainer, PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DataTable } from "@/components/ui/data-table";
 import {
   CompanyPartnersTable,
   parseActiveMoaRanges,
@@ -25,12 +23,9 @@ import {
   type CompanyPartnerUniversity,
   type PartnerStatus,
 } from "@/components/company/company-partners-table";
-import { MoaStatusBadge } from "@/components/status-badge";
 import { useModal } from "@/app/providers/modal-provider";
-import { formatDateWithoutTime, cn } from "@/lib/utils";
 import {
   AlertCircle,
-  ArrowLeft,
   ArrowUpRight,
   ClipboardList,
   Clock,
@@ -38,11 +33,6 @@ import {
 } from "lucide-react";
 import { RequestDialog } from "@/components/moa-request-dialog";
 import { CareerListingCta } from "@/components/career-listing-cta";
-
-// "list" and "detail" are stable states; "to-detail" / "to-list" are mid-transition.
-type Phase = "list" | "to-detail" | "detail" | "to-list";
-
-const ANIM_DURATION = 200;
 
 interface Moa {
   id: string;
@@ -63,51 +53,6 @@ interface Moa {
 interface PartnerUniversity extends CompanyPartnerUniversity {
   moas: Moa[];
 }
-
-const moaHistoryColumns: ColumnDef<Moa>[] = [
-  {
-    id: "status",
-    header: "Status",
-    enableSorting: false,
-    cell: ({ row }) => (
-      <div className="whitespace-normal">
-        <MoaStatusBadge
-          status={row.original.status}
-          isExpired={row.original.is_expired}
-        />
-        {row.original.status === "rejected" &&
-          row.original.rejection_reason && (
-            <p className="text-muted-foreground mt-0.5 text-xs">
-              {row.original.rejection_reason}
-            </p>
-          )}
-      </div>
-    ),
-  },
-  {
-    id: "period",
-    header: "Period",
-    accessorFn: (row) => row.effective_date,
-    cell: ({ row }) => (
-      <span className="text-muted-foreground">
-        {formatDateWithoutTime(row.original.effective_date)} –{" "}
-        {row.original.expiry_date
-          ? formatDateWithoutTime(row.original.expiry_date)
-          : "Perpetual"}
-      </span>
-    ),
-  },
-  {
-    id: "requested",
-    header: "Requested",
-    accessorFn: (row) => row.created_at,
-    cell: ({ row }) => (
-      <span className="text-muted-foreground">
-        {formatDateWithoutTime(row.original.created_at)}
-      </span>
-    ),
-  },
-];
 
 function VerificationBanner({
   status,
@@ -242,10 +187,6 @@ function CompanyDashboardContent() {
     );
   };
 
-  const [phase, setPhase] = useState<Phase>("list");
-  const [currentUniId, setCurrentUniId] = useState<string | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
   const { data: moasData, isLoading: moasLoading } =
     useCompanyControllerListMoas(
       { limit: 100 },
@@ -312,34 +253,6 @@ function CompanyDashboardContent() {
     verified,
   ]);
 
-  // Clean up timer on unmount.
-  useEffect(() => () => clearTimeout(timerRef.current), []);
-
-  // Read hashes before paint so deep links do not briefly show the list panel.
-  useLayoutEffect(() => {
-    const hash = window.location.hash.slice(1);
-    if (!hash) return;
-    setCurrentUniId(hash);
-    setPhase("detail");
-  }, []);
-
-  // Invalid hashes fall back to list once MOA data is available.
-  useEffect(() => {
-    if (!currentUniId || moasLoading || !moasData) return;
-    const exists = (moasData?.moas ?? []).some(
-      (m) => m.university?.id === currentUniId,
-    );
-    if (!exists) {
-      window.history.replaceState(
-        null,
-        "",
-        window.location.pathname + window.location.search,
-      );
-      setCurrentUniId(null);
-      setPhase("list");
-    }
-  }, [currentUniId, moasLoading, moasData]);
-
   if (isLoading) {
     return (
       <>
@@ -389,267 +302,165 @@ function CompanyDashboardContent() {
   const pendingInvites = (invitesData?.invites ?? []).filter(
     (inv) => inv.university !== null,
   );
-  const detail = currentUniId ? (byUni.get(currentUniId) ?? null) : null;
-  const history = detail
-    ? [...detail.moas].sort(
-        (a, b) => +new Date(b.created_at) - +new Date(a.created_at),
-      )
-    : [];
-
   const navigateToDetail = (uniId: string) => {
-    clearTimeout(timerRef.current);
-    setCurrentUniId(uniId);
-    setPhase("to-detail");
-    window.history.replaceState(null, "", "#" + uniId);
-    timerRef.current = setTimeout(() => setPhase("detail"), ANIM_DURATION + 10);
+    router.push(`/partners/${uniId}`);
   };
-
-  const navigateToList = () => {
-    clearTimeout(timerRef.current);
-    setPhase("to-list");
-    window.history.replaceState(
-      null,
-      "",
-      window.location.pathname + window.location.search,
-    );
-    timerRef.current = setTimeout(() => {
-      setPhase("list");
-      setCurrentUniId(null);
-    }, ANIM_DURATION + 10);
-  };
-
-  // During "to-detail": list is in-flow (exiting left), detail is absolute (entering from right).
-  // During "to-list":  detail is in-flow (exiting right), list is absolute (entering from left).
-  const showList = phase !== "detail";
-  const showDetail = phase !== "list";
 
   return (
-    <>
-      <PageContainer>
-        {/* overflow-hidden clips the sliding panels; relative enables absolute children */}
-        <div className="relative overflow-hidden">
-          {/* ── List panel ───────────────────────────────────────────────────── */}
-          {showList && (
-            <div
-              className={cn(
-                "space-y-8 bg-background",
-                phase === "to-detail" &&
-                  `animate-out slide-out-to-left fade-out duration-${ANIM_DURATION}`,
-                phase === "to-list" &&
-                  `absolute inset-x-0 top-0 z-10 animate-in slide-in-from-left fade-in duration-${ANIM_DURATION}`,
-              )}
+    <PageContainer className="space-y-8">
+      <PageHeader
+        title="Partners"
+        description="Universities you have MOAs with."
+      >
+        {canRequest && (
+          <Button asChild>
+            <Link href="/universities">
+              <Plus /> Request MOA
+            </Link>
+          </Button>
+        )}
+      </PageHeader>
+
+      {canRequest && <CareerListingCta />}
+
+      {pendingInvites.length > 0 &&
+        (() => {
+          const invite = pendingInvites[0];
+          const params = new URLSearchParams({
+            open_university_id: invite.university!.id,
+            invite_id: invite.id,
+          });
+          if (invite.template) params.set("template_id", invite.template.id);
+          const href = `/company/dashboard?${params}`;
+          return (
+            <Card
+              key={invite.id}
+              className="gap-2 border-primary/30 bg-primary/5 px-5 py-4"
             >
-              <PageHeader
-                title="Partners"
-                description="Universities you have MOAs with."
-              >
-                {canRequest && (
-                  <Button asChild>
-                    <Link href="/universities">
-                      <Plus /> Request MOA
-                    </Link>
-                  </Button>
-                )}
-              </PageHeader>
-
-              {canRequest && <CareerListingCta />}
-
-              {pendingInvites.length > 0 &&
-                (() => {
-                  const invite = pendingInvites[0];
-                  const params = new URLSearchParams({
-                    open_university_id: invite.university!.id,
-                    invite_id: invite.id,
-                  });
-                  if (invite.template)
-                    params.set("template_id", invite.template.id);
-                  const href = `/company/dashboard?${params}`;
-                  return (
-                    <Card
-                      key={invite.id}
-                      className="gap-2 border-primary/30 bg-primary/5 px-5 py-4"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <p className="text-sm font-medium text-gray-900">
-                          MOA invitation from{" "}
-                          {invite.university!.registered_name}
-                        </p>
-                        <Link
-                          href="/invites"
-                          className="text-muted-foreground hover:text-foreground flex flex-shrink-0 items-center gap-1 text-xs transition-colors"
-                        >
-                          {pendingInvites.length > 1 && (
-                            <span className="font-medium">
-                              {pendingInvites.length - 1} more
-                            </span>
-                          )}
-                          View all
-                          <ArrowUpRight
-                            className="h-3.5 w-3.5"
-                            aria-hidden="true"
-                          />
-                        </Link>
-                      </div>
-                      <p className="text-muted-foreground text-sm">
-                        You were invited to sign a MOA
-                        {invite.template
-                          ? ` using the "${invite.template.name}" template`
-                          : ""}
-                        .
-                      </p>
-                      <div className="pt-1">
-                        <Button asChild size="sm">
-                          <Link href={href}>Sign MOA</Link>
-                        </Button>
-                      </div>
-                    </Card>
-                  );
-                })()}
-
-              {pendingQueued.length > 0 && (
-                <div className="space-y-3">
-                  <h2 className="text-sm font-semibold text-gray-900">
-                    Pending MOAs
-                  </h2>
-                  <p className="text-muted-foreground -mt-1 text-xs">
-                    These will be issued automatically once your company is
-                    verified.
-                  </p>
-                  {pendingQueued.map((q) => (
-                    <Card
-                      key={q.id}
-                      className="flex-row items-center gap-3 border-primary/20 bg-primary/5 px-5 py-3.5"
-                    >
-                      <Clock className="text-primary h-4 w-4 flex-shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-gray-900">
-                          {q.university?.registered_name ??
-                            "Unknown university"}
-                        </p>
-                        {q.template && (
-                          <p className="text-muted-foreground truncate text-xs">
-                            {q.template.name}
-                          </p>
-                        )}
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              )}
-
-              {failedQueued.length > 0 && (
-                <Card className="flex-row items-start gap-3 border-destructive/30 bg-destructive/5 px-5 py-4">
-                  <AlertCircle className="text-destructive mt-0.5 h-5 w-5 flex-shrink-0" />
-                  <div className="space-y-0.5">
-                    <p className="text-sm font-medium text-gray-900">
-                      {failedQueued.length === 1
-                        ? "A queued MOA failed"
-                        : `${failedQueued.length} queued MOAs failed`}
-                    </p>
-                    <p className="text-muted-foreground text-sm">
-                      Please contact us for help at{" "}
-                      <a
-                        href="mailto:hello@betterinternship.com"
-                        className="text-primary underline"
-                      >
-                        hello@betterinternship.com
-                      </a>
-                      .
-                    </p>
-                  </div>
-                </Card>
-              )}
-
-              {vLoading ? (
-                <div className="space-y-2.5">
-                  <Skeleton className="h-20 w-full" />
-                  <Skeleton className="h-20 w-full" />
-                </div>
-              ) : status && status !== "verified" ? (
-                <>
-                  <VerificationBanner
-                    status={status}
-                    rejectionReason={verification?.rejectionReason ?? null}
-                  />
-                  {partners.length > 0 && (
-                    <CompanyPartnersTable
-                      partners={partners}
-                      isLoading={moasLoading}
-                      canRequest={canRequest}
-                      initialSearch={initialPartnerSearch}
-                      initialStatuses={initialPartnerStatuses}
-                      initialRanges={initialActiveMoaRanges}
-                      initialPage={initialPartnerPage}
-                      onPartnerClick={(partner) =>
-                        navigateToDetail(partner.university.id)
-                      }
-                      onQueryChange={updatePartnerQuery}
-                    />
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-sm font-medium text-gray-900">
+                  MOA invitation from {invite.university!.registered_name}
+                </p>
+                <Link
+                  href="/invites"
+                  className="text-muted-foreground hover:text-foreground flex flex-shrink-0 items-center gap-1 text-xs transition-colors"
+                >
+                  {pendingInvites.length > 1 && (
+                    <span className="font-medium">
+                      {pendingInvites.length - 1} more
+                    </span>
                   )}
-                </>
-              ) : (
-                <CompanyPartnersTable
-                  partners={partners}
-                  isLoading={moasLoading}
-                  canRequest={canRequest}
-                  initialSearch={initialPartnerSearch}
-                  initialStatuses={initialPartnerStatuses}
-                  initialRanges={initialActiveMoaRanges}
-                  initialPage={initialPartnerPage}
-                  onPartnerClick={(partner) =>
-                    navigateToDetail(partner.university.id)
-                  }
-                  onQueryChange={updatePartnerQuery}
-                />
-              )}
-            </div>
-          )}
+                  View all
+                  <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+                </Link>
+              </div>
+              <p className="text-muted-foreground text-sm">
+                You were invited to sign a MOA
+                {invite.template
+                  ? ` using the "${invite.template.name}" template`
+                  : ""}
+                .
+              </p>
+              <div className="pt-1">
+                <Button asChild size="sm">
+                  <Link href={href}>Sign MOA</Link>
+                </Button>
+              </div>
+            </Card>
+          );
+        })()}
 
-          {/* ── Detail panel ─────────────────────────────────────────────────── */}
-          {showDetail && (
-            <div
-              className={cn(
-                "space-y-4 bg-background",
-                phase === "to-detail" &&
-                  `absolute inset-x-0 top-0 z-10 animate-in slide-in-from-right fade-in duration-${ANIM_DURATION}`,
-                phase === "to-list" &&
-                  `animate-out slide-out-to-right fade-out duration-${ANIM_DURATION}`,
-              )}
+      {pendingQueued.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold text-gray-900">Pending MOAs</h2>
+          <p className="text-muted-foreground -mt-1 text-xs">
+            These will be issued automatically once your company is verified.
+          </p>
+          {pendingQueued.map((q) => (
+            <Card
+              key={q.id}
+              className="flex-row items-center gap-3 border-primary/20 bg-primary/5 px-5 py-3.5"
             >
-              <button
-                onClick={navigateToList}
-                className="text-muted-foreground hover:text-foreground inline-flex cursor-pointer items-center gap-1.5 text-sm"
-              >
-                <ArrowLeft className="h-4 w-4" /> Partners
-              </button>
-
-              {detail && (
-                <>
-                  <div>
-                    <h3 className="font-semibold text-gray-900">
-                      {detail.university.registered_name}
-                    </h3>
-                    <p className="text-muted-foreground mt-0.5 text-xs">
-                      {detail.activeCount} active MOA
-                      {detail.activeCount === 1 ? "" : "s"} ·{" "}
-                      {detail.moas.length} total
-                    </p>
-                  </div>
-                  <DataTable
-                    id={`company-uni-moas-${detail.university.id}`}
-                    columns={moaHistoryColumns}
-                    data={history}
-                    rowLabelSingular="MOA"
-                    rowLabelPlural="MOAs"
-                    onRowClick={(moa) => router.push(`/company/moas/${moa.id}`)}
-                  />
-                </>
-              )}
-            </div>
-          )}
+              <Clock className="text-primary h-4 w-4 flex-shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-gray-900">
+                  {q.university?.registered_name ?? "Unknown university"}
+                </p>
+                {q.template && (
+                  <p className="text-muted-foreground truncate text-xs">
+                    {q.template.name}
+                  </p>
+                )}
+              </div>
+            </Card>
+          ))}
         </div>
-      </PageContainer>
-    </>
+      )}
+
+      {failedQueued.length > 0 && (
+        <Card className="flex-row items-start gap-3 border-destructive/30 bg-destructive/5 px-5 py-4">
+          <AlertCircle className="text-destructive mt-0.5 h-5 w-5 flex-shrink-0" />
+          <div className="space-y-0.5">
+            <p className="text-sm font-medium text-gray-900">
+              {failedQueued.length === 1
+                ? "A queued MOA failed"
+                : `${failedQueued.length} queued MOAs failed`}
+            </p>
+            <p className="text-muted-foreground text-sm">
+              Please contact us for help at{" "}
+              <a
+                href="mailto:hello@betterinternship.com"
+                className="text-primary underline"
+              >
+                hello@betterinternship.com
+              </a>
+              .
+            </p>
+          </div>
+        </Card>
+      )}
+
+      {vLoading ? (
+        <div className="space-y-2.5">
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-20 w-full" />
+        </div>
+      ) : status && status !== "verified" ? (
+        <>
+          <VerificationBanner
+            status={status}
+            rejectionReason={verification?.rejectionReason ?? null}
+          />
+          {partners.length > 0 && (
+            <CompanyPartnersTable
+              partners={partners}
+              isLoading={moasLoading}
+              canRequest={canRequest}
+              initialSearch={initialPartnerSearch}
+              initialStatuses={initialPartnerStatuses}
+              initialRanges={initialActiveMoaRanges}
+              initialPage={initialPartnerPage}
+              onPartnerClick={(partner) =>
+                navigateToDetail(partner.university.id)
+              }
+              onQueryChange={updatePartnerQuery}
+            />
+          )}
+        </>
+      ) : (
+        <CompanyPartnersTable
+          partners={partners}
+          isLoading={moasLoading}
+          canRequest={canRequest}
+          initialSearch={initialPartnerSearch}
+          initialStatuses={initialPartnerStatuses}
+          initialRanges={initialActiveMoaRanges}
+          initialPage={initialPartnerPage}
+          onPartnerClick={(partner) => navigateToDetail(partner.university.id)}
+          onQueryChange={updatePartnerQuery}
+        />
+      )}
+    </PageContainer>
   );
 }
 

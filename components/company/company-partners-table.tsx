@@ -178,6 +178,9 @@ export function CompanyPartnersTable({
     };
   };
 
+  const partnerHref = (partner: CompanyPartnerUniversity) =>
+    `/partners/${partner.university.id}`;
+
   const columns: Array<ResourceTableColumn<CompanyPartnerUniversity>> = [
     {
       id: "university",
@@ -185,7 +188,11 @@ export function CompanyPartnersTable({
       width: "w-[46%]",
       getSortValue: (partner) => partner.university.registered_name,
       render: (partner) => (
-        <div className="flex min-w-0 items-center gap-4">
+        <Link
+          href={partnerHref(partner)}
+          onClick={(event) => event.stopPropagation()}
+          className="flex min-w-0 items-center gap-4 text-inherit"
+        >
           <PartnerLogo partner={partner} />
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-gray-900">
@@ -195,7 +202,7 @@ export function CompanyPartnersTable({
               {partner.university.address || "Address not provided"}
             </p>
           </div>
-        </div>
+        </Link>
       ),
     },
     {
@@ -204,7 +211,15 @@ export function CompanyPartnersTable({
       width: "w-[22%]",
       defaultSortDirection: "desc",
       getSortValue: (partner) => (partner.activeCount > 0 ? 1 : 0),
-      render: (partner) => <PartnerStatusBadge partner={partner} />,
+      render: (partner) => (
+        <Link
+          href={partnerHref(partner)}
+          onClick={(event) => event.stopPropagation()}
+          className="inline-flex text-inherit"
+        >
+          <PartnerStatusBadge partner={partner} />
+        </Link>
+      ),
     },
     {
       id: "active-moas",
@@ -213,7 +228,15 @@ export function CompanyPartnersTable({
       align: "center",
       defaultSortDirection: "desc",
       getSortValue: (partner) => partner.activeCount,
-      render: (partner) => <ActiveMoas partner={partner} />,
+      render: (partner) => (
+        <Link
+          href={partnerHref(partner)}
+          onClick={(event) => event.stopPropagation()}
+          className="inline-flex text-inherit"
+        >
+          <ActiveMoas partner={partner} />
+        </Link>
+      ),
     },
     {
       id: "action",
@@ -221,11 +244,18 @@ export function CompanyPartnersTable({
       width: "w-[12%]",
       align: "center",
       sortable: false,
-      render: () => (
-        <ChevronRight
-          className="text-primary mx-auto h-5 w-5 transition-transform group-hover:translate-x-0.5"
-          aria-hidden="true"
-        />
+      render: (partner) => (
+        <Link
+          href={partnerHref(partner)}
+          onClick={(event) => event.stopPropagation()}
+          aria-label={`Open ${partner.university.registered_name}`}
+          className="text-primary mx-auto inline-flex h-9 w-9 items-center justify-center"
+        >
+          <ChevronRight
+            className="h-5 w-5 transition-transform group-hover:translate-x-0.5"
+            aria-hidden="true"
+          />
+        </Link>
       ),
     },
   ];
@@ -324,9 +354,8 @@ export function CompanyPartnersTable({
       table={table}
       onRowClick={onPartnerClick}
       renderMobileRow={(partner) => (
-        <button
-          type="button"
-          onClick={() => onPartnerClick(partner)}
+        <Link
+          href={partnerHref(partner)}
           className="group w-full px-4 py-4 text-left transition-colors hover:bg-primary/[0.035] focus-visible:bg-primary/[0.035] focus-visible:outline-none"
         >
           <div className="flex items-start gap-3">
@@ -349,7 +378,7 @@ export function CompanyPartnersTable({
               <ActiveMoas partner={partner} />
             </span>
           </div>
-        </button>
+        </Link>
       )}
       emptyState={{
         title: "No partner universities yet",
