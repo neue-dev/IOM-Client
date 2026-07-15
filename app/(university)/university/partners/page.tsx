@@ -1,6 +1,13 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from "react";
+import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUniversityProfile } from "@/app/providers/university-profile.provider";
 import { preconfiguredAxios } from "@/app/api/preconfig.axios";
@@ -10,13 +17,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useModal } from "@/app/providers/modal-provider";
 import { useIomModalRegistry } from "@/components/modal-registry";
 import { Card } from "@/components/ui/card";
-import { MoaStatusBadge } from "@/components/status-badge";
 import {
-  LegacyCompaniesPanel,
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { PartnershipStatusBadge } from "@/components/partnership-status-badge";
+import {
   LegacyCompanyDetail,
   formatLegacyLabel,
   formatLegacyFieldLabel,
-  formatLegacyMoaPeriod,
   isFilledValue,
   isLegacyMoaExpired,
   UploadDialog,
@@ -30,11 +41,11 @@ import {
   ChevronRight,
   CircleAlert,
   CircleCheck,
-  Eye,
-  Loader2,
+  GripVertical,
   Plus,
   ShieldCheck,
   Upload,
+  X,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -48,6 +59,13 @@ import {
   type UniversityLegacyCompanySummary as LegacyCompanySummary,
   type UniversityPartnerTableRow as PartnerTableRow,
 } from "@/components/university/university-partners-table";
+import {
+  LegacyPartnerMoasTable,
+  PartnerPdfPane,
+  RegisteredPartnerMoasTable,
+  type PartnerPdfSelection,
+  type RegisteredPartnerMoa,
+} from "@/components/university/partner-moa-history-tables";
 
 interface Partner {
   company: {
@@ -70,16 +88,6 @@ interface AvailableTemplate {
   is_available: boolean;
 }
 
-interface PartnerMoaEntry {
-  id: string;
-  status: string;
-  created_at: string;
-  effective_date: string;
-  expiry_date: string | null;
-  is_expired: boolean | null;
-  template: { name: string } | null;
-}
-
 type DocReviewDetails = Record<
   string,
   { type?: string; document?: string; value: string }
@@ -98,65 +106,165 @@ const DOC_LABELS: Record<string, string> = {
 };
 
 const DOC_TYPES_LIST = Object.entries(DOC_LABELS);
+const PREVIEW_WIDTH_STORAGE_KEY = "iom-partner-preview-width";
 
-function VerifiedDocumentDetails({ details }: { details: DocReviewDetails }) {
-  const entries = Object.entries(details).filter(([, v]) => v.value);
-  if (entries.length === 0) return null;
+function CollapsibleCard({
+  id,
+  title,
+  children,
+  defaultOpen = false,
+  contentClassName,
+}: {
+  id: string;
+  title: ReactNode;
+  children: ReactNode;
+  defaultOpen?: boolean;
+  contentClassName?: string;
+}) {
   return (
-    <div className="space-y-0 rounded-[0.33em] border border-gray-200">
-      <div className="flex items-center gap-1.5 border-b border-gray-100 px-3 py-2 text-xs font-medium text-gray-700">
-        <ShieldCheck className="h-3.5 w-3.5 text-supportive" />
-        Verified details
+    <Card className="gap-0 overflow-hidden border-gray-200 py-0">
+      <Accordion
+        type="single"
+        collapsible
+        defaultValue={defaultOpen ? id : undefined}
+      >
+        <AccordionItem value={id} className="border-0">
+          <AccordionTrigger className="px-4 py-3 text-sm font-semibold text-gray-900 hover:no-underline">
+            {title}
+          </AccordionTrigger>
+          <AccordionContent
+            className={cn(
+              "border-t border-gray-100 pt-0 pb-0",
+              contentClassName,
+            )}
+          >
+            {children}
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+    </Card>
+  );
+}
+
+function companyInitials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase();
+}
+
+function PartnerIdentity({
+  name,
+  logoUrl,
+  status,
+}: {
+  name: string;
+  logoUrl?: string | null;
+  status: string;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 text-lg font-semibold text-gray-600">
+        {logoUrl ? (
+          // Company logos are user-uploaded external assets.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={logoUrl}
+            alt={`${name} logo`}
+            className="size-full object-contain p-2"
+          />
+        ) : (
+          <span aria-hidden="true">{companyInitials(name)}</span>
+        )}
       </div>
-      <div className="divide-y divide-gray-100">
-        {entries.map(([key, field]) => (
-          <div key={key} className="flex items-center gap-4 px-3 py-2">
-            <p className="text-muted-foreground w-44 flex-shrink-0 text-xs">
-              {key}
-            </p>
-            <p className="text-sm font-medium text-gray-900">{field.value}</p>
-          </div>
-        ))}
+      <div className="min-w-0">
+        <h2 className="text-lg leading-tight font-semibold text-gray-900">
+          {name}
+        </h2>
+        <div className="mt-1.5">
+          <PartnershipStatusBadge
+            status={status}
+            label={status === "active" ? "Active Partnership" : undefined}
+          />
+        </div>
       </div>
     </div>
   );
 }
 
-function DocumentsSection({ documents }: { documents: CompanyDoc[] }) {
-  const { openModal } = useModal();
+function VerifiedDocumentDetails({
+  details,
+  companyType,
+}: {
+  details: DocReviewDetails;
+  companyType?: string | null;
+}) {
+  const entries = Object.entries(details).filter(([, v]) => v.value);
+  const includesCompanyType = entries.some(([key]) =>
+    ["company type", "company_type"].includes(key.toLowerCase()),
+  );
+  if (companyType && !includesCompanyType) {
+    entries.unshift([
+      "Company type",
+      { value: companyType.replace(/_/g, " ") },
+    ]);
+  }
+  if (entries.length === 0) return null;
   return (
-    <Card className="gap-4 py-5">
-      <p className="px-5 text-sm font-semibold text-gray-900">Documents</p>
-      <div className="space-y-1">
+    <CollapsibleCard
+      id="verified-details"
+      title={
+        <span className="flex items-center gap-2">
+          <ShieldCheck className="text-supportive h-4 w-4" />
+          Verified details
+        </span>
+      }
+    >
+      <div className="divide-y divide-gray-100">
+        {entries.map(([key, field]) => {
+          const isDateOfIncorporation =
+            key.toLowerCase().replace(/_/g, " ") === "date of incorporation";
+
+          return (
+            <div key={key} className="flex items-center gap-4 px-4 py-2.5">
+              <p className="text-muted-foreground w-44 flex-shrink-0 text-xs">
+                {key}
+              </p>
+              <p className="text-sm font-medium text-gray-900">
+                {isDateOfIncorporation
+                  ? formatDateWithoutTime(field.value)
+                  : field.value}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </CollapsibleCard>
+  );
+}
+
+function DocumentsSection({
+  documents,
+  onOpenDocument,
+}: {
+  documents: CompanyDoc[];
+  onOpenDocument: (url: string, label: string) => void;
+}) {
+  return (
+    <CollapsibleCard id="documents" title="Documents" defaultOpen={false}>
+      <div>
         {DOC_TYPES_LIST.map(([type, label]) => {
           const doc = documents.find((d) => d.type === type);
           return (
             <div
               key={type}
-              className="flex flex-row items-center px-5 duration-200 hover:cursor-pointer hover:bg-gray-50"
+              className="flex flex-row items-center px-4 duration-200 hover:cursor-pointer hover:bg-gray-50"
               onClick={() => {
                 if (!doc?.url) return;
-                openModal(
-                  "preview-doc",
-                  doc.url ? (
-                    <iframe
-                      src={doc.url}
-                      className="h-full w-full border-none"
-                      title={doc.filename}
-                    />
-                  ) : (
-                    <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-                      Couldn&apos;t load that document.
-                    </div>
-                  ),
-                  {
-                    title: DOC_LABELS[doc.type] ?? doc.type.replace(/_/g, " "),
-                    panelClassName: "!w-full sm:!max-w-4xl",
-                    contentClassName:
-                      "min-h-0 flex-1 overflow-hidden p-0 sm:p-0",
-                    showHeaderDivider: true,
-                  },
-                );
+                onOpenDocument(doc.url, doc.filename);
               }}
             >
               {doc ? (
@@ -164,7 +272,7 @@ function DocumentsSection({ documents }: { documents: CompanyDoc[] }) {
               ) : (
                 <CircleAlert className="text-warning flex-shrink-0" />
               )}
-              <div className="flex flex-1 items-center gap-3 rounded-[0.16em] p-3">
+              <div className="flex flex-1 items-center gap-3 rounded-[0.16em] px-3 py-2.5">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-800">{label}</p>
                   {doc && (
@@ -178,25 +286,29 @@ function DocumentsSection({ documents }: { documents: CompanyDoc[] }) {
           );
         })}
       </div>
-    </Card>
+    </CollapsibleCard>
   );
 }
-
-// "list" and "detail" are stable states; "to-detail" / "to-list" are mid-transition.
-type Phase = "list" | "to-detail" | "detail" | "to-list";
-
-const ANIM_DURATION = 200;
 
 function ReadOnlyLegacyDetail({
   company,
   onPreviewDoc,
+  onOpenMoa,
+  showHeader = true,
 }: {
   company: LegacyCompanyDetail;
   onPreviewDoc: (url: string, title: string) => void;
+  onOpenMoa: (selection: PartnerPdfSelection) => void;
+  showHeader?: boolean;
 }) {
   const details = company.company_details as Record<string, unknown>;
   const companyType =
     typeof details.company_type === "string" ? details.company_type : null;
+  const logoUrl =
+    typeof details.logo_url === "string" ? details.logo_url : null;
+  const hasActiveMoa = company.moas.some(
+    (moa) => !isLegacyMoaExpired(moa.expiry_date, moa.is_perpetual),
+  );
   const standardDetailKeys = [
     "company_type",
     "tin",
@@ -219,24 +331,24 @@ function ReadOnlyLegacyDetail({
 
   return (
     <>
-      <div>
-        <p className="text-sm font-semibold text-gray-900">
-          {company.company_name}
-        </p>
-        {companyType && (
-          <p className="text-muted-foreground mt-0.5 text-xs">
-            {formatLegacyLabel(companyType)}
-          </p>
-        )}
-      </div>
+      {showHeader && (
+        <PartnerIdentity
+          name={company.company_name}
+          logoUrl={logoUrl}
+          status={
+            hasActiveMoa
+              ? "active"
+              : company.moas.length
+                ? "expired"
+                : "inactive"
+          }
+        />
+      )}
 
-      <div className="space-y-0 rounded-[0.33em] border border-gray-200">
-        <div className="flex items-center gap-1.5 border-b border-gray-100 px-3 py-2 text-xs font-medium text-gray-700">
-          Company details
-        </div>
+      <CollapsibleCard id="company-details" title="Company details">
         <div className="divide-y divide-gray-100">
           {detailEntries.map(([label, value]) => (
-            <div key={label} className="flex items-center gap-4 px-3 py-2">
+            <div key={label} className="flex items-center gap-4 px-4 py-2.5">
               <p className="text-muted-foreground w-44 flex-shrink-0 text-xs">
                 {label}
               </p>
@@ -246,25 +358,30 @@ function ReadOnlyLegacyDetail({
             </div>
           ))}
         </div>
-      </div>
+      </CollapsibleCard>
 
-      <Card className="gap-4 py-5">
-        <p className="px-5 text-sm font-semibold text-gray-900">Documents</p>
-        <div className="space-y-1">
+      <CollapsibleCard
+        id="legacy-documents"
+        title="Documents"
+        defaultOpen={false}
+      >
+        <div>
           {company.company_documents.length === 0 ? (
-            <p className="px-5 text-sm text-muted-foreground">No documents.</p>
+            <p className="text-muted-foreground px-4 py-3 text-sm">
+              No documents.
+            </p>
           ) : (
             company.company_documents.map((doc) => (
               <div
                 key={doc.id}
                 className={cn(
-                  "flex flex-row items-center px-5 duration-200",
+                  "flex flex-row items-center px-4 duration-200",
                   doc.url && "hover:cursor-pointer hover:bg-gray-50",
                 )}
                 onClick={() => doc.url && onPreviewDoc(doc.url, doc.filename)}
               >
                 <CircleCheck className="text-supportive flex-shrink-0" />
-                <div className="flex flex-1 items-center gap-3 rounded-[0.16em] p-3">
+                <div className="flex flex-1 items-center gap-3 rounded-[0.16em] px-3 py-2.5">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-800">
                       {doc.type === "other"
@@ -285,74 +402,25 @@ function ReadOnlyLegacyDetail({
             ))
           )}
         </div>
-      </Card>
+      </CollapsibleCard>
 
-      {company.moas.length > 0 ? (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-left">
-              <th className="pb-2 pr-4 font-medium text-gray-500">Status</th>
-              <th className="pb-2 pr-4 font-medium text-gray-500">Document</th>
-              <th className="pb-2 pr-4 font-medium text-gray-500">Created</th>
-              <th className="pb-2 font-medium text-gray-500">Period</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {company.moas.map((moa) => (
-              <tr
-                key={moa.id}
-                className={cn(
-                  "align-top",
-                  moa.document_url && "cursor-pointer hover:bg-gray-50",
-                )}
-                onClick={() =>
-                  moa.document_url &&
-                  onPreviewDoc(moa.document_url, moa.filename ?? "MOA Document")
-                }
-              >
-                <td className="py-2.5 pr-4 text-gray-600">
-                  <MoaStatusBadge
-                    status="active"
-                    isExpired={isLegacyMoaExpired(
-                      moa.expiry_date,
-                      moa.is_perpetual,
-                    )}
-                  />
-                </td>
-                <td className="py-2.5 pr-4 text-gray-600">
-                  {moa.document_url ? (
-                    <span className="inline-flex items-center gap-1.5 text-primary">
-                      <Eye className="h-3.5 w-3.5" />{" "}
-                      {moa.filename ?? "MOA Document"}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </td>
-                <td className="py-2.5 pr-4 text-gray-600">
-                  {formatDateWithoutTime(moa.created_at)}
-                </td>
-                <td className="py-2.5 text-gray-600">
-                  {formatLegacyMoaPeriod(moa)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <p className="text-sm text-muted-foreground">No MOA history.</p>
-      )}
+      <CollapsibleCard id="legacy-moa-history" title="MOA history" defaultOpen>
+        <LegacyPartnerMoasTable moas={company.moas} onOpenMoa={onOpenMoa} />
+      </CollapsibleCard>
     </>
   );
 }
 
 function LegacyRecordsSection({
   currentCompanyId: companyId,
+  onOpenMoa,
+  onOpenDocument,
 }: {
   currentCompanyId: string | null;
+  onOpenMoa: (selection: PartnerPdfSelection) => void;
+  onOpenDocument: (url: string, label: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const { openModal } = useModal();
 
   const { data, isLoading } = useQuery({
     queryKey: ["partner-legacy-company", companyId],
@@ -366,11 +434,11 @@ function LegacyRecordsSection({
   const company = data?.legacyCompany;
 
   return (
-    <div className="rounded-[0.33em] border border-gray-200">
+    <Card className="gap-0 overflow-hidden border-gray-200 py-0">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-gray-900 hover:bg-gray-50"
+        className="flex w-full items-center justify-between px-4 py-3 text-sm font-semibold text-gray-900 hover:bg-gray-50"
       >
         <span>Legacy records</span>
         {open ? (
@@ -381,7 +449,7 @@ function LegacyRecordsSection({
       </button>
 
       {open && (
-        <div className="space-y-4 border-t border-gray-200 p-4">
+        <div className="space-y-3 border-t border-gray-100 p-3">
           {isLoading ? (
             <>
               <Skeleton className="h-4 w-48" />
@@ -395,48 +463,43 @@ function LegacyRecordsSection({
           ) : (
             <ReadOnlyLegacyDetail
               company={company}
-              onPreviewDoc={(url, title) =>
-                openModal(
-                  "preview-doc",
-                  <iframe
-                    src={url}
-                    className="h-full w-full border-none"
-                    title={title}
-                  />,
-                  {
-                    title,
-                    panelClassName: "!w-full sm:!max-w-4xl",
-                    contentClassName:
-                      "min-h-0 flex-1 overflow-hidden p-0 sm:p-0",
-                    showHeaderDivider: true,
-                  },
-                )
-              }
+              onOpenMoa={onOpenMoa}
+              onPreviewDoc={(url, title) => onOpenDocument(url, title)}
+              showHeader={false}
             />
           )}
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 
-export default function PartnersPage() {
+function PartnersContent({
+  initialDetailType = null,
+  initialDetailId = null,
+}: {
+  initialDetailType?: "partner" | "legacy" | null;
+  initialDetailId?: string | null;
+} = {}) {
   const { account, isLoading: profileLoading } = useUniversityProfile();
   const router = useRouter();
   const queryClient = useQueryClient();
-
-  const [phase, setPhase] = useState<Phase>("list");
-  const [detailType, setDetailType] = useState<"partner" | "legacy" | null>(
+  const detailType = initialDetailType;
+  const detailId = initialDetailId;
+  const [pdfSelection, setPdfSelection] = useState<PartnerPdfSelection | null>(
     null,
   );
-  const [detailId, setDetailId] = useState<string | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [previewWidth, setPreviewWidth] = useState(50);
+
+  useEffect(() => {
+    const savedWidth = Number(
+      window.localStorage.getItem(PREVIEW_WIDTH_STORAGE_KEY),
+    );
+    if (savedWidth >= 30 && savedWidth <= 70) setPreviewWidth(savedWidth);
+  }, []);
 
   const { openModal, closeModal } = useModal();
   const modal = useIomModalRegistry();
-
-  // Clean up timer on unmount.
-  useEffect(() => () => clearTimeout(timerRef.current), []);
 
   const { data: partnersData, isLoading: isPartnersLoading } = useQuery({
     queryKey: ["university-partners"],
@@ -474,7 +537,7 @@ export default function PartnersPage() {
             company: Partner["company"] & {
               document_review_details?: DocReviewDetails;
             };
-            moas: PartnerMoaEntry[];
+            moas: RegisteredPartnerMoa[];
             companyDocuments: CompanyDoc[];
           },
       ),
@@ -681,32 +744,33 @@ export default function PartnersPage() {
   }, [partnersData, blacklistData, legacyData]);
 
   const navigateToDetail = (row: PartnerTableRow) => {
-    clearTimeout(timerRef.current);
     if (row.isImported && row.legacyEntry) {
-      setDetailType("legacy");
-      setDetailId(row.legacyEntry.id);
+      router.push(`/partners/legacy/${row.legacyEntry.id}`);
     } else {
-      setDetailType("partner");
-      setDetailId(row.id.replace("registered:", ""));
+      router.push(`/partners/registered/${row.id.replace("registered:", "")}`);
     }
-    setPhase("to-detail");
-    window.history.replaceState(null, "", "#" + row.id);
-    timerRef.current = setTimeout(() => setPhase("detail"), ANIM_DURATION + 10);
   };
 
-  const navigateToList = () => {
-    clearTimeout(timerRef.current);
-    setPhase("to-list");
-    window.history.replaceState(
-      null,
-      "",
-      window.location.pathname + window.location.search,
+  const navigateToList = () => router.push("/partners");
+  const openDocumentPreview = (url: string, label: string) =>
+    setPdfSelection({ kind: "document", url, label });
+
+  const updatePreviewWidth = (nextWidth: number) => {
+    const clampedWidth = Math.min(70, Math.max(30, nextWidth));
+    setPreviewWidth(clampedWidth);
+    window.localStorage.setItem(
+      PREVIEW_WIDTH_STORAGE_KEY,
+      String(clampedWidth),
     );
-    timerRef.current = setTimeout(() => {
-      setPhase("list");
-      setDetailType(null);
-      setDetailId(null);
-    }, ANIM_DURATION + 10);
+  };
+
+  const resizePreview = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    const bounds = event.currentTarget.parentElement?.getBoundingClientRect();
+    if (!bounds) return;
+
+    const nextWidth = ((bounds.right - event.clientX) / bounds.width) * 100;
+    updatePreviewWidth(nextWidth);
   };
 
   if (profileLoading || !account) return null;
@@ -745,49 +809,55 @@ export default function PartnersPage() {
   const company = partnerMoasData?.company ?? partnerEntry?.partnerCompany;
   const moas = partnerMoasData?.moas ?? [];
   const legacyCompany = legacyDetailData?.legacyCompany;
+  const registeredPartnerStatus = partnerEntry?.isBlacklisted
+    ? "blacklisted"
+    : partnerEntry?.hasActiveMoa
+      ? "active"
+      : partnerEntry?.isPartnerExpired
+        ? "expired"
+        : "inactive";
 
-  // During "to-detail": list is in-flow (exiting left), detail is absolute (entering from right).
-  // During "to-list":  detail is in-flow (exiting right), list is absolute (entering from left).
-  const showList = phase !== "detail";
-  const showDetailPanel = phase !== "list";
+  const showList = !detailType;
+  const showDetailPanel = !!detailType;
 
   const getCompanyIdForBlacklist = (row: PartnerTableRow) =>
     row.partnerCompany?.id ?? row.blacklistEntry?.company_id ?? "";
 
   return (
-    <PageContainer className="max-w-7xl">
-      <PageHeader title="Partners" description="Manage your partners.">
-        {isLoading
-          ? [0, 1, 2].map((index) => (
-              <Skeleton key={index} className="h-[58px] w-28" />
-            ))
-          : partnerStats.map((stat) => (
-              <div
-                key={stat.label}
-                className="min-w-28 rounded-[0.33em] border border-gray-200 bg-white px-3 py-2"
-              >
-                <p className="text-lg font-semibold leading-none text-gray-900">
-                  {stat.value}
-                </p>
-                <p className="text-muted-foreground mt-1 text-xs">
-                  {stat.label}
-                </p>
-              </div>
-            ))}
-      </PageHeader>
-      {/* overflow-hidden clips the sliding panels; relative enables absolute children */}
-      <div className="relative overflow-hidden mt-6">
+    <PageContainer
+      className={cn(
+        detailType
+          ? pdfSelection
+            ? "max-w-none py-0 pr-0 sm:pr-0"
+            : "max-w-7xl py-0"
+          : "max-w-7xl",
+      )}
+    >
+      {showList && (
+        <PageHeader title="Partners" description="Manage your partners.">
+          {isLoading
+            ? [0, 1, 2].map((index) => (
+                <Skeleton key={index} className="h-[58px] w-28" />
+              ))
+            : partnerStats.map((stat) => (
+                <div
+                  key={stat.label}
+                  className="min-w-28 rounded-[0.33em] border border-gray-200 bg-white px-3 py-2"
+                >
+                  <p className="text-lg font-semibold leading-none text-gray-900">
+                    {stat.value}
+                  </p>
+                  <p className="text-muted-foreground mt-1 text-xs">
+                    {stat.label}
+                  </p>
+                </div>
+              ))}
+        </PageHeader>
+      )}
+      <div className={cn("relative", showList && "mt-6")}>
         {/* ── List panel ───────────────────────────────────────────────────── */}
         {showList && (
-          <div
-            className={cn(
-              "space-y-6",
-              phase === "to-detail" &&
-                `animate-out slide-out-to-left fade-out duration-${ANIM_DURATION}`,
-              phase === "to-list" &&
-                `absolute inset-x-0 top-0 animate-in slide-in-from-left fade-in duration-${ANIM_DURATION}`,
-            )}
-          >
+          <div className="space-y-6">
             <UniversityPartnersTable
               rows={rows}
               isLoading={isLoading}
@@ -901,212 +971,252 @@ export default function PartnersPage() {
         {showDetailPanel && (
           <div
             className={cn(
-              "space-y-4",
-              phase === "to-detail" &&
-                `absolute inset-x-0 top-0 animate-in slide-in-from-right fade-in duration-${ANIM_DURATION}`,
-              phase === "to-list" &&
-                `animate-out slide-out-to-right fade-out duration-${ANIM_DURATION}`,
+              "relative min-h-[calc(100dvh-5rem-1px)] lg:h-[calc(100dvh-5rem-1px)] lg:min-h-0 lg:overflow-hidden",
+              pdfSelection && "lg:grid",
             )}
+            style={
+              pdfSelection
+                ? {
+                    gridTemplateColumns: `${100 - previewWidth}% ${previewWidth}%`,
+                  }
+                : undefined
+            }
           >
-            {/* Partner detail */}
-            {detailType === "partner" && (
-              <>
-                <div className="flex items-center justify-between gap-3">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={navigateToList}
-                    className="text-muted-foreground hover:text-foreground gap-1.5 px-0"
-                  >
-                    <ArrowLeft className="h-4 w-4" /> Partners
-                  </Button>
-                  {partnerEntry &&
-                    (partnerEntry.isBlacklisted ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          modal.confirmAction.open({
-                            title: `Remove ${partnerEntry.displayName} from the blacklist?`,
-                            description:
-                              "This re-enables future requests from this company. Previously revoked MOAs will not be restored.",
-                            confirmLabel: "Remove",
-                            onConfirm: () =>
-                              unblacklistMutation.mutate(
-                                getCompanyIdForBlacklist(partnerEntry),
-                              ),
-                          })
-                        }
-                      >
-                        Un-blacklist
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        scheme="destructive"
-                        size="sm"
-                        onClick={() =>
-                          modal.blacklistPartner.open({
-                            companyName: partnerEntry.displayName,
-                            onBlacklist: (reason) =>
-                              blacklistMutation.mutate({
-                                companyId:
-                                  getCompanyIdForBlacklist(partnerEntry),
-                                reason,
-                              }),
-                            isPending: blacklistMutation.isPending,
-                          })
-                        }
-                      >
-                        Blacklist
-                      </Button>
-                    ))}
-                </div>
+            <div className="min-w-0 space-y-3 py-5 pr-4 lg:h-full lg:overflow-y-auto lg:px-6">
+              {/* Partner detail */}
+              {detailType === "partner" && (
+                <>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={navigateToList}
+                      className="text-muted-foreground hover:text-foreground gap-1.5 px-0"
+                    >
+                      <ArrowLeft className="h-4 w-4" /> Partners
+                    </Button>
+                  </div>
 
-                <div>
-                  <h3 className="font-semibold text-gray-900">
-                    {company?.registered_name ?? "—"}
-                  </h3>
-                  {company?.company_type && (
-                    <p className="text-muted-foreground mt-0.5 text-xs">
-                      {company.company_type.replace(/_/g, " ")}
+                  <PartnerIdentity
+                    name={company?.registered_name ?? "—"}
+                    logoUrl={partnerEntry?.logoUrl}
+                    status={registeredPartnerStatus}
+                  />
+
+                  {partnerEntry?.isBlacklisted &&
+                    partnerEntry.blacklistEntry && (
+                      <div className="border-destructive/30 bg-destructive/5 text-destructive space-y-1 rounded-[0.33em] border p-3 text-sm">
+                        <p>
+                          This company is <strong>blacklisted</strong> — all
+                          active MOAs are revoked and new requests are blocked.
+                        </p>
+                        {partnerEntry.blacklistEntry.reason && (
+                          <p className="text-destructive/80 text-xs">
+                            Reason: {partnerEntry.blacklistEntry.reason}
+                          </p>
+                        )}
+                        <p className="text-destructive/60 text-xs">
+                          Blacklisted on{" "}
+                          {formatDateWithoutTime(
+                            partnerEntry.blacklistEntry.created_at,
+                          )}
+                          {partnerEntry.blacklistEntry.actor_email &&
+                            ` by ${partnerEntry.blacklistEntry.actor_email}`}
+                        </p>
+                      </div>
+                    )}
+
+                  {(partnerMoasData?.company?.document_review_details ||
+                    company?.company_type) && (
+                    <VerifiedDocumentDetails
+                      details={
+                        partnerMoasData?.company?.document_review_details ?? {}
+                      }
+                      companyType={company?.company_type}
+                    />
+                  )}
+                  {partnerMoasData?.companyDocuments && (
+                    <DocumentsSection
+                      documents={partnerMoasData.companyDocuments}
+                      onOpenDocument={openDocumentPreview}
+                    />
+                  )}
+
+                  <CollapsibleCard
+                    id="registered-moa-history"
+                    title="MOA history"
+                    defaultOpen
+                  >
+                    <RegisteredPartnerMoasTable
+                      moas={moas}
+                      isLoading={isMoasLoading}
+                      onOpenMoa={setPdfSelection}
+                    />
+                  </CollapsibleCard>
+
+                  <LegacyRecordsSection
+                    currentCompanyId={detailId}
+                    onOpenMoa={setPdfSelection}
+                    onOpenDocument={openDocumentPreview}
+                  />
+
+                  {partnerEntry && (
+                    <CollapsibleCard id="partner-actions" title="Actions">
+                      <div className="flex flex-col items-start justify-between gap-4 p-4 sm:flex-row sm:items-center">
+                        <p className="text-muted-foreground max-w-lg text-sm">
+                          {partnerEntry.isBlacklisted
+                            ? "Allow this company to send new partnership requests again. Previously revoked MOAs will not be restored."
+                            : "Block new requests from this company and revoke its currently active MOAs."}
+                        </p>
+                        {partnerEntry.isBlacklisted ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="shrink-0"
+                            onClick={() =>
+                              modal.confirmAction.open({
+                                title: `Remove ${partnerEntry.displayName} from the blacklist?`,
+                                description:
+                                  "This re-enables future requests from this company. Previously revoked MOAs will not be restored.",
+                                confirmLabel: "Remove",
+                                onConfirm: () =>
+                                  unblacklistMutation.mutate(
+                                    getCompanyIdForBlacklist(partnerEntry),
+                                  ),
+                              })
+                            }
+                          >
+                            Un-blacklist
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            scheme="destructive"
+                            size="sm"
+                            className="shrink-0"
+                            onClick={() =>
+                              modal.blacklistPartner.open({
+                                companyName: partnerEntry.displayName,
+                                onBlacklist: (reason) =>
+                                  blacklistMutation.mutate({
+                                    companyId:
+                                      getCompanyIdForBlacklist(partnerEntry),
+                                    reason,
+                                  }),
+                                isPending: blacklistMutation.isPending,
+                              })
+                            }
+                          >
+                            Blacklist company
+                          </Button>
+                        )}
+                      </div>
+                    </CollapsibleCard>
+                  )}
+                </>
+              )}
+
+              {/* Legacy detail */}
+              {detailType === "legacy" && (
+                <>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={navigateToList}
+                      className="text-muted-foreground hover:text-foreground gap-1.5 px-0"
+                    >
+                      <ArrowLeft className="h-4 w-4" /> Partners
+                    </Button>
+                  </div>
+                  {isLegacyDetailLoading ? (
+                    <div className="space-y-2">
+                      <Skeleton className="h-8 w-64" />
+                      <Skeleton className="h-32 w-full" />
+                      <Skeleton className="h-16 w-full" />
+                    </div>
+                  ) : legacyCompany ? (
+                    <ReadOnlyLegacyDetail
+                      company={legacyCompany}
+                      onOpenMoa={setPdfSelection}
+                      onPreviewDoc={(url, title) =>
+                        openDocumentPreview(url, title)
+                      }
+                    />
+                  ) : (
+                    <p className="text-muted-foreground text-sm">
+                      Legacy company not found.
                     </p>
                   )}
-                </div>
-
-                {partnerEntry?.isBlacklisted && partnerEntry.blacklistEntry && (
-                  <div className="border-destructive/30 bg-destructive/5 text-destructive space-y-1 rounded-[0.33em] border p-3 text-sm">
-                    <p>
-                      This company is <strong>blacklisted</strong> — all active
-                      MOAs are revoked and new requests are blocked.
-                    </p>
-                    {partnerEntry.blacklistEntry.reason && (
-                      <p className="text-destructive/80 text-xs">
-                        Reason: {partnerEntry.blacklistEntry.reason}
-                      </p>
-                    )}
-                    <p className="text-destructive/60 text-xs">
-                      Blacklisted on{" "}
-                      {formatDateWithoutTime(
-                        partnerEntry.blacklistEntry.created_at,
-                      )}
-                      {partnerEntry.blacklistEntry.actor_email &&
-                        ` by ${partnerEntry.blacklistEntry.actor_email}`}
-                    </p>
-                  </div>
-                )}
-
-                {partnerMoasData?.company?.document_review_details && (
-                  <VerifiedDocumentDetails
-                    details={partnerMoasData.company.document_review_details}
-                  />
-                )}
-                {partnerMoasData?.companyDocuments && (
-                  <DocumentsSection
-                    documents={partnerMoasData.companyDocuments}
-                  />
-                )}
-
-                {isMoasLoading ? (
-                  <div className="space-y-1">
-                    {[0, 1, 2].map((i) => (
-                      <Skeleton key={i} className="h-12 w-full" />
-                    ))}
-                  </div>
-                ) : moas.length > 0 ? (
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-200 text-left">
-                        <th className="pb-2 pr-4 font-medium text-gray-500">
-                          Status
-                        </th>
-                        <th className="pb-2 pr-4 font-medium text-gray-500">
-                          Template
-                        </th>
-                        <th className="pb-2 pr-4 font-medium text-gray-500">
-                          Requested
-                        </th>
-                        <th className="pb-2 font-medium text-gray-500">
-                          Period
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {moas.map((moa) => (
-                        <tr
-                          key={moa.id}
-                          className="cursor-pointer align-top hover:bg-gray-50"
-                          onClick={() =>
-                            router.push(`/university/moas/${moa.id}`)
-                          }
-                        >
-                          <td className="py-2.5 pr-4">
-                            <MoaStatusBadge
-                              status={moa.status}
-                              isExpired={moa.is_expired}
-                            />
-                          </td>
-                          <td className="py-2.5 pr-4 text-gray-600">
-                            {moa.template?.name ?? "—"}
-                          </td>
-                          <td className="py-2.5 pr-4 text-gray-600">
-                            {formatDateWithoutTime(moa.created_at)}
-                          </td>
-                          <td className="py-2.5 text-gray-600">
-                            {moa.effective_date
-                              ? `${formatDateWithoutTime(moa.effective_date)} – ${moa.expiry_date ? formatDateWithoutTime(moa.expiry_date) : "Perpetual"}`
-                              : "—"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <p className="text-muted-foreground text-sm">
-                    No MOA history.
-                  </p>
-                )}
-
-                <LegacyRecordsSection currentCompanyId={detailId} />
-              </>
-            )}
-
-            {/* Legacy detail */}
-            {detailType === "legacy" && (
+                </>
+              )}
+            </div>
+            {pdfSelection && (
               <>
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={navigateToList}
-                    className="text-muted-foreground hover:text-foreground gap-1.5 px-0"
-                  >
-                    <ArrowLeft className="h-4 w-4" /> Partners
-                  </Button>
-                </div>
-                {isLegacyDetailLoading ? (
-                  <div className="space-y-2">
-                    <Skeleton className="h-8 w-64" />
-                    <Skeleton className="h-32 w-full" />
-                    <Skeleton className="h-16 w-full" />
-                  </div>
-                ) : legacyCompany ? (
-                  <ReadOnlyLegacyDetail
-                    company={legacyCompany}
-                    onPreviewDoc={(url, title) =>
-                      modal.previewDocument.open(url, title)
+                <div
+                  role="separator"
+                  aria-label="Resize preview pane"
+                  aria-orientation="vertical"
+                  aria-valuemin={30}
+                  aria-valuemax={70}
+                  aria-valuenow={Math.round(previewWidth)}
+                  tabIndex={0}
+                  className="group absolute top-0 bottom-0 z-30 hidden w-5 -translate-x-1/2 cursor-col-resize touch-none lg:block"
+                  style={{ left: `${100 - previewWidth}%` }}
+                  onPointerDown={(event) => {
+                    event.preventDefault();
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                  }}
+                  onPointerMove={resizePreview}
+                  onPointerUp={(event) =>
+                    event.currentTarget.releasePointerCapture(event.pointerId)
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === "ArrowLeft") {
+                      updatePreviewWidth(previewWidth + 2);
                     }
-                  />
-                ) : (
-                  <p className="text-muted-foreground text-sm">
-                    Legacy company not found.
-                  </p>
-                )}
+                    if (event.key === "ArrowRight") {
+                      updatePreviewWidth(previewWidth - 2);
+                    }
+                  }}
+                >
+                  <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-gray-300 transition-colors group-hover:bg-primary group-focus:bg-primary" />
+                  <div className="absolute top-1/2 left-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-full border border-gray-300 bg-white text-gray-500 shadow-sm transition-colors group-hover:border-primary group-focus:border-primary">
+                    <button
+                      type="button"
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={() => setPdfSelection(null)}
+                      className="flex h-8 w-7 items-center justify-center border-b border-gray-200 hover:bg-gray-100 hover:text-gray-900"
+                      aria-label="Close preview"
+                    >
+                      <X className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                    <span className="flex h-10 w-7 items-center justify-center group-hover:text-primary group-focus:text-primary">
+                      <GripVertical className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                  </div>
+                </div>
+                <PartnerPdfPane selection={pdfSelection} />
               </>
             )}
           </div>
         )}
       </div>
     </PageContainer>
+  );
+}
+
+export default function PartnersPage() {
+  const { companyId, legacyCompanyId } = useParams<{
+    companyId?: string;
+    legacyCompanyId?: string;
+  }>();
+  return (
+    <PartnersContent
+      initialDetailType={
+        companyId ? "partner" : legacyCompanyId ? "legacy" : null
+      }
+      initialDetailId={companyId ?? legacyCompanyId ?? null}
+    />
   );
 }

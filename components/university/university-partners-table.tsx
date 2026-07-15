@@ -1,7 +1,8 @@
 "use client";
 
 import type { KeyboardEvent, ReactNode } from "react";
-import { ArrowRight, UserPlus } from "lucide-react";
+import Link from "next/link";
+import { ChevronRight, UserPlus } from "lucide-react";
 
 import {
   ResourceTable,
@@ -127,6 +128,33 @@ function companyInitials(name: string) {
     .toUpperCase();
 }
 
+function partnerHref(row: UniversityPartnerTableRow) {
+  if (row.isImported && row.legacyEntry) {
+    return `/partners/legacy/${row.legacyEntry.id}`;
+  }
+  return `/partners/registered/${row.partnerCompany?.id ?? row.id.replace("registered:", "")}`;
+}
+
+function PartnerLink({
+  row,
+  children,
+  className,
+}: {
+  row: UniversityPartnerTableRow;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <Link
+      href={partnerHref(row)}
+      onClick={(event) => event.stopPropagation()}
+      className={className}
+    >
+      {children}
+    </Link>
+  );
+}
+
 function CompanyLogo({ row }: { row: UniversityPartnerTableRow }) {
   return (
     <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[0.33em] border border-gray-200 bg-gray-50 text-xs font-semibold text-gray-600">
@@ -199,7 +227,11 @@ export function UniversityPartnersTable({
       header: "Status",
       width: "w-[12%]",
       getSortValue: getPartnerStatus,
-      render: (row) => <PartnerStatus row={row} />,
+      render: (row) => (
+        <PartnerLink row={row} className="inline-flex text-inherit">
+          <PartnerStatus row={row} />
+        </PartnerLink>
+      ),
     },
     {
       id: "company",
@@ -207,7 +239,10 @@ export function UniversityPartnersTable({
       width: "w-[44%]",
       getSortValue: (row) => row.displayName,
       render: (row) => (
-        <div className="flex min-w-0 items-center gap-3">
+        <PartnerLink
+          row={row}
+          className="flex min-w-0 items-center gap-3 text-inherit"
+        >
           <CompanyLogo row={row} />
           <div className="flex min-w-0 items-center gap-2">
             <p className="truncate font-medium text-gray-900">
@@ -219,7 +254,7 @@ export function UniversityPartnersTable({
               </span>
             )}
           </div>
-        </div>
+        </PartnerLink>
       ),
     },
     {
@@ -228,9 +263,11 @@ export function UniversityPartnersTable({
       width: "w-[15%]",
       getSortValue: getPartnerStartDate,
       render: (row) => (
-        <span className="text-muted-foreground text-sm">
-          {getPartnerStartDate(row)}
-        </span>
+        <PartnerLink row={row} className="block text-inherit">
+          <span className="text-muted-foreground text-sm">
+            {getPartnerStartDate(row)}
+          </span>
+        </PartnerLink>
       ),
     },
     {
@@ -238,26 +275,43 @@ export function UniversityPartnersTable({
       header: "End Date",
       width: "w-[15%]",
       getSortValue: getPartnerEndDate,
-      render: (row) => <PartnerEndDate row={row} />,
+      render: (row) => (
+        <PartnerLink row={row} className="block text-inherit">
+          <PartnerEndDate row={row} />
+        </PartnerLink>
+      ),
     },
     {
       id: "actions",
       header: "Actions",
       width: "w-[14%]",
       sortable: false,
-      render: (row) =>
-        !row.isBlacklisted && !row.hasActiveMoa ? (
-          <Button
-            size="xs"
-            variant="outline"
-            onClick={(event) => {
-              event.stopPropagation();
-              onInvite(row);
-            }}
+      render: (row) => (
+        <div className="flex items-center justify-end gap-2">
+          {!row.isBlacklisted && !row.hasActiveMoa && (
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={(event) => {
+                event.stopPropagation();
+                onInvite(row);
+              }}
+            >
+              <UserPlus className="h-3.5 w-3.5" /> Invite
+            </Button>
+          )}
+          <PartnerLink
+            row={row}
+            className="text-primary inline-flex h-8 w-8 items-center justify-center"
           >
-            <UserPlus className="h-3.5 w-3.5" /> Invite
-          </Button>
-        ) : null,
+            <ChevronRight
+              className="h-5 w-5 transition-transform group-hover:translate-x-0.5"
+              aria-hidden="true"
+            />
+            <span className="sr-only">Open {row.displayName}</span>
+          </PartnerLink>
+        </div>
+      ),
     },
   ];
 
@@ -352,7 +406,13 @@ export function UniversityPartnersTable({
                 </div>
               </div>
             </div>
-            <ArrowRight className="text-primary mt-1 h-4 w-4 shrink-0" />
+            <PartnerLink
+              row={row}
+              className="text-primary mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center"
+            >
+              <ChevronRight className="h-5 w-5" aria-hidden="true" />
+              <span className="sr-only">Open {row.displayName}</span>
+            </PartnerLink>
           </div>
           <div className="mt-2.5 flex items-end justify-between gap-4">
             <div className="grid grid-cols-2 gap-x-5 gap-y-1 text-sm">
