@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -16,8 +16,6 @@ import { Card } from "@/components/ui/card";
 import { MoaStatusBadge } from "@/components/status-badge";
 import { LegacyCompaniesPanel, LegacyCompanyDetail, formatLegacyLabel, formatLegacyFieldLabel, formatLegacyMoaPeriod, isFilledValue, isLegacyMoaExpired, UploadDialog, CsvUploadDialog, ZipUploadDialog } from "@/components/legacy-companies/legacy-companies-panel";
 import { formatDateWithoutTime, cn } from "@/lib/utils";
-import { toast } from "sonner";
-import { toastPresets } from "@/components/sonner-toaster";
 import { ArrowLeft, Ban, ChevronDown, ChevronRight, CircleAlert, CircleCheck, Clock, Eye, Loader2, Minus, Plus, ShieldCheck, Upload, UserPlus } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
@@ -56,6 +54,12 @@ interface LegacyCompanySummary {
   latestMoaEffectiveDate: string | null;
   latestMoaExpiryDate: string | null;
   latestMoaIsPerpetual: boolean;
+}
+
+interface AvailableTemplate {
+  id: string;
+  template: { id: string; name: string };
+  is_available: boolean;
 }
 
 interface PartnerMoaEntry {
@@ -457,6 +461,17 @@ export default function PartnersPage() {
     enabled: detailType === "legacy" && !!detailId,
   });
 
+  const { data: templatesData } = useQuery({
+    queryKey: ["university-templates-for-invite"],
+    queryFn: () =>
+      preconfiguredAxios
+        .get("/api/university/templates")
+        .then((r) => r.data as { templates: AvailableTemplate[] }),
+    enabled: !!account,
+  });
+
+  const availableTemplates = (templatesData?.templates ?? []).filter((t) => t.is_available);
+
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["university-partners"] });
     queryClient.invalidateQueries({ queryKey: ["university-blacklist"] });
@@ -483,17 +498,30 @@ export default function PartnersPage() {
     },
   });
 
-  const inviteMutation = useMutation({
-    mutationFn: (payload: { invitedEmail: string; companyName?: string; personalMessage?: string }) =>
-      preconfiguredAxios.post("/api/university/invites", payload),
-    onSuccess: () => {
-      toast("Invite sent.", toastPresets.success);
-      refresh();
-    },
-    onError: (e: Error) => {
-      toast(e.message, toastPresets.destructive);
-    },
-  });
+  const openInviteModal = useCallback((row: PartnerTableRow) => {
+    if (availableTemplates.length === 0) {
+      openModal("no-templates", <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">You need at least one active MOA template before you can invite companies. Go to your templates page to activate one.</p>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={() => closeModal("no-templates")}>Cancel</Button>
+          <Button onClick={() => { closeModal("no-templates"); router.push("/templates"); }}>Go to Templates</Button>
+        </div>
+      </div>, { title: "No active templates", panelClassName: "!w-full sm:!max-w-sm" });
+      return;
+    }
+
+    const contactEmail = row.isImported ? (row.contactEmail ?? "") : "";
+    const initialStep: 1 | 2 = row.isImported && !contactEmail ? 1 : 2;
+
+    modal.inviteCompany.open({
+      onSent: refresh,
+      initialMode: row.isImported ? "new" : "registered",
+      initialStep,
+      initialCompanyId: row.partnerCompany?.id,
+      initialCompanyName: row.displayName,
+      initialEmail: contactEmail,
+    });
+  }, [availableTemplates.length, closeModal, modal.inviteCompany, openModal, refresh, router]);
 
   const rows = useMemo<PartnerTableRow[]>(() => {
     const map = new Map<string, PartnerTableRow>();
@@ -653,17 +681,7 @@ export default function PartnersPage() {
           if (row.original.isBlacklisted) return null;
           if (row.original.hasActiveMoa) return null;
           const handleInvite = () => {
-            const email = row.original.isImported
-              ? (row.original.contactEmail ?? "")
-              : "";
-            modal.invitePartner.open({
-              companyName: row.original.displayName,
-              email,
-              onInvite: (invitedEmail, companyName) => {
-                inviteMutation.mutate({ invitedEmail, companyName: companyName || undefined });
-              },
-              isPending: inviteMutation.isPending,
-            });
+            openInviteModal(row.original);
           };
           return (
             <Button size="xs" variant="outline" onClick={handleInvite}>
@@ -673,7 +691,7 @@ export default function PartnersPage() {
         },
       },
     ],
-    [],
+    [openInviteModal],
   );
 
   const navigateToDetail = (row: PartnerTableRow) => {

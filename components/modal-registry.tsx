@@ -1,9 +1,8 @@
 "use client";
 
 import { useModal } from "@/app/providers/modal-provider";
+import { CompanyInviteForm } from "@/components/invites/company-invite-form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
@@ -26,25 +25,29 @@ export function useIomModalRegistry() {
         ),
       close: () => closeModal("preview-document"),
     },
-    invitePartner: {
+    inviteCompany: {
       open: (opts: {
-        companyName: string;
-        email: string;
-        onInvite: (email: string, companyName: string) => void;
-        isPending: boolean;
+        onSent: () => void;
+        initialMode?: "registered" | "new";
+        initialStep?: 1 | 2;
+        initialCompanyId?: string;
+        initialCompanyName?: string;
+        initialEmail?: string;
       }) =>
         openModal(
-          "invite-partner",
-          <InviteForm
-            companyName={opts.companyName}
-            email={opts.email}
-            onInvite={opts.onInvite}
-            isPending={opts.isPending}
-            close={() => closeModal("invite-partner")}
+          "invite-company",
+          <CompanyInviteForm
+            onClose={() => closeModal("invite-company")}
+            onSent={opts.onSent}
+            initialMode={opts.initialMode}
+            initialStep={opts.initialStep}
+            initialCompanyId={opts.initialCompanyId}
+            initialCompanyName={opts.initialCompanyName}
+            initialEmail={opts.initialEmail}
           />,
-          { title: "Invite company", showHeaderDivider: false }
+          { title: "Invite a company", panelClassName: "!w-full sm:!max-w-md" },
         ),
-      close: () => closeModal("invite-partner"),
+      close: () => closeModal("invite-company"),
     },
     blacklistPartner: {
       open: (opts: {
@@ -87,54 +90,6 @@ export function useIomModalRegistry() {
       close: () => closeModal("confirm-action"),
     },
   };
-}
-
-function InviteForm({
-  companyName,
-  email: initialEmail,
-  onInvite,
-  isPending,
-  close,
-}: {
-  companyName: string;
-  email: string;
-  onInvite: (email: string, companyName: string) => void;
-  isPending: boolean;
-  close: () => void;
-}) {
-  const [email, setEmail] = useState(initialEmail);
-  const [name, setName] = useState(companyName);
-
-  return (
-    <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">{companyName}</p>
-      <div className="space-y-1.5">
-        <Label htmlFor="invite-company-name">Company name</Label>
-        <Input id="invite-company-name" value={name} onChange={(e) => setName(e.target.value)} />
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="invite-email">Company email</Label>
-        <Input
-          id="invite-email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-      </div>
-      <div className="flex justify-end gap-2">
-        <Button variant="outline" onClick={close}>
-          Cancel
-        </Button>
-        <Button
-          disabled={!email.trim() || isPending}
-          onClick={() => onInvite(email.trim(), name.trim())}
-        >
-          {isPending && <Loader2 className="animate-spin" />}
-          {isPending ? "Sending…" : "Send invite"}
-        </Button>
-      </div>
-    </div>
-  );
 }
 
 function BlacklistForm({
