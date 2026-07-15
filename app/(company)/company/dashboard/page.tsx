@@ -37,6 +37,7 @@ import {
   Search,
 } from "lucide-react";
 import { RequestDialog } from "@/components/moa-request-dialog";
+import { CareerListingCta } from "@/components/career-listing-cta";
 
 // "list" and "detail" are stable states; "to-detail" / "to-list" are mid-transition.
 type Phase = "list" | "to-detail" | "detail" | "to-list";
@@ -596,6 +597,8 @@ function CompanyDashboardContent() {
                   </Button>
                 )}
               </PageHeader>
+
+              {canRequest && <CareerListingCta />}
 
               {pendingInvites.length > 0 &&
                 (() => {

@@ -29,12 +29,30 @@ interface InvitePeek {
   template: { id: string } | null;
 }
 
+/**
+ * Reads (never verifies) the career → new-IOM prefill JWT's payload for
+ * form prefill purposes only (plan §6) — actual verification happens
+ * server-side on registration completion. An unreadable/malformed token
+ * just means no prefill, never an error.
+ */
+function peekPrefillPayload(token: string): { name?: string; email?: string } | null {
+  try {
+    const payloadSegment = token.split(".")[1];
+    if (!payloadSegment) return null;
+    const base64 = payloadSegment.replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(atob(base64)) as { name?: string; email?: string };
+  } catch {
+    return null;
+  }
+}
+
 function RegisterPageContent() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { openModal, closeModal } = useModal();
   const searchParams = useSearchParams();
   const inviteToken = searchParams.get("invite_token") ?? "";
+  const prefillToken = searchParams.get("prefill") ?? "";
 
   const [step, setStep] = useState<Step>("details");
   const [form, setForm] = useState({
@@ -43,6 +61,20 @@ function RegisterPageContent() {
     repEmail: "",
     password: "",
   });
+
+  // One-time prefill from the career-site handoff — doesn't clobber
+  // whatever the user has already typed.
+  useEffect(() => {
+    if (!prefillToken) return;
+    const payload = peekPrefillPayload(prefillToken);
+    if (!payload) return;
+    setForm((prev) => ({
+      ...prev,
+      repEmail: prev.repEmail || (payload.email ?? ""),
+      legalIdentifier: prev.legalIdentifier || (payload.name ?? "").toUpperCase(),
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillToken]);
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [tinTakenEmail, setTinTakenEmail] = useState("");
@@ -388,7 +420,9 @@ function RegisterPageContent() {
           e.preventDefault();
           setError("");
           setTinTakenEmail("");
-          register.mutate({ data: form });
+          register.mutate({
+            data: prefillToken ? { ...form, prefillToken } : form,
+          });
         }}
         className="space-y-4"
       >

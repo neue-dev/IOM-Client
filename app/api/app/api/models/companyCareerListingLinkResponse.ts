@@ -6,11 +6,8 @@
  * OpenAPI spec version: 1.0
  */
 
-export interface CompanyRegisterDto {
-  tin: string;
-  legalIdentifier: string;
-  repEmail: string;
-  password: string;
-  cfToken?: string;
-  prefillToken?: string;
+export interface CompanyCareerListingLinkResponse {
+  success: boolean;
+  message?: string;
+  magicLink?: string;
 }
