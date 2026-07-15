@@ -25,6 +25,7 @@ import type {
 
 import type {
   ClaimInviteDto,
+  CompanyCareerListingLinkResponse,
   CompanyClaimInviteResponse,
   CompanyControllerCreateQueuedMoaBody,
   CompanyControllerListMoasParams,
@@ -644,6 +645,79 @@ export function useCompanyControllerGetVerificationSuspense<
   return query;
 }
 
+export const companyControllerCareerListingLink = (signal?: AbortSignal) => {
+  return preconfiguredAxiosFunction<CompanyCareerListingLinkResponse>({
+    url: `/api/company/career-listing-link`,
+    method: "POST",
+    signal,
+  });
+};
+
+export const getCompanyControllerCareerListingLinkMutationOptions = <
+  TError = ErrorResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof companyControllerCareerListingLink>>,
+    TError,
+    void,
+    TContext
+  >;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof companyControllerCareerListingLink>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["companyControllerCareerListingLink"];
+  const { mutation: mutationOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey } };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof companyControllerCareerListingLink>>,
+    void
+  > = () => {
+    return companyControllerCareerListingLink();
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CompanyControllerCareerListingLinkMutationResult = NonNullable<
+  Awaited<ReturnType<typeof companyControllerCareerListingLink>>
+>;
+
+export type CompanyControllerCareerListingLinkMutationError = ErrorResponse;
+
+export const useCompanyControllerCareerListingLink = <
+  TError = ErrorResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof companyControllerCareerListingLink>>,
+      TError,
+      void,
+      TContext
+    >;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof companyControllerCareerListingLink>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationOptions =
+    getCompanyControllerCareerListingLinkMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
 export const companyControllerUploadLogo = (
   companyControllerUploadLogoBody: CompanyControllerUploadLogoBody,
   signal?: AbortSignal,
