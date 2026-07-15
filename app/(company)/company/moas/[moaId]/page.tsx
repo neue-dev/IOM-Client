@@ -1,7 +1,6 @@
 "use client";
 import { useEffect } from "react";
-import { useParams, useSearchParams } from "next/navigation";
-import Link from "next/link";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCompanyControllerGetMoa } from "@/app/api";
 import { useModal } from "@/app/providers/modal-provider";
 import { PageContainer } from "@/components/page-header";
@@ -27,6 +26,7 @@ interface CompanyMoaDetail {
 
 export default function CompanyMoaDetailPage() {
   const { moaId } = useParams<{ moaId: string }>();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { closeModal } = useModal();
   const justIssued = searchParams.get("issued") === "1";
@@ -71,15 +71,23 @@ export default function CompanyMoaDetailPage() {
   const { moa, pdfUrl } = detail!;
   const isActive = moa.status === "active" && !moa.is_expired;
   const downloadFilename = `${moa.university.registered_name} MOA.pdf`;
+  const goBack = () => {
+    if (window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.replace("/company/dashboard");
+  };
 
   return (
     <PageContainer className="max-w-3xl space-y-6">
-      <Link
-        href="/company/dashboard"
+      <button
+        type="button"
+        onClick={goBack}
         className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
       >
-        <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Dashboard
-      </Link>
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Back
+      </button>
 
       <Card className="overflow-hidden">
         {isActive && (

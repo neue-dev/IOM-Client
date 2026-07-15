@@ -6,6 +6,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { toast } from "sonner";
 import { useUniversityProfile } from "@/app/providers/university-profile.provider";
 import { preconfiguredAxios } from "@/app/api/preconfig.axios";
+import { toastPresets } from "@/components/sonner-toaster";
 import { PageContainer, PageHeader } from "@/components/page-header";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -56,11 +57,16 @@ export default function UniversityTemplatesPage() {
       preconfiguredAxios.put(`/api/university/templates/${templateId}`, {
         is_available,
       }),
-    onSuccess: () => {
+    onSuccess: (_res, variables) => {
       queryClient.invalidateQueries({ queryKey: ["university-templates"] });
       queryClient.invalidateQueries({
         queryKey: ["university-templates-for-invite"],
       });
+      confirmAction.close();
+      toast(
+        variables.is_available ? "Template offered." : "Template hidden.",
+        toastPresets.success,
+      );
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -115,11 +121,12 @@ export default function UniversityTemplatesPage() {
                   ? `Companies will no longer be able to request new MOAs using "${row.original.template.name}". Existing active MOAs are unaffected.`
                   : `Companies will be able to request MOAs using "${row.original.template.name}".`,
                 confirmLabel: row.original.is_available ? "Hide" : "Offer",
-                onConfirm: () =>
-                  toggle.mutate({
+                onConfirm: async () => {
+                  await toggle.mutateAsync({
                     templateId: row.original.template.id,
                     is_available: !row.original.is_available,
-                  }),
+                  });
+                },
                 isPending: toggle.isPending,
               })
             }

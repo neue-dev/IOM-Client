@@ -94,7 +94,7 @@ export function useIomModalRegistry() {
         title: string;
         description: string;
         confirmLabel: string;
-        onConfirm: () => void;
+        onConfirm: () => void | Promise<void>;
         isPending?: boolean;
       }) =>
         openModal(
@@ -174,10 +174,22 @@ function ConfirmForm({
   title: string;
   description: string;
   confirmLabel: string;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
   isPending?: boolean;
   close: () => void;
 }) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const pending = isPending || isSubmitting;
+
+  const handleConfirm = async () => {
+    setIsSubmitting(true);
+    try {
+      await onConfirm();
+    } catch {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold">{title}</h2>
@@ -186,8 +198,8 @@ function ConfirmForm({
         <Button variant="outline" onClick={close}>
           Cancel
         </Button>
-        <Button disabled={isPending} onClick={onConfirm}>
-          {isPending && <Loader2 className="animate-spin" />}
+        <Button disabled={pending} onClick={handleConfirm}>
+          {pending && <Loader2 className="animate-spin" />}
           {confirmLabel}
         </Button>
       </div>
