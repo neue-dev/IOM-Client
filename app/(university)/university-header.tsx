@@ -21,13 +21,11 @@ export function UniversityHeader() {
   const nav: NavItem[] = [
     { href: "/partners", label: "Partners" },
     { href: "/invites", label: "Invites" },
-    ...(isSuperadmin
-      ? [{ href: "/accounts", label: "Accounts" }]
-      : []),
+    ...(isSuperadmin ? [{ href: "/templates", label: "MOA Templates" }] : []),
+  ];
+  const accountNav: NavItem[] = [
+    ...(isSuperadmin ? [{ href: "/accounts", label: "Accounts" }] : []),
     { href: "/activity-log", label: "Activity Log" },
-    ...(isSuperadmin
-      ? [{ href: "/templates", label: "MOA Templates" }]
-      : []),
   ];
 
   return (
@@ -41,6 +39,7 @@ export function UniversityHeader() {
       postLogoutPath="/login"
       profileHref="/profile"
       userAvatarUrl={account?.university.logo_url}
+      accountNav={accountNav}
     />
   );
 }

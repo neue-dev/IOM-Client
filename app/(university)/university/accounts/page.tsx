@@ -1,7 +1,6 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { ColumnDef } from "@tanstack/react-table";
 import { toast } from "sonner";
 import { useUniversityProfile } from "@/app/providers/university-profile.provider";
 import { preconfiguredAxios } from "@/app/api/preconfig.axios";
@@ -9,21 +8,13 @@ import { PageContainer, PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { DataTable } from "@/components/ui/data-table";
 import { FormError } from "@/components/auth-shell";
 import { useModal } from "@/app/providers/modal-provider";
 import { Loader2, Plus } from "lucide-react";
-
-interface StaffAccount {
-  id: string;
-  email: string;
-  display_name: string;
-  role: "superadmin" | "staff";
-  is_deactivated: boolean | null;
-  created_at: string;
-}
+import {
+  StaffAccountsTable,
+  type StaffAccount,
+} from "@/components/university/staff-accounts-table";
 
 function InviteStaffForm({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
@@ -78,8 +69,14 @@ function InviteStaffForm({ onClose }: { onClose: () => void }) {
         />
       </div>
       <div className="flex justify-end gap-2 pt-2">
-        <Button variant="outline" onClick={onClose}>Cancel</Button>
-        <Button type="submit" form="invite-staff" disabled={!email || !name || createStaff.isPending}>
+        <Button variant="outline" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          form="invite-staff"
+          disabled={!email || !name || createStaff.isPending}
+        >
           {createStaff.isPending && <Loader2 className="animate-spin" />}
           {createStaff.isPending ? "Sending…" : "Send invite"}
         </Button>
@@ -124,82 +121,6 @@ export default function AccountsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const staffColumns = useMemo<ColumnDef<StaffAccount>[]>(
-    () => [
-      {
-        id: "name",
-        header: "Name",
-        accessorKey: "display_name",
-        cell: ({ row }) => (
-          <span className="font-medium text-gray-900">{row.original.display_name}</span>
-        ),
-      },
-      {
-        id: "email",
-        header: "Email",
-        accessorKey: "email",
-        cell: ({ row }) => (
-          <span className="text-muted-foreground">{row.original.email}</span>
-        ),
-      },
-      {
-        id: "status",
-        header: "Status",
-        enableSorting: false,
-        cell: ({ row }) =>
-          row.original.is_deactivated ? (
-            <Badge type="destructive" strength="medium">Deactivated</Badge>
-          ) : (
-            <Badge type="supportive" strength="medium">Active</Badge>
-          ),
-      },
-      {
-        id: "actions",
-        header: "",
-        enableSorting: false,
-        enableResizing: false,
-        size: 260,
-        cell: ({ row }) => {
-          const a = row.original;
-          return (
-            <div className="flex items-center justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => resendInvite.mutate(a.id)}
-                disabled={resendInvite.isPending}
-              >
-                Resend invite
-              </Button>
-              {a.is_deactivated ? (
-                <Button
-                  variant="outline"
-                  scheme="supportive"
-                  size="sm"
-                  onClick={() => reactivate.mutate(a.id)}
-                  disabled={reactivate.isPending}
-                >
-                  Reactivate
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  scheme="destructive"
-                  size="sm"
-                  onClick={() => deactivate.mutate(a.id)}
-                  disabled={deactivate.isPending}
-                >
-                  Deactivate
-                </Button>
-              )}
-            </div>
-          );
-        },
-      },
-    ],
-    [deactivate, reactivate, resendInvite],
-  );
-
   if (isLoading || !account) return null;
   if (!isSuperadmin) return null;
 
@@ -211,41 +132,34 @@ export default function AccountsPage() {
         title="Accounts"
         description="Manage staff accounts for your institution."
       />
-      {accountsLoading ? (
-        <div className="space-y-4">
-          <div className="flex justify-end">
-            <Skeleton className="h-10 w-32" />
-          </div>
-          <div className="space-y-1">
-            {[0, 1, 2].map((i) => (
-              <Skeleton key={i} className="h-12 w-full" />
-            ))}
-          </div>
-        </div>
-      ) : (
-        <DataTable
-          id="staff-accounts"
-          columns={staffColumns}
-          data={staff}
-          searchKey="email"
-          searchPlaceholder="Search by name or email..."
-          rowLabelSingular="account"
-          rowLabelPlural="accounts"
-          toolbarActions={
-            <Button
-              onClick={() =>
-                openModal("invite-staff", <InviteStaffForm onClose={() => closeModal("invite-staff")} />, {
+      <StaffAccountsTable
+        accounts={staff}
+        isLoading={accountsLoading}
+        isDeactivating={deactivate.isPending}
+        isReactivating={reactivate.isPending}
+        isResendingInvite={resendInvite.isPending}
+        onDeactivate={(id) => deactivate.mutate(id)}
+        onReactivate={(id) => reactivate.mutate(id)}
+        onResendInvite={(id) => resendInvite.mutate(id)}
+        toolbarActions={
+          <Button
+            onClick={() =>
+              openModal(
+                "invite-staff",
+                <InviteStaffForm onClose={() => closeModal("invite-staff")} />,
+                {
                   title: "Invite staff member",
-                  description: "They'll receive an email to set their password and join your institution.",
+                  description:
+                    "They'll receive an email to set their password and join your institution.",
                   panelClassName: "!w-full sm:!max-w-md",
-                })
-              }
-            >
-              <Plus /> Invite staff
-            </Button>
-          }
-        />
-      )}
+                },
+              )
+            }
+          >
+            <Plus /> Invite staff
+          </Button>
+        }
+      />
     </PageContainer>
   );
 }

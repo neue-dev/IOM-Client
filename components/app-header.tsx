@@ -53,6 +53,7 @@ interface AppHeaderProps {
   postLogoutPath: string;
   profileHref?: string;
   userAvatarUrl?: string | null;
+  accountNav?: NavItem[];
 }
 
 function labelIcon(label: string): LucideIcon {
@@ -81,6 +82,7 @@ export function AppHeader({
   postLogoutPath,
   profileHref,
   userAvatarUrl,
+  accountNav = [],
 }: AppHeaderProps) {
   const pathname = usePathname() ?? "";
   const router = useRouter();
@@ -173,7 +175,8 @@ export function AppHeader({
                 variant="ghost"
                 className={cn(
                   "group h-auto w-20 flex-col items-center justify-center gap-1 rounded-[0.33em] px-2 py-1",
-                  profileHref && isActive(profileHref)
+                  (profileHref && isActive(profileHref)) ||
+                    accountNav.some((item) => isActive(item.href))
                     ? "text-primary"
                     : "opacity-80 hover:bg-gray-100 hover:opacity-100",
                 )}
@@ -211,6 +214,20 @@ export function AppHeader({
                     Profile
                   </Link>
                 </DropdownMenuItem>
+              )}
+              {accountNav.map((item) => {
+                const Icon = item.icon ?? labelIcon(item.label);
+                return (
+                  <DropdownMenuItem key={item.href} asChild>
+                    <Link href={item.href}>
+                      <Icon className="h-4 w-4" />
+                      {item.label}
+                    </Link>
+                  </DropdownMenuItem>
+                );
+              })}
+              {(profileHref || accountNav.length > 0) && (
+                <DropdownMenuSeparator />
               )}
               <DropdownMenuItem
                 variant="destructive"
@@ -330,6 +347,17 @@ export function AppHeader({
                 </button>
               </Link>
             )}
+            {accountNav.map((item) => {
+              const Icon = item.icon ?? labelIcon(item.label);
+              return (
+                <Link key={item.href} href={item.href} className="block w-full">
+                  <button className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-gray-50">
+                    <Icon className="h-4 w-4" />
+                    {item.label}
+                  </button>
+                </Link>
+              );
+            })}
             <button
               onClick={() => logout.mutate()}
               disabled={logout.isPending}
