@@ -129,10 +129,9 @@ export function AppHeader({
               <h1 className="font-display text-lg font-bold text-gray-900">
                 Partners
               </h1>
-              <span
-                className="mx-2.5 h-4 w-px bg-gray-300"
-                aria-hidden="true"
-              />
+              <span className="mx-2.5 text-gray-300" aria-hidden="true">
+                |
+              </span>
               <span className="font-display text-gray-500">
                 {portal === "Platform Admin" ? portal : `${portal} Portal`}
               </span>
