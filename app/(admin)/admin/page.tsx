@@ -1,9 +1,20 @@
 "use client";
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useAdminProfile } from "@/app/providers/admin-profile.provider";
 
 export default function AdminRootPage() {
   const router = useRouter();
-  useEffect(() => { router.replace("/admin/login"); }, [router]);
+  const pathname = usePathname();
+  const { isAuthenticated, isLoading } = useAdminProfile();
+
+  useEffect(() => {
+    if (isLoading) return;
+    const prefix = pathname.startsWith("/admin") ? "/admin" : "";
+    router.replace(
+      isAuthenticated ? `${prefix}/universities` : `${prefix}/login`,
+    );
+  }, [isAuthenticated, isLoading, pathname, router]);
+
   return null;
 }

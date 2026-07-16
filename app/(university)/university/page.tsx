@@ -1,9 +1,18 @@
 "use client";
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useUniversityProfile } from "@/app/providers/university-profile.provider";
 
 export default function UniversityRootPage() {
   const router = useRouter();
-  useEffect(() => { router.replace("/university/login"); }, [router]);
+  const pathname = usePathname();
+  const { account, isLoading } = useUniversityProfile();
+
+  useEffect(() => {
+    if (isLoading) return;
+    const prefix = pathname.startsWith("/university") ? "/university" : "";
+    router.replace(account ? `${prefix}/partners` : `${prefix}/login`);
+  }, [account, isLoading, pathname, router]);
+
   return null;
 }
