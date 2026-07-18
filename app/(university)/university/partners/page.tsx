@@ -16,6 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useModal } from "@/app/providers/modal-provider";
 import { useIomModalRegistry } from "@/components/modal-registry";
+import { toast } from "sonner";
+import { toastPresets } from "@/components/sonner-toaster";
 import { Card } from "@/components/ui/card";
 import {
   Accordion,
@@ -26,6 +28,10 @@ import {
 import { PartnershipStatusBadge } from "@/components/partnership-status-badge";
 import {
   LegacyCompanyDetail,
+  AddDocumentsForm,
+  MoaUploadDialog,
+  buildMoaFormData,
+  type DocInput,
   formatLegacyLabel,
   formatLegacyFieldLabel,
   isFilledValue,
@@ -160,10 +166,12 @@ function PartnerIdentity({
   name,
   logoUrl,
   status,
+  badge,
 }: {
   name: string;
   logoUrl?: string | null;
   status: string;
+  badge?: ReactNode;
 }) {
   return (
     <div className="flex items-center gap-3">
@@ -180,10 +188,13 @@ function PartnerIdentity({
           <span aria-hidden="true">{companyInitials(name)}</span>
         )}
       </div>
-      <div className="min-w-0">
-        <h2 className="text-lg leading-tight font-semibold text-gray-900">
-          {name}
-        </h2>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg leading-tight font-semibold text-gray-900">
+            {name}
+          </h2>
+          {badge}
+        </div>
         <div className="mt-1.5">
           <PartnershipStatusBadge
             status={status}
@@ -295,12 +306,16 @@ function ReadOnlyLegacyDetail({
   onPreviewDoc,
   onOpenMoa,
   showHeader = true,
+  canUpload = false,
 }: {
   company: LegacyCompanyDetail;
   onPreviewDoc: (url: string, title: string) => void;
   onOpenMoa: (selection: PartnerPdfSelection) => void;
   showHeader?: boolean;
+  canUpload?: boolean;
 }) {
+  const queryClient = useQueryClient();
+  const { openModal, closeModal } = useModal();
   const details = company.company_details as Record<string, unknown>;
   const companyType =
     typeof details.company_type === "string" ? details.company_type : null;
@@ -329,6 +344,62 @@ function ReadOnlyLegacyDetail({
       .map(([key, value]) => [formatLegacyFieldLabel(key), value] as const),
   ];
 
+  const docUploadMutation = useMutation({
+    mutationFn: (inputs: DocInput[]) => {
+      const formData = new FormData();
+      const documentTypes: string[] = [];
+      inputs.forEach(({ file, type }) => {
+        formData.append("companyDocuments", file);
+        documentTypes.push(type || "other");
+      });
+      formData.append("documentTypes", JSON.stringify(documentTypes));
+      return preconfiguredAxios.post(
+        `/api/university/legacy-companies/${company.id}/documents`,
+        formData,
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["university-legacy-company-detail", company.id],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["university-legacy-companies"],
+      });
+      closeModal("legacy-add-documents");
+      toast("Documents uploaded", toastPresets.success);
+    },
+    onError: (err) => {
+      toast(
+        err instanceof Error ? err.message : "Failed to upload documents",
+        toastPresets.destructive,
+      );
+    },
+  });
+
+  const moaUploadMutation = useMutation({
+    mutationFn: (inputs: Parameters<typeof buildMoaFormData>[0]) =>
+      preconfiguredAxios.post(
+        `/api/university/legacy-companies/${company.id}/moas`,
+        buildMoaFormData(inputs),
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["university-legacy-company-detail", company.id],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["university-legacy-companies"],
+      });
+      closeModal("legacy-add-moa");
+      toast("Legacy MOA added", toastPresets.success);
+    },
+    onError: (err) => {
+      toast(
+        err instanceof Error ? err.message : "Failed to add legacy MOA",
+        toastPresets.destructive,
+      );
+    },
+  });
+
   return (
     <>
       {showHeader && (
@@ -342,6 +413,7 @@ function ReadOnlyLegacyDetail({
                 ? "expired"
                 : "inactive"
           }
+          badge={<PartnershipStatusBadge status="imported" label="Imported" />}
         />
       )}
 
@@ -362,7 +434,35 @@ function ReadOnlyLegacyDetail({
 
       <CollapsibleCard
         id="legacy-documents"
-        title="Documents"
+        title={
+          <span className="flex w-full items-center justify-between gap-3">
+            <span>Documents</span>
+            {canUpload && (
+              <Button
+                size="xs"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  openModal(
+                    "legacy-add-documents",
+                    <AddDocumentsForm
+                      isPending={docUploadMutation.isPending}
+                      onSubmit={(inputs) => docUploadMutation.mutate(inputs)}
+                      onClose={() => closeModal("legacy-add-documents")}
+                    />,
+                    {
+                      title: "Add documents",
+                      description:
+                        "Upload additional company documents (PDF, max 2.5MB each).",
+                      panelClassName: "!w-full sm:!max-w-md",
+                    },
+                  );
+                }}
+              >
+                <Upload className="h-3.5 w-3.5" /> Add
+              </Button>
+            )}
+          </span>
+        }
         defaultOpen={false}
       >
         <div>
@@ -404,7 +504,41 @@ function ReadOnlyLegacyDetail({
         </div>
       </CollapsibleCard>
 
-      <CollapsibleCard id="legacy-moa-history" title="MOA history" defaultOpen>
+      <CollapsibleCard
+        id="legacy-moa-history"
+        title={
+          <span className="flex w-full items-center justify-between gap-3">
+            <span>MOA history</span>
+            {canUpload && (
+              <Button
+                size="xs"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  openModal(
+                    "legacy-add-moa",
+                    <MoaUploadDialog
+                      title="Add Legacy MOA"
+                      description="Add an MOA record to this imported company."
+                      isPending={moaUploadMutation.isPending}
+                      onClose={() => closeModal("legacy-add-moa")}
+                      onSubmit={(moas) => moaUploadMutation.mutate(moas)}
+                    />,
+                    {
+                      title: "Add Legacy MOA",
+                      description:
+                        "Add an MOA record to this imported company.",
+                      panelClassName: "!w-full sm:!max-w-2xl",
+                    },
+                  );
+                }}
+              >
+                <Plus className="h-3.5 w-3.5" /> Add MOA
+              </Button>
+            )}
+          </span>
+        }
+        defaultOpen
+      >
         <LegacyPartnerMoasTable moas={company.moas} onOpenMoa={onOpenMoa} />
       </CollapsibleCard>
     </>
@@ -1138,6 +1272,7 @@ function PartnersContent({
                   ) : legacyCompany ? (
                     <ReadOnlyLegacyDetail
                       company={legacyCompany}
+                      canUpload
                       onOpenMoa={setPdfSelection}
                       onPreviewDoc={(url, title) =>
                         openDocumentPreview(url, title)
