@@ -1,10 +1,13 @@
 "use client";
 import { useRouter } from "next/navigation";
-import type { ColumnDef } from "@tanstack/react-table";
 import { useAdminControllerCompanyReviewQueue } from "@/app/api";
 import { PageContainer, PageHeader } from "@/components/page-header";
+import {
+  ResourceTable,
+  type ResourceTableColumn,
+} from "@/components/ui/resource-table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DataTable } from "@/components/ui/data-table";
+import { useResourceTable } from "@/components/ui/use-resource-table";
 import { formatDateWithoutTime } from "@/lib/utils";
 
 interface ReviewRow {
@@ -19,18 +22,19 @@ interface ReviewRow {
   } | null;
 }
 
-const columns: ColumnDef<ReviewRow>[] = [
+const columns: Array<ResourceTableColumn<ReviewRow>> = [
   {
     id: "company",
     header: "Company",
-    accessorFn: (row) => row.company?.registered_name ?? "",
-    cell: ({ row }) => (
+    width: "w-[70%]",
+    getSortValue: (review) => review.company?.registered_name ?? "",
+    render: (review) => (
       <div className="min-w-0">
         <p className="font-medium text-gray-900">
-          {row.original.company?.registered_name ?? "Unknown company"}
+          {review.company?.registered_name ?? "Unknown company"}
         </p>
         <p className="text-muted-foreground truncate text-xs">
-          {row.original.company?.email}
+          {review.company?.email}
         </p>
       </div>
     ),
@@ -38,10 +42,11 @@ const columns: ColumnDef<ReviewRow>[] = [
   {
     id: "submitted",
     header: "Submitted",
-    accessorFn: (row) => row.created_at,
-    cell: ({ row }) => (
+    width: "w-[30%]",
+    getSortValue: (review) => review.created_at,
+    render: (review) => (
       <span className="text-muted-foreground">
-        {formatDateWithoutTime(row.original.created_at)}
+        {formatDateWithoutTime(review.created_at)}
       </span>
     ),
   },
@@ -55,6 +60,20 @@ export default function AdminReviewsPage() {
   });
 
   const reviews = (data?.reviews ?? []) as unknown as ReviewRow[];
+  const table = useResourceTable({
+    data: reviews,
+    getRowId: (review) => review.id,
+    columns,
+    search: {
+      placeholder: "Search companies...",
+      ariaLabel: "Search company reviews",
+      matches: (review, query) =>
+        (review.company?.registered_name ?? "").toLowerCase().includes(query) ||
+        review.created_at.toLowerCase().includes(query),
+    },
+    sort: { initialColumn: "company", initialDirection: "asc" },
+    pagination: { pageSize: 20, pageSizeOptions: [10, 20, 50] },
+  });
 
   return (
     <PageContainer className="space-y-6">
@@ -69,11 +88,28 @@ export default function AdminReviewsPage() {
           <Skeleton className="h-64 w-full" />
         </div>
       ) : (
-        <DataTable
-          id="admin-reviews"
-          columns={columns}
-          data={reviews}
-          searchPlaceholder="Search companies..."
+        <ResourceTable
+          table={table}
+          renderMobileRow={(review) => (
+            <article
+              className="cursor-pointer px-4 py-4"
+              onClick={() =>
+                router.push(`/companies/${review.company_id}/review`)
+              }
+            >
+              <p className="font-semibold text-gray-900">
+                {review.company?.registered_name ?? "Unknown company"}
+              </p>
+              <p className="text-muted-foreground mt-1 truncate text-sm">
+                {review.company?.email}
+              </p>
+              <p className="text-muted-foreground mt-3 text-xs">
+                Submitted {formatDateWithoutTime(review.created_at)}
+              </p>
+            </article>
+          )}
+          emptyState={{ title: "No company reviews" }}
+          noResultsState={{ title: "No reviews match your search" }}
           rowLabelSingular="review"
           rowLabelPlural="reviews"
           onRowClick={(r) => router.push(`/companies/${r.company_id}/review`)}

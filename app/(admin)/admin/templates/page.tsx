@@ -2,13 +2,16 @@
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import type { ColumnDef } from "@tanstack/react-table";
 import { preconfiguredAxios } from "@/app/api/preconfig.axios";
 import { PageContainer, PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  ResourceTable,
+  type ResourceTableColumn,
+} from "@/components/ui/resource-table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DataTable } from "@/components/ui/data-table";
+import { useResourceTable } from "@/components/ui/use-resource-table";
 import { useIomModalRegistry } from "@/components/modal-registry";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 
@@ -25,7 +28,8 @@ function ActionsCell({ template }: { template: Template }) {
   const { confirmAction } = useIomModalRegistry();
 
   const remove = useMutation({
-    mutationFn: () => preconfiguredAxios.delete(`/api/admin/templates/${template.id}`),
+    mutationFn: () =>
+      preconfiguredAxios.delete(`/api/admin/templates/${template.id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-templates"] });
       toast.success("Template deleted");
@@ -34,7 +38,10 @@ function ActionsCell({ template }: { template: Template }) {
   });
 
   return (
-    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="flex items-center gap-2"
+      onClick={(e) => e.stopPropagation()}
+    >
       <Button
         variant="outline"
         size="sm"
@@ -49,7 +56,8 @@ function ActionsCell({ template }: { template: Template }) {
         onClick={() =>
           confirmAction.open({
             title: `Delete ${template.name}?`,
-            description: "It will be removed from the catalog and universities can no longer offer it. Existing MOAs are unaffected (their PDFs are frozen). This can't be undone.",
+            description:
+              "It will be removed from the catalog and universities can no longer offer it. Existing MOAs are unaffected (their PDFs are frozen). This can't be undone.",
             confirmLabel: "Delete",
             onConfirm: () => remove.mutate(),
             isPending: remove.isPending,
@@ -62,16 +70,19 @@ function ActionsCell({ template }: { template: Template }) {
   );
 }
 
-const columns: ColumnDef<Template>[] = [
+const columns: Array<ResourceTableColumn<Template>> = [
   {
     id: "name",
     header: "Template",
-    accessorFn: (row) => row.name,
-    cell: ({ row }) => (
+    width: "w-[55%]",
+    getSortValue: (template) => template.name,
+    render: (template) => (
       <div className="min-w-0">
-        <p className="font-medium text-gray-900">{row.original.name}</p>
-        {row.original.description && (
-          <p className="text-muted-foreground truncate text-xs">{row.original.description}</p>
+        <p className="font-medium text-gray-900">{template.name}</p>
+        {template.description && (
+          <p className="text-muted-foreground truncate text-xs">
+            {template.description}
+          </p>
         )}
       </div>
     ),
@@ -79,21 +90,23 @@ const columns: ColumnDef<Template>[] = [
   {
     id: "term",
     header: "Term",
-    accessorFn: (row) => row.term_months ?? Infinity,
-    cell: ({ row }) => (
+    width: "w-[20%]",
+    getSortValue: (template) => template.term_months ?? Infinity,
+    render: (template) => (
       <Badge type="default" strength="medium">
-        {row.original.term_months == null ? "Perpetual" : `${row.original.term_months} mo`}
+        {template.term_months == null
+          ? "Perpetual"
+          : `${template.term_months} mo`}
       </Badge>
     ),
   },
   {
     id: "actions",
-    header: "",
-    enableSorting: false,
-    enableResizing: false,
-    size: 140,
-    minSize: 140,
-    cell: ({ row }) => <ActionsCell template={row.original} />,
+    header: <span className="sr-only">Actions</span>,
+    width: "w-[25%]",
+    align: "right",
+    sortable: false,
+    render: (template) => <ActionsCell template={template} />,
   },
 ];
 
@@ -106,6 +119,23 @@ export default function AdminTemplatesPage() {
       preconfiguredAxios
         .get("/api/admin/templates")
         .then((r) => r.data.templates as Template[]),
+  });
+  const templates = data ?? [];
+  const table = useResourceTable({
+    data: templates,
+    getRowId: (template) => template.id,
+    columns,
+    search: {
+      placeholder: "Search templates...",
+      ariaLabel: "Search templates",
+      matches: (template, query) =>
+        template.name.toLowerCase().includes(query) ||
+        String(template.term_months ?? Infinity)
+          .toLowerCase()
+          .includes(query),
+    },
+    sort: { initialColumn: "name", initialDirection: "asc" },
+    pagination: { pageSize: 20, pageSizeOptions: [10, 20, 50] },
   });
 
   return (
@@ -125,11 +155,35 @@ export default function AdminTemplatesPage() {
           <Skeleton className="h-64 w-full" />
         </div>
       ) : (
-        <DataTable
-          id="admin-templates"
-          columns={columns}
-          data={data ?? []}
-          searchPlaceholder="Search templates..."
+        <ResourceTable
+          table={table}
+          renderMobileRow={(template) => (
+            <article
+              className="cursor-pointer px-4 py-4"
+              onClick={() => router.push(`/templates/${template.id}`)}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold text-gray-900">{template.name}</p>
+                  {template.description && (
+                    <p className="text-muted-foreground mt-1 text-sm leading-5">
+                      {template.description}
+                    </p>
+                  )}
+                </div>
+                <Badge type="default" strength="medium">
+                  {template.term_months == null
+                    ? "Perpetual"
+                    : `${template.term_months} mo`}
+                </Badge>
+              </div>
+              <div className="mt-4">
+                <ActionsCell template={template} />
+              </div>
+            </article>
+          )}
+          emptyState={{ title: "No templates" }}
+          noResultsState={{ title: "No templates match your search" }}
           rowLabelSingular="template"
           rowLabelPlural="templates"
           onRowClick={(t) => router.push(`/templates/${t.id}`)}

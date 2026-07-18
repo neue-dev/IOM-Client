@@ -3,15 +3,18 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import type { ColumnDef } from "@tanstack/react-table";
 import { preconfiguredAxios } from "@/app/api/preconfig.axios";
 import { PageContainer, PageHeader } from "@/components/page-header";
+import { PartnershipStatusBadge } from "@/components/partnership-status-badge";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DataTable } from "@/components/ui/data-table";
+import {
+  ResourceTable,
+  type ResourceTableColumn,
+} from "@/components/ui/resource-table";
+import { useResourceTable } from "@/components/ui/use-resource-table";
 import { FormError } from "@/components/auth-shell";
 import { useModal } from "@/app/providers/modal-provider";
 import { useIomModalRegistry } from "@/components/modal-registry";
@@ -21,8 +24,48 @@ import { Loader2, Plus } from "lucide-react";
 interface University {
   id: string;
   registered_name: string;
+  logo_url: string | null;
   is_deactivated: boolean | null;
   university_accounts: { email: string; display_name: string }[];
+}
+
+function UniversityIdentity({ university }: { university: University }) {
+  const initials = university.registered_name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+
+  return (
+    <div className="flex min-w-0 items-center gap-3">
+      <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-[0.33em] border border-gray-200 bg-gray-50 text-xs font-semibold text-gray-600">
+        {university.logo_url ? (
+          // University logos are user-uploaded and served from signed URLs.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={university.logo_url}
+            alt={`${university.registered_name} logo`}
+            className="h-full w-full object-contain p-1"
+          />
+        ) : (
+          <span aria-hidden="true">{initials}</span>
+        )}
+      </div>
+      <span className="truncate font-medium text-gray-900">
+        {university.registered_name}
+      </span>
+    </div>
+  );
+}
+
+function UniversityStatus({ university }: { university: University }) {
+  return university.is_deactivated ? (
+    <PartnershipStatusBadge status="rejected" label="Deactivated" />
+  ) : (
+    <PartnershipStatusBadge status="active" />
+  );
 }
 
 const EMPTY_FORM = {
@@ -65,7 +108,9 @@ function CreateUniversityForm({ onClose }: { onClose: () => void }) {
           id="registered_name"
           placeholder="De La Salle University"
           value={form.registered_name}
-          onChange={(e) => setForm({ ...form, registered_name: e.target.value })}
+          onChange={(e) =>
+            setForm({ ...form, registered_name: e.target.value })
+          }
           required
         />
       </div>
@@ -76,7 +121,9 @@ function CreateUniversityForm({ onClose }: { onClose: () => void }) {
           type="email"
           placeholder="admin@university.edu"
           value={form.superadmin_email}
-          onChange={(e) => setForm({ ...form, superadmin_email: e.target.value })}
+          onChange={(e) =>
+            setForm({ ...form, superadmin_email: e.target.value })
+          }
           required
         />
       </div>
@@ -92,8 +139,14 @@ function CreateUniversityForm({ onClose }: { onClose: () => void }) {
         />
       </div>
       <div className="flex justify-end gap-2 pt-2">
-        <Button variant="outline" onClick={onClose}>Cancel</Button>
-        <Button type="submit" form="create-university" disabled={!valid || create.isPending}>
+        <Button variant="outline" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          form="create-university"
+          disabled={!valid || create.isPending}
+        >
           {create.isPending && <Loader2 className="animate-spin" />}
           {create.isPending ? "Creating…" : "Create"}
         </Button>
@@ -127,7 +180,8 @@ function DeactivateCell({ uni }: { uni: University }) {
         e.stopPropagation();
         confirmAction.open({
           title: `Deactivate ${uni.registered_name}?`,
-          description: "Staff will lose access and the institution can no longer receive new MOA requests. This can be reversed later.",
+          description:
+            "Staff will lose access and the institution can no longer receive new MOA requests. This can be reversed later.",
           confirmLabel: "Deactivate",
           onConfirm: () => deactivate.mutate(),
           isPending: deactivate.isPending,
@@ -139,45 +193,39 @@ function DeactivateCell({ uni }: { uni: University }) {
   );
 }
 
-const columns: ColumnDef<University>[] = [
+const columns: Array<ResourceTableColumn<University>> = [
   {
     id: "name",
     header: "University",
-    accessorFn: (row) => row.registered_name,
-    cell: ({ row }) => (
-      <span className="font-medium text-gray-900">{row.original.registered_name}</span>
-    ),
+    width: "w-[35%]",
+    getSortValue: (university) => university.registered_name,
+    render: (university) => <UniversityIdentity university={university} />,
   },
   {
     id: "superadmin",
     header: "Superadmin",
-    accessorFn: (row) => row.university_accounts[0]?.email ?? "",
-    cell: ({ row }) => (
+    width: "w-[35%]",
+    getSortValue: (university) => university.university_accounts[0]?.email,
+    render: (university) => (
       <span className="text-muted-foreground">
-        {row.original.university_accounts[0]?.email ?? "—"}
+        {university.university_accounts[0]?.email ?? "—"}
       </span>
     ),
   },
   {
     id: "status",
     header: "Status",
-    enableSorting: false,
-    accessorFn: (row) => (row.is_deactivated ? "Deactivated" : "Active"),
-    cell: ({ row }) =>
-      row.original.is_deactivated ? (
-        <Badge type="destructive" strength="medium">Deactivated</Badge>
-      ) : (
-        <Badge type="supportive" strength="medium">Active</Badge>
-      ),
+    width: "w-[15%]",
+    sortable: false,
+    render: (university) => <UniversityStatus university={university} />,
   },
   {
     id: "actions",
     header: "",
-    enableSorting: false,
-    enableResizing: false,
-    size: 120,
-    minSize: 120,
-    cell: ({ row }) => <DeactivateCell uni={row.original} />,
+    width: "w-[15%]",
+    align: "right",
+    sortable: false,
+    render: (university) => <DeactivateCell uni={university} />,
   },
 ];
 
@@ -191,6 +239,27 @@ export default function AdminUniversitiesPage() {
       return res.data.universities as University[];
     },
   });
+  const universities = data ?? [];
+  const table = useResourceTable({
+    data: universities,
+    getRowId: (university) => university.id,
+    columns,
+    search: {
+      placeholder: "Search universities...",
+      ariaLabel: "Search universities",
+      matches: (university, query) =>
+        university.registered_name.toLowerCase().includes(query) ||
+        (university.is_deactivated ? "deactivated" : "active").includes(
+          query,
+        ) ||
+        university.university_accounts.some(
+          (account) =>
+            account.email.toLowerCase().includes(query) ||
+            account.display_name.toLowerCase().includes(query),
+        ),
+    },
+    pagination: { pageSize: 20, pageSizeOptions: [10, 20, 50] },
+  });
 
   return (
     <PageContainer className="space-y-6">
@@ -200,11 +269,18 @@ export default function AdminUniversitiesPage() {
       >
         <Button
           onClick={() =>
-            openModal("create-university", <CreateUniversityForm onClose={() => closeModal("create-university")} />, {
-              title: "Create university",
-              description: "The superadmin is emailed an invitation to set their password.",
-              panelClassName: "!w-full sm:!max-w-md",
-            })
+            openModal(
+              "create-university",
+              <CreateUniversityForm
+                onClose={() => closeModal("create-university")}
+              />,
+              {
+                title: "Create university",
+                description:
+                  "The superadmin is emailed an invitation to set their password.",
+                panelClassName: "!w-full sm:!max-w-md",
+              },
+            )
           }
         >
           <Plus /> Add university
@@ -217,11 +293,41 @@ export default function AdminUniversitiesPage() {
           <Skeleton className="h-64 w-full" />
         </div>
       ) : (
-        <DataTable
-          id="admin-universities"
-          columns={columns}
-          data={data ?? []}
-          searchPlaceholder="Search universities..."
+        <ResourceTable
+          table={table}
+          renderMobileRow={(university) => (
+            <article
+              className="cursor-pointer px-4 py-4 transition-colors hover:bg-primary/[0.035]"
+              onClick={() =>
+                router.push(`/admin/universities/${university.id}`)
+              }
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <UniversityIdentity university={university} />
+                  <p className="text-muted-foreground mt-1 break-all text-sm">
+                    {university.university_accounts[0]?.email ??
+                      "No superadmin"}
+                  </p>
+                </div>
+                <UniversityStatus university={university} />
+              </div>
+              <div
+                className="mt-4"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <DeactivateCell uni={university} />
+              </div>
+            </article>
+          )}
+          emptyState={{
+            title: "No universities yet",
+            description: "Add a university to onboard its superadmin.",
+          }}
+          noResultsState={{
+            title: "No universities found",
+            description: "Try searching by another university, name, or email.",
+          }}
           rowLabelSingular="university"
           rowLabelPlural="universities"
           onRowClick={(uni) => router.push(`/admin/universities/${uni.id}`)}
