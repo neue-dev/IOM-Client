@@ -7,6 +7,7 @@ import { useUniversityProfile } from "@/app/providers/university-profile.provide
 import { preconfiguredAxios } from "@/app/api/preconfig.axios";
 import { toastPresets } from "@/components/sonner-toaster";
 import { PageContainer, PageHeader } from "@/components/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useIomModalRegistry } from "@/components/modal-registry";
 import {
   UniversityTemplatesTable,
@@ -58,6 +59,7 @@ export default function UniversityTemplatesPage() {
   });
 
   const offers = (data?.templates ?? []).filter((o) => !o.template.is_deleted);
+  const availableMoaCount = offers.filter((offer) => offer.is_available).length;
 
   if (isLoading || !account || !isSuperadmin) return null;
 
@@ -66,7 +68,18 @@ export default function UniversityTemplatesPage() {
       <PageHeader
         title="MOA Templates"
         description="Choose which catalog templates your university offers to companies. Your institution signatory must be set on your profile first."
-      />
+      >
+        {tLoading ? (
+          <Skeleton className="h-[58px] w-32" />
+        ) : (
+          <div className="min-w-32 rounded-[0.33em] border border-gray-200 bg-white px-3 py-2">
+            <p className="leading-none font-semibold text-gray-900">
+              {availableMoaCount}
+            </p>
+            <p className="text-muted-foreground mt-1 text-xs">Offered MOA/s</p>
+          </div>
+        )}
+      </PageHeader>
 
       <UniversityTemplatesTable
         offers={offers}
