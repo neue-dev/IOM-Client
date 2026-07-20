@@ -53,6 +53,7 @@ interface AppHeaderProps {
   postLogoutPath: string;
   profileHref?: string;
   userAvatarUrl?: string | null;
+  accountNav?: NavItem[];
 }
 
 function labelIcon(label: string): LucideIcon {
@@ -81,6 +82,7 @@ export function AppHeader({
   postLogoutPath,
   profileHref,
   userAvatarUrl,
+  accountNav = [],
 }: AppHeaderProps) {
   const pathname = usePathname() ?? "";
   const router = useRouter();
@@ -129,10 +131,9 @@ export function AppHeader({
               <h1 className="font-display text-lg font-bold text-gray-900">
                 Partners
               </h1>
-              <span
-                className="mx-2.5 h-4 w-px bg-gray-300"
-                aria-hidden="true"
-              />
+              <span className="mx-2.5 text-gray-300" aria-hidden="true">
+                |
+              </span>
               <span className="font-display text-gray-500">
                 {portal === "Platform Admin" ? portal : `${portal} Portal`}
               </span>
@@ -159,8 +160,8 @@ export function AppHeader({
                 <Icon className="!h-6 !w-6" strokeWidth={1.7} />
                 <span className="text-xs">{item.label}</span>
                 {!!item.badge && (
-                  <span className="absolute -top-0.5 -right-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-amber-400 text-[10px] font-bold leading-none text-amber-900">
-                    !
+                  <span className="absolute -top-0.5 right-5.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-amber-400 text-[10px] font-bold leading-none text-amber-900">
+                    {item.badge}
                   </span>
                 )}
               </Button>
@@ -172,22 +173,28 @@ export function AppHeader({
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="group h-auto min-w-24 flex-col items-stretch justify-center gap-0 rounded-[0.33em] p-0 hover:bg-gray-100"
+                className={cn(
+                  "group h-auto w-20 flex-col items-center justify-center gap-1 rounded-[0.33em] px-2 py-1",
+                  (profileHref && isActive(profileHref)) ||
+                    accountNav.some((item) => isActive(item.href))
+                    ? "text-primary"
+                    : "opacity-80 hover:bg-gray-100 hover:opacity-100",
+                )}
               >
-                <div className="flex items-center justify-center gap-2 rounded-[0.33em] border border-gray-300 p-2 px-3 text-xs">
+                <div className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-gray-100">
                   {userAvatarUrl ? (
                     <img
                       src={userAvatarUrl}
                       alt=""
-                      className="h-5 w-5 flex-shrink-0 rounded-full border border-gray-200 object-contain"
+                      className="h-full w-full object-contain"
                     />
                   ) : (
-                    <UserRound className="h-4 w-4 shrink-0 text-gray-500" />
+                    <UserRound className="h-5 w-5 text-gray-500" />
                   )}
-                  <span className="max-w-[120px] truncate font-medium">
-                    {userPrimary ?? "Account"}
-                  </span>
-                  <ChevronDown className="h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform group-data-[state=open]:rotate-180" />
+                </div>
+                <div className="flex items-center gap-0.5">
+                  <span className="text-xs">Account</span>
+                  <ChevronDown className="!h-3 !w-3 transition-transform group-data-[state=open]:rotate-180" />
                 </div>
               </Button>
             </DropdownMenuTrigger>
@@ -207,6 +214,20 @@ export function AppHeader({
                     Profile
                   </Link>
                 </DropdownMenuItem>
+              )}
+              {accountNav.map((item) => {
+                const Icon = item.icon ?? labelIcon(item.label);
+                return (
+                  <DropdownMenuItem key={item.href} asChild>
+                    <Link href={item.href}>
+                      <Icon className="h-4 w-4" />
+                      {item.label}
+                    </Link>
+                  </DropdownMenuItem>
+                );
+              })}
+              {(profileHref || accountNav.length > 0) && (
+                <DropdownMenuSeparator />
               )}
               <DropdownMenuItem
                 variant="destructive"
@@ -326,6 +347,17 @@ export function AppHeader({
                 </button>
               </Link>
             )}
+            {accountNav.map((item) => {
+              const Icon = item.icon ?? labelIcon(item.label);
+              return (
+                <Link key={item.href} href={item.href} className="block w-full">
+                  <button className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-gray-50">
+                    <Icon className="h-4 w-4" />
+                    {item.label}
+                  </button>
+                </Link>
+              );
+            })}
             <button
               onClick={() => logout.mutate()}
               disabled={logout.isPending}

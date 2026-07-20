@@ -4,7 +4,6 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import type { ColumnDef } from "@tanstack/react-table";
 import { preconfiguredAxios } from "@/app/api/preconfig.axios";
 import { PageContainer } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,7 +14,11 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DataTable } from "@/components/ui/data-table";
+import {
+  ResourceTable,
+  type ResourceTableColumn,
+} from "@/components/ui/resource-table";
+import { useResourceTable } from "@/components/ui/use-resource-table";
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import {
   Accordion,
@@ -33,7 +36,10 @@ interface ReviewDoc {
   url: string | null;
 }
 
-type ReviewFieldDetails = Record<string, { type?: string; document?: string; value: string }>;
+type ReviewFieldDetails = Record<
+  string,
+  { type?: string; document?: string; value: string }
+>;
 
 interface HistoryEntry {
   id: string;
@@ -73,8 +79,16 @@ function ReviewStatusBadge({ status }: { status: HistoryEntry["status"] }) {
 }
 
 const REVIEW_FIELDS = [
-  { key: "Date of Incorporation", type: "date", document: "SEC/DTI Registration" },
-  { key: "Company Registry Number", type: "text", document: "SEC/DTI Registration" },
+  {
+    key: "Date of Incorporation",
+    type: "date",
+    document: "SEC/DTI Registration",
+  },
+  {
+    key: "Company Registry Number",
+    type: "text",
+    document: "SEC/DTI Registration",
+  },
 ] as const;
 
 function ReviewFieldsEditor({
@@ -99,7 +113,9 @@ function ReviewFieldsEditor({
               type={field.type}
               className="h-8 text-xs"
               value={values[field.key] ?? ""}
-              onChange={(e) => onChange({ ...values, [field.key]: e.target.value })}
+              onChange={(e) =>
+                onChange({ ...values, [field.key]: e.target.value })
+              }
             />
           </div>
         ))}
@@ -112,15 +128,27 @@ function reviewFieldsComplete(values: Record<string, string>): boolean {
   return REVIEW_FIELDS.every((f) => (values[f.key] ?? "").trim() !== "");
 }
 
-function buildReviewDetails(values: Record<string, string>): ReviewFieldDetails {
+function buildReviewDetails(
+  values: Record<string, string>,
+): ReviewFieldDetails {
   const out: ReviewFieldDetails = {};
   for (const field of REVIEW_FIELDS) {
-    out[field.key] = { type: field.type, document: field.document, value: values[field.key] ?? "" };
+    out[field.key] = {
+      type: field.type,
+      document: field.document,
+      value: values[field.key] ?? "",
+    };
   }
   return out;
 }
 
-function DocumentsReadOnly({ entry, openPreview }: { entry: HistoryEntry; openPreview: (url: string, title: string) => void }) {
+function DocumentsReadOnly({
+  entry,
+  openPreview,
+}: {
+  entry: HistoryEntry;
+  openPreview: (url: string, title: string) => void;
+}) {
   if (entry.documents.length === 0) return null;
   return (
     <div className="divide-y divide-gray-100 rounded-[0.16em] border border-gray-200 bg-gray-50">
@@ -135,9 +163,13 @@ function DocumentsReadOnly({ entry, openPreview }: { entry: HistoryEntry; openPr
             disabled={!doc.url}
           >
             <Eye className="text-muted-foreground h-3.5 w-3.5 flex-shrink-0" />
-            <span className="text-sm font-medium text-gray-900">View {label}</span>
+            <span className="text-sm font-medium text-gray-900">
+              View {label}
+            </span>
             {!doc.url && (
-              <span className="text-muted-foreground ml-auto text-xs">Unavailable</span>
+              <span className="text-muted-foreground ml-auto text-xs">
+                Unavailable
+              </span>
             )}
           </button>
         );
@@ -148,13 +180,17 @@ function DocumentsReadOnly({ entry, openPreview }: { entry: HistoryEntry; openPr
 
 function MaterialFields({ entry }: { entry: HistoryEntry }) {
   if (!entry.material) return null;
-  const fields = Object.entries(entry.material).filter(([, v]) => v !== null && v !== "");
+  const fields = Object.entries(entry.material).filter(
+    ([, v]) => v !== null && v !== "",
+  );
   if (fields.length === 0) return null;
   return (
     <div className="divide-y divide-gray-100 rounded-[0.33em] border border-gray-200">
       {fields.map(([key, value]) => (
         <div key={key} className="flex items-start gap-4 px-3 py-2">
-          <p className="text-muted-foreground w-44 flex-shrink-0 text-xs">{key.replace(/_/g, " ")}</p>
+          <p className="text-muted-foreground w-44 flex-shrink-0 text-xs">
+            {key.replace(/_/g, " ")}
+          </p>
           <p className="min-w-0 flex-1 text-sm text-gray-900">{value}</p>
         </div>
       ))}
@@ -169,37 +205,41 @@ function ReviewFieldsReadOnly({ details }: { details: ReviewFieldDetails }) {
     <div className="divide-y divide-gray-100 rounded-[0.33em] border border-gray-200">
       {entries.map(([key, field]) => (
         <div key={key} className="flex items-start gap-4 px-3 py-2">
-          <p className="text-muted-foreground w-52 flex-shrink-0 text-xs">{key}</p>
-          <p className="min-w-0 flex-1 text-sm font-medium text-gray-900">{field.value}</p>
+          <p className="text-muted-foreground w-52 flex-shrink-0 text-xs">
+            {key}
+          </p>
+          <p className="min-w-0 flex-1 text-sm font-medium text-gray-900">
+            {field.value}
+          </p>
         </div>
       ))}
     </div>
   );
 }
 
-const pastColumns: ColumnDef<HistoryEntry>[] = [
+const pastColumns: Array<ResourceTableColumn<HistoryEntry>> = [
   {
     id: "status",
     header: "Status",
-    enableSorting: false,
-    cell: ({ row }) => <ReviewStatusBadge status={row.original.status} />,
+    sortable: false,
+    render: (entry) => <ReviewStatusBadge status={entry.status} />,
   },
   {
     id: "requested",
     header: "Request date",
-    accessorFn: (row) => row.created_at,
-    cell: ({ row }) => (
+    getSortValue: (entry) => entry.created_at,
+    render: (entry) => (
       <span className="text-muted-foreground text-sm">
-        {formatDateWithoutTime(row.original.created_at)}
+        {formatDateWithoutTime(entry.created_at)}
       </span>
     ),
   },
   {
     id: "reviewer",
     header: "Reviewer",
-    accessorFn: (row) => row.reviewer_email ?? "—",
-    cell: ({ row }) => (
-      <span className="text-sm">{row.original.reviewer_email ?? "—"}</span>
+    getSortValue: (entry) => entry.reviewer_email ?? "—",
+    render: (entry) => (
+      <span className="text-sm">{entry.reviewer_email ?? "—"}</span>
     ),
   },
 ];
@@ -207,9 +247,13 @@ const pastColumns: ColumnDef<HistoryEntry>[] = [
 function DocPreviewContent({ url, title }: { url: string; title: string }) {
   const isImage = /\.(png|jpe?g|gif|webp)$/i.test(url);
   if (isImage) {
-    return <img src={url} alt={title} className="h-full w-full object-contain" />;
+    return (
+      <img src={url} alt={title} className="h-full w-full object-contain" />
+    );
   }
-  return <iframe src={url} className="h-full w-full border-none" title={title} />;
+  return (
+    <iframe src={url} className="h-full w-full border-none" title={title} />
+  );
 }
 
 export default function AdminCompanyReviewPage() {
@@ -282,8 +326,12 @@ export default function AdminCompanyReviewPage() {
   });
 
   const { openEntry, pastEntries } = useMemo(() => {
-    const visible = (data?.history ?? []).filter((h) => h.status !== "superseded");
-    const open = data?.openReviewId ? visible.find((h) => h.id === data.openReviewId) : undefined;
+    const visible = (data?.history ?? []).filter(
+      (h) => h.status !== "superseded",
+    );
+    const open = data?.openReviewId
+      ? visible.find((h) => h.id === data.openReviewId)
+      : undefined;
     const past = visible.filter((h) => h.id !== data?.openReviewId);
     return { openEntry: open ?? null, pastEntries: past };
   }, [data]);
@@ -291,6 +339,63 @@ export default function AdminCompanyReviewPage() {
   const canApprove = openEntry
     ? reviewFieldsComplete(reviewValues) && !!approvalExpiresAt
     : false;
+
+  const pastTable = useResourceTable({
+    data: pastEntries,
+    getRowId: (entry) => entry.id,
+    columns: pastColumns,
+    sort: { initialColumn: "requested", initialDirection: "asc" },
+    pagination: { pageSize: 20, pageSizeOptions: [10, 20, 50, 100] },
+  });
+
+  const openPastReview = (entry: HistoryEntry) => {
+    setSelectedPast(entry);
+    const label = entry.status === "approved" ? "Approved" : "Reviewed";
+    openModal(
+      "past-review",
+      <div className="space-y-4">
+        {entry.rejection_reason && (
+          <p className="text-destructive text-xs">
+            Reason: {entry.rejection_reason}
+          </p>
+        )}
+        {entry.approval_expires_at && (
+          <p className="text-muted-foreground text-xs">
+            Approval expires: {formatDateWithoutTime(entry.approval_expires_at)}
+          </p>
+        )}
+        <MaterialFields entry={entry} />
+        <DocumentsReadOnly
+          entry={entry}
+          openPreview={(url, title) =>
+            openModal(
+              "preview-doc",
+              <DocPreviewContent url={url} title={title} />,
+              {
+                title,
+                panelClassName: "!w-full sm:!max-w-4xl",
+                contentClassName: "min-h-0 flex-1 overflow-hidden p-0 sm:p-0",
+                showHeaderDivider: true,
+              },
+            )
+          }
+        />
+        <ReviewFieldsReadOnly details={entry.document_review_details ?? {}} />
+      </div>,
+      {
+        title: (
+          <div className="flex items-center gap-2">
+            <ReviewStatusBadge status={entry.status} />
+            <span>Request — {formatDateWithoutTime(entry.created_at)}</span>
+          </div>
+        ),
+        description: entry.reviewed_at
+          ? `${label} by ${entry.reviewer_email ?? "—"} on ${formatDateWithoutTime(entry.reviewed_at)}`
+          : undefined,
+        panelClassName: "!w-full sm:!max-w-lg",
+      },
+    );
+  };
 
   if (isLoading) {
     return (
@@ -314,7 +419,7 @@ export default function AdminCompanyReviewPage() {
   }
 
   if (!openEntry) {
-    return router.push('/reviews')
+    return router.push("/reviews");
   }
 
   const { company } = data;
@@ -330,12 +435,10 @@ export default function AdminCompanyReviewPage() {
 
       <div>
         <h1 className="flex flex-row items-center gap-2 text-xl font-semibold text-gray-900">
-          {company.registered_name} 
+          {company.registered_name}
           <ReviewStatusBadge status={openEntry.status} />
         </h1>
-        <p className="text-muted-foreground mt-0.5 text-sm">
-          {company.email}
-        </p>
+        <p className="text-muted-foreground mt-0.5 text-sm">{company.email}</p>
         <p className="text-muted-foreground mt-0.5 text-sm">
           Submitted {formatDateWithoutTime(openEntry.created_at)}
         </p>
@@ -344,9 +447,26 @@ export default function AdminCompanyReviewPage() {
       {/* Pending review */}
       {openEntry ? (
         <>
-          <DocumentsReadOnly entry={openEntry} openPreview={(url, title) => openModal("preview-doc", <DocPreviewContent url={url} title={title} />, { title, panelClassName: "!w-full sm:!max-w-4xl", contentClassName: "min-h-0 flex-1 overflow-hidden p-0 sm:p-0", showHeaderDivider: true })} />
+          <DocumentsReadOnly
+            entry={openEntry}
+            openPreview={(url, title) =>
+              openModal(
+                "preview-doc",
+                <DocPreviewContent url={url} title={title} />,
+                {
+                  title,
+                  panelClassName: "!w-full sm:!max-w-4xl",
+                  contentClassName: "min-h-0 flex-1 overflow-hidden p-0 sm:p-0",
+                  showHeaderDivider: true,
+                },
+              )
+            }
+          />
           <br />
-          <ReviewFieldsEditor values={reviewValues} onChange={setReviewValues} />
+          <ReviewFieldsEditor
+            values={reviewValues}
+            onChange={setReviewValues}
+          />
           <div className="space-y-1.5">
             <Label htmlFor="approval-expires" className="text-md">
               Approval expires on
@@ -366,14 +486,19 @@ export default function AdminCompanyReviewPage() {
               onClick={() =>
                 confirmAction.open({
                   title: `Verify ${company.registered_name}?`,
-                  description: "The company will be able to request MOAs from any university and is emailed a confirmation.",
+                  description:
+                    "The company will be able to request MOAs from any university and is emailed a confirmation.",
                   confirmLabel: "Approve",
                   onConfirm: () => approve.mutate(),
                   isPending: approve.isPending,
                 })
               }
             >
-              {approve.isPending ? <Loader2 className="animate-spin" /> : <Check />}
+              {approve.isPending ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                <Check />
+              )}
               Approve
             </Button>
             <Button
@@ -381,9 +506,13 @@ export default function AdminCompanyReviewPage() {
               scheme="destructive"
               className="flex-1"
               onClick={() =>
-                openModal("reject-company", (
+                openModal(
+                  "reject-company",
                   <div className="space-y-4">
-                    <p className="text-sm text-muted-foreground">{company.registered_name} will be asked to update their details. The reason is emailed to the company.</p>
+                    <p className="text-sm text-muted-foreground">
+                      {company.registered_name} will be asked to update their
+                      details. The reason is emailed to the company.
+                    </p>
                     <textarea
                       rows={3}
                       placeholder="Reason (optional — emailed to the company)"
@@ -392,14 +521,29 @@ export default function AdminCompanyReviewPage() {
                       className="w-full rounded-[0.33em] border border-gray-200 p-2 text-sm"
                     />
                     <div className="flex justify-end gap-2">
-                      <Button variant="outline" onClick={() => closeModal("reject-company")}>Cancel</Button>
-                      <Button scheme="destructive" disabled={reject.isPending} onClick={() => reject.mutate()}>
-                        {reject.isPending && <Loader2 className="animate-spin" />}
+                      <Button
+                        variant="outline"
+                        onClick={() => closeModal("reject-company")}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        scheme="destructive"
+                        disabled={reject.isPending}
+                        onClick={() => reject.mutate()}
+                      >
+                        {reject.isPending && (
+                          <Loader2 className="animate-spin" />
+                        )}
                         {reject.isPending ? "Rejecting…" : "Reject"}
                       </Button>
                     </div>
-                  </div>
-                ), { title: "Reject verification", panelClassName: "!w-full sm:!max-w-md" })
+                  </div>,
+                  {
+                    title: "Reject verification",
+                    panelClassName: "!w-full sm:!max-w-md",
+                  },
+                )
               }
             >
               <X /> Reject
@@ -425,41 +569,35 @@ export default function AdminCompanyReviewPage() {
             </AccordionPrimitive.Header>
             <br />
             <AccordionContent className="pb-0">
-              <DataTable
-                id="past-reviews"
-                columns={pastColumns}
-                data={pastEntries}
-                enableSearch={false}
+              <ResourceTable
+                table={pastTable}
+                emptyState={{ title: "No previous requests." }}
+                noResultsState={{ title: "No matching requests." }}
                 rowLabelSingular="request"
                 rowLabelPlural="requests"
-                onRowClick={(entry) => {
-                  setSelectedPast(entry);
-                  const label = entry.status === "approved" ? "Approved" : "Reviewed";
-                  openModal("past-review", (
-                    <div className="space-y-4">
-                      {entry.rejection_reason && (
-                        <p className="text-destructive text-xs">Reason: {entry.rejection_reason}</p>
-                      )}
-                      {entry.approval_expires_at && (
-                        <p className="text-muted-foreground text-xs">Approval expires: {formatDateWithoutTime(entry.approval_expires_at)}</p>
-                      )}
-                      <MaterialFields entry={entry} />
-                      <DocumentsReadOnly entry={entry} openPreview={(url, title) => openModal("preview-doc", <DocPreviewContent url={url} title={title} />, { title, panelClassName: "!w-full sm:!max-w-4xl", contentClassName: "min-h-0 flex-1 overflow-hidden p-0 sm:p-0", showHeaderDivider: true })} />
-                      <ReviewFieldsReadOnly details={entry.document_review_details ?? {}} />
+                onRowClick={openPastReview}
+                renderMobileRow={(entry) => (
+                  <button
+                    type="button"
+                    onClick={() => openPastReview(entry)}
+                    className="w-full cursor-pointer px-4 py-3 text-left transition-colors hover:bg-primary/[0.035] focus-visible:bg-primary/[0.035] focus-visible:outline-none"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <ReviewStatusBadge status={entry.status} />
+                      <span className="text-muted-foreground text-xs">
+                        {formatDateWithoutTime(entry.created_at)}
+                      </span>
                     </div>
-                  ), {
-                    title: <div className="flex items-center gap-2"><ReviewStatusBadge status={entry.status} /><span>Request — {formatDateWithoutTime(entry.created_at)}</span></div>,
-                    description: entry.reviewed_at ? `${label} by ${entry.reviewer_email ?? "—"} on ${formatDateWithoutTime(entry.reviewed_at)}` : undefined,
-                    panelClassName: "!w-full sm:!max-w-lg",
-                  });
-                }}
+                    <p className="mt-2 text-sm">
+                      {entry.reviewer_email ?? "—"}
+                    </p>
+                  </button>
+                )}
               />
             </AccordionContent>
           </AccordionItem>
         </Accordion>
       )}
-
-      
     </PageContainer>
   );
 }

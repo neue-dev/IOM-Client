@@ -10,6 +10,7 @@ import {
   usePdfPageRenderer,
 } from "@betterinternship/core/pdf-viewer";
 import {
+  type CompanyPendingInvitesResponse,
   getCompanyControllerListMoasQueryKey,
   getCompanyControllerListPendingInvitesQueryKey,
   getCompanyControllerListQueuedMoasQueryKey,
@@ -22,7 +23,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FormError } from "@/components/auth-shell";
-import { MoaSignatureInput, type MoaSignatureMode } from "@/components/moa-signature-input";
+import {
+  MoaSignatureInput,
+  type MoaSignatureMode,
+} from "@/components/moa-signature-input";
 import { useResolvedFile } from "@/app/lib/resolve-file";
 import { toast } from "sonner";
 import { toastPresets } from "@/components/sonner-toaster";
@@ -39,7 +43,13 @@ import {
 
 function AnimatedCheck() {
   return (
-    <svg width="72" height="72" viewBox="0 0 52 52" fill="none" className="text-supportive">
+    <svg
+      width="72"
+      height="72"
+      viewBox="0 0 52 52"
+      fill="none"
+      className="text-supportive"
+    >
       <path
         d="M14 27 L22 35 L38 18"
         stroke="currentColor"
@@ -76,7 +86,9 @@ function MoaIssuedSuccess() {
       <div className="mb-5 rounded-full bg-supportive/10 p-6">
         <AnimatedCheck />
       </div>
-      <h2 className="text-3xl font-semibold tracking-tight text-foreground">MOA issued</h2>
+      <h2 className="text-3xl font-semibold tracking-tight text-foreground">
+        MOA issued
+      </h2>
       <p className="text-muted-foreground mt-2 text-sm">Opening your MOA...</p>
     </div>
   );
@@ -95,7 +107,9 @@ function MoaIssuingState() {
         <span className="absolute h-20 w-20 animate-pulse rounded-full bg-primary/10" />
         <FileText className="text-primary relative h-12 w-12" />
       </div>
-      <h2 className="text-3xl font-semibold tracking-tight text-foreground">Issuing your MOA</h2>
+      <h2 className="text-3xl font-semibold tracking-tight text-foreground">
+        Issuing your MOA
+      </h2>
       <p className="text-muted-foreground mt-2 max-w-sm text-sm">
         We&apos;re generating the agreement and preparing the signed document.
       </p>
@@ -123,7 +137,7 @@ const requestSteps = [
   { title: "Sign request", icon: PenLine },
 ];
 
-function TemplatePdfViewer({ url, title }: { url: string; title: string }) {
+function TemplatePdfViewer({ url }: { url: string }) {
   const { pdfDoc, pageCount, isLoading, error } = usePdfDocumentFromUrl(url);
   const [scale, setScale] = useState(1);
   const [visiblePage, setVisiblePage] = useState(1);
@@ -155,11 +169,6 @@ function TemplatePdfViewer({ url, title }: { url: string; title: string }) {
       onScaleChange={setScale}
       visiblePage={visiblePage}
       onVisiblePageChange={setVisiblePage}
-      headerLeft={
-        <span className="truncate text-xs font-medium text-slate-700">
-          {title}
-        </span>
-      }
       renderPage={(pageNumber) => (
         <TemplatePdfPage
           key={pageNumber}
@@ -208,7 +217,6 @@ export function TemplatePreviewContent({
       ) : pdfUrl ? (
         <TemplatePdfViewer
           url={`/gcs-proxy?url=${encodeURIComponent(pdfUrl)}`}
-          title={templateName}
         />
       ) : (
         <div className="flex h-full items-center justify-center">
@@ -265,9 +273,24 @@ export function RequestDialog({
     queryClient.invalidateQueries({
       queryKey: getCompanyControllerListQueuedMoasQueryKey(),
     });
-    queryClient.invalidateQueries({
-      queryKey: getCompanyControllerListPendingInvitesQueryKey(),
-    });
+    const pendingInvitesQueryKey =
+      getCompanyControllerListPendingInvitesQueryKey();
+    if (inviteId) {
+      queryClient.setQueriesData<CompanyPendingInvitesResponse>(
+        { queryKey: pendingInvitesQueryKey },
+        (current) =>
+          current
+            ? {
+                ...current,
+                invites: current.invites.filter(
+                  (invite) => invite.id !== inviteId,
+                ),
+              }
+            : current,
+      );
+    } else {
+      queryClient.invalidateQueries({ queryKey: pendingInvitesQueryKey });
+    }
     if (verified && res.moa) {
       setRequestPhase("issued");
       window.setTimeout(() => {
@@ -497,13 +520,25 @@ export function RequestDialog({
           disabled={!step2Ready || isRequestPending}
         >
           {isRequestPending && <Loader2 className="animate-spin" />}
-          {isRequestPending ? "Requesting…" : "Request MOA"}
+          {isRequestPending
+            ? verified
+              ? "Requesting…"
+              : "Queueing…"
+            : verified
+              ? "Request MOA"
+              : "Queue MOA"}
         </Button>
       </div>
     );
 
   return (
     <div className="space-y-4 sm:w-[min(92vw,64rem)]">
+      {!verified && (
+        <div className="border-primary/20 bg-primary/5 rounded-[0.33em] border px-4 py-3 text-sm text-gray-700">
+          Your company is still pending approval. This request will be queued
+          and issued automatically once the platform team approves your company.
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
         {requestSteps.map((requestStep, index) => {
           const Icon = requestStep.icon;

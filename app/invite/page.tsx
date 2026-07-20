@@ -1,64 +1,110 @@
 "use client";
+
 import { Suspense, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useInviteControllerResolveCompanyInvite, useCompanyAuthControllerLoginViaInvite } from "@/app/api";
-import { useResolvedFile } from "@/app/lib/resolve-file";
+import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
+import {
+  ArrowRight,
+  CalendarDays,
+  ChevronRight,
+  FileText,
+  Loader2,
+  Quote,
+} from "lucide-react";
+
+import {
+  useCompanyAuthControllerLoginViaInvite,
+  useCompanyControllerCareerListingLink,
+  useInviteControllerResolveCompanyInvite,
+} from "@/app/api";
+import type { ApiError } from "@/app/api/preconfig.axios";
+import { getCareerHireUrl } from "@/components/career-listing-cta";
+import { useIomModalRegistry } from "@/components/modal-registry";
+import { toastPresets } from "@/components/sonner-toaster";
 import { Button } from "@/components/ui/button";
-import { useModal } from "@/app/providers/modal-provider";
-import { Loader2 } from "lucide-react";
+import { formatDateWithoutTime } from "@/lib/utils";
+
+const CAREER_UNREACHABLE_MESSAGE =
+  "Your account is ready, but we couldn't reach BetterInternship just now — use the \"Post a listing\" button on your dashboard to continue.";
 
 interface InviteData {
   email: string;
   company_name: string | null;
-  email_status: "not_registered" | "registered_unverified" | "registered_verified";
-  university: { id: string; registered_name: string; address: string | null; logo_url: string | null };
-  template: { id: string; name: string; description: string | null; term_months: number | null } | null;
+  email_status:
+    | "not_registered"
+    | "registered_unverified"
+    | "registered_verified";
+  university: {
+    id: string;
+    registered_name: string;
+    address: string | null;
+    logo_url: string | null;
+  };
+  template: {
+    id: string;
+    name: string;
+    description: string | null;
+    term_months: number | null;
+  } | null;
   invite: { personal_message: string | null; expires_at: string };
-}
-
-interface Template {
-  id: string;
-  name: string;
-  description: string | null;
-}
-
-function TemplatePreviewContent({ template, close }: { template: Template; close: () => void }) {
-  const { url: pdfUrl, loading: isLoading } = useResolvedFile("template_pdf", template.id);
-  return (
-    <>
-      {isLoading ? (
-        <div className="flex h-full items-center justify-center">
-          <Loader2 className="text-muted-foreground h-5 w-5 animate-spin" />
-        </div>
-      ) : pdfUrl ? (
-        <iframe src={pdfUrl} className="h-full w-full border-0" title={template.name} />
-      ) : (
-        <div className="flex h-full items-center justify-center">
-          <p className="text-muted-foreground text-sm">Couldn&apos;t load the template PDF.</p>
-        </div>
-      )}
-    </>
-  );
+  kind: "moa" | "listing";
+  tin_hint: string | null;
 }
 
 function InvitePageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { openModal, closeModal } = useModal();
+  const modal = useIomModalRegistry();
   const token = searchParams.get("token") ?? "";
   const [loginError, setLoginError] = useState("");
 
+  // Listing-invite handoff after sign-in — no MOA modal, straight to
+  // create-listing (mirrors career-listing-cta.tsx's conflict handling).
+  const careerListingLink = useCompanyControllerCareerListingLink({
+    mutation: {
+      onSuccess: (data) => {
+        if (data.magicLink) {
+          window.location.href = data.magicLink;
+        } else {
+          toast(CAREER_UNREACHABLE_MESSAGE, toastPresets.destructive);
+          router.replace("/company/dashboard");
+        }
+      },
+      onError: (e: Error) => {
+        const error = e as ApiError;
+        if (
+          error.code === "EMAIL_MANAGES_OTHER_EMPLOYER" &&
+          error.email &&
+          error.autoLinkToken
+        ) {
+          const url = new URL("/login", getCareerHireUrl());
+          url.searchParams.set("email", error.email);
+          url.searchParams.set("auto_link", error.autoLinkToken);
+          window.location.href = url.toString();
+          return;
+        }
+        toast(CAREER_UNREACHABLE_MESSAGE, toastPresets.destructive);
+        router.replace("/company/dashboard");
+      },
+    },
+  });
+
   const loginViaInvite = useCompanyAuthControllerLoginViaInvite({
     mutation: {
-    onSuccess: (res) => {
-      const params = new URLSearchParams();
-      params.set("open_university_id", res.university_id);
-      if (res.template_id) params.set("template_id", res.template_id);
-      if (res.invite_id) params.set("invite_id", res.invite_id);
-      router.replace(`/company/dashboard?${params}`);
-    },
-    onError: (e: Error) => setLoginError(e.message),
+      onSuccess: (response) => {
+        if (response.kind === "listing") {
+          careerListingLink.mutate();
+          return;
+        }
+        const params = new URLSearchParams();
+        params.set("open_university_id", response.university_id);
+        if (response.template_id)
+          params.set("template_id", response.template_id);
+        if (response.invite_id) params.set("invite_id", response.invite_id);
+        router.replace(`/company/dashboard?${params}`);
+      },
+      onError: (error: Error) => setLoginError(error.message),
     },
   });
 
@@ -66,14 +112,13 @@ function InvitePageContent() {
     { token },
     { query: { enabled: !!token, retry: false } },
   );
-
   const inviteData = data as unknown as InviteData | undefined;
 
   if (!token || (!isLoading && (error || !inviteData))) {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
-        <div className="space-y-2 rounded-[0.33em] bg-white/90 px-8 py-6 text-center shadow-lg backdrop-blur-sm">
-          <p className="text-lg font-semibold text-gray-900">
+        <div className="space-y-2 rounded-lg border border-slate-200 bg-white px-8 py-7 text-center shadow-lg backdrop-blur-sm">
+          <p className="text-lg font-semibold text-slate-950">
             {!token ? "Invalid invite link" : "Invite not found"}
           </p>
           <p className="text-muted-foreground text-sm">
@@ -89,116 +134,142 @@ function InvitePageContent() {
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-white drop-shadow" />
+        <Loader2 className="text-primary size-8 animate-spin" />
       </div>
     );
   }
 
-  const { email, company_name, email_status, university, template, invite } = inviteData!;
+  const { company_name, email_status, university, template, invite, kind } =
+    inviteData!;
   const registerHref = `/company/register?invite_token=${encodeURIComponent(token)}`;
+  const companyLabel = company_name || "Your company";
+  const isListing = kind === "listing";
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-4 py-10">
-      <div className="w-full max-w-md space-y-4">
-        {university.logo_url && (
-          <div className="flex justify-center">
+    <main className="flex min-h-screen items-center justify-center px-5 py-10 sm:px-8">
+      <div className="w-full max-w-md rounded-xl bg-white px-5 py-8 backdrop-blur-[2px] sm:px-0 md:bg-transparent md:py-12 md:backdrop-blur-none">
+        <section className="text-center">
+          {university.logo_url && (
+            // University logos are user-uploaded external assets.
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={university.logo_url}
-              alt={university.registered_name}
-              className="h-48 w-48 rounded-full border border-gray-200 object-contain"
+              alt={`${university.registered_name} logo`}
+              className="mx-auto size-24 object-contain sm:size-28"
             />
-          </div>
-        )}
+          )}
 
-        <div className="overflow-hidden rounded-[0.33em] border border-gray-300 bg-white shadow-lg">
-          <div className="space-y-6 p-6 sm:p-8">
-            <p className="font-semibold text-gray-900 text-2xl">
-              {university.registered_name}
-              <br />
-              <span className="font-normal text-base">
-                invites {company_name ? <span className="font-medium text-gray-900">{company_name}</span> : "your company"} to <span className="font-semibold">sign a MOA</span> with them!
+          <h1 className="mt-4 text-2xl font-semibold tracking-tight text-[#121d3d] sm:text-3xl">
+            {university.registered_name}
+          </h1>
+          <p className="text-muted-foreground mx-auto mt-4 max-w-sm text-base leading-7 sm:text-lg">
+            invites{" "}
+            <strong className="font-semibold text-primary">
+              {companyLabel}
+            </strong>{" "}
+            {isListing
+              ? "to post internship listings on BetterInternship."
+              : "to establish an internship partnership."}
+          </p>
+        </section>
+
+        <div className="mt-8 border-t border-slate-200">
+          {template && (
+            <div className="flex items-center gap-4 border-b border-slate-200 py-6">
+              <span className="bg-primary/5 text-primary flex size-14 shrink-0 items-center justify-center rounded-full">
+                <FileText className="size-6" aria-hidden="true" />
               </span>
-            </p>
-
-            <div className="space-y-3">
-              {template && (
-                <div className="flex items-stretch overflow-hidden rounded-[0.33em] border border-gray-200">
-                  <div className="flex-1 bg-gray-50 px-3 py-2.5">
-                    <p className="text-muted-foreground text-xs">MOA template</p>
-                    <p className="mt-0.5 text-sm font-medium text-gray-900">{template.name}</p>
-                    {template.description && (
-                      <p className="text-muted-foreground mt-0.5 text-xs">{template.description}</p>
-                    )}
-                    <p className="text-muted-foreground mt-0.5 text-xs">
-                      Term: {template.term_months == null ? "Perpetual (no expiry)" : `${template.term_months} months`}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() =>
-                      openModal("template-preview", <TemplatePreviewContent template={template} close={() => closeModal("template-preview")} />, {
-                        title: template.name,
-                        panelClassName: "!w-full sm:!max-w-4xl",
-                        contentClassName: "min-h-0 flex-1 overflow-hidden p-0 sm:p-0",
-                        showHeaderDivider: true,
-                      })
-                    }
-                    className="text-muted-foreground flex cursor-pointer items-center border-l border-gray-200 bg-gray-50 px-4 text-sm duration-200 hover:bg-gray-200"
-                  >
-                    Preview
-                  </button>
-                </div>
-              )}
-
-              {invite.personal_message && (
-                <div className="rounded-[0.33em] border border-gray-200 px-3 py-2.5">
-                  <p className="text-muted-foreground mb-1 text-xs">Message</p>
-                  <p className="whitespace-pre-line text-sm text-gray-700">
-                    {invite.personal_message}
-                  </p>
-                </div>
-              )}
+              <div className="min-w-0 flex-1 text-left">
+                <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                  Document
+                </p>
+                <p className="mt-1 font-semibold text-[#121d3d]">
+                  {template.name}
+                </p>
+                <p className="text-muted-foreground mt-1 text-sm">
+                  {template.term_months == null
+                    ? "Perpetual  •  No expiry"
+                    : `${template.term_months} months`}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => modal.previewTemplate.open(template)}
+                className="text-primary hidden shrink-0 cursor-pointer items-center gap-2 text-sm font-medium hover:underline sm:flex"
+              >
+                Preview template
+                <ChevronRight className="size-4" aria-hidden="true" />
+              </button>
             </div>
+          )}
 
-            <hr className="border-gray-100" />
+          {template && (
+            <button
+              type="button"
+              onClick={() => modal.previewTemplate.open(template)}
+              className="text-primary flex w-full cursor-pointer items-center justify-center gap-2 border-b border-slate-200 py-3 text-sm font-medium sm:hidden"
+            >
+              Preview template
+              <ChevronRight className="size-4" aria-hidden="true" />
+            </button>
+          )}
 
-            <div className="space-y-3">
-              {email_status === "not_registered" ? (
-                <>
-                  <p className="text-sm text-gray-700">
-                    We'll help you set up the MOA.
-                  </p>
-                  <Button size="lg" className="w-full" asChild>
-                    <Link href={registerHref}>Create company account</Link>
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <p className="text-sm text-gray-700">
-                    Your company already has an account.
-                  </p>
-                  {loginError && (
-                    <p className="text-destructive rounded-[0.33em] bg-red-50 px-3 py-2 text-sm">
-                      {loginError}
-                    </p>
-                  )}
-                  <Button
-                    size="lg"
-                    className="w-full"
-                    onClick={() => loginViaInvite.mutate({ data: { token } })}
-                    disabled={loginViaInvite.isPending}
-                  >
-                    {loginViaInvite.isPending && <Loader2 className="animate-spin" />}
-                    {loginViaInvite.isPending ? "Signing in…" : email_status === "registered_verified" ? "Sign MOA" : "Continue"}
-                  </Button>
-                </>
-              )}
+          {invite.personal_message && (
+            <div className="flex items-center gap-4 border-b border-slate-200 py-6">
+              <span className="bg-primary/5 text-primary flex size-14 shrink-0 items-center justify-center rounded-full">
+                <Quote className="size-7 fill-current" aria-hidden="true" />
+              </span>
+              <div className="min-w-0 text-left">
+                <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                  Message from {university.registered_name}
+                </p>
+                <p className="mt-2 whitespace-pre-line text-base leading-6 text-[#121d3d]">
+                  “{invite.personal_message}”
+                </p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
-      </div>
+        <div className="mt-8">
+          {loginError && (
+            <p className="text-destructive mb-3 rounded-md bg-red-50 px-3 py-2 text-sm">
+              {loginError}
+            </p>
+          )}
 
-    </div>
+          {email_status === "not_registered" ? (
+            <Button size="lg" className="w-full" asChild>
+              <Link href={registerHref}>
+                Accept invitation
+                <ArrowRight aria-hidden="true" />
+              </Link>
+            </Button>
+          ) : (
+            <Button
+              size="lg"
+              className="w-full"
+              onClick={() => loginViaInvite.mutate({ data: { token } })}
+              disabled={loginViaInvite.isPending || careerListingLink.isPending}
+            >
+              {loginViaInvite.isPending || careerListingLink.isPending
+                ? "Signing in…"
+                : "Accept invitation"}
+              {loginViaInvite.isPending || careerListingLink.isPending ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                <ArrowRight aria-hidden="true" />
+              )}
+            </Button>
+          )}
+          <p className="text-muted-foreground mt-3 text-center text-sm">
+            {isListing
+              ? "You'll set up your account and can start posting right away."
+              : "You'll be able to review the agreement before signing."}
+          </p>
+        </div>
+      </div>
+    </main>
   );
 }
 
@@ -208,7 +279,7 @@ export default function CompanyInvitePage() {
       <Suspense
         fallback={
           <div className="flex min-h-screen items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-white drop-shadow" />
+            <Loader2 className="text-primary size-8 animate-spin" />
           </div>
         }
       >

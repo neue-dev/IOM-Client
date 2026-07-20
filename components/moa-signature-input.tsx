@@ -16,6 +16,7 @@ type MoaSignatureInputProps = {
   onTextChange: (text: string) => void;
   file: File | null;
   onFileChange: (file: File | null) => void;
+  modes?: MoaSignatureMode[];
 };
 
 const MAX_SIGNATURE_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -40,6 +41,7 @@ export function MoaSignatureInput({
   onTextChange,
   file,
   onFileChange,
+  modes = ["type", "upload", "draw"],
 }: MoaSignatureInputProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState("");
@@ -96,7 +98,9 @@ export function MoaSignatureInput({
       const dataUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () =>
-          typeof reader.result === "string" ? resolve(reader.result) : reject(new Error());
+          typeof reader.result === "string"
+            ? resolve(reader.result)
+            : reject(new Error());
         reader.onerror = () => reject(reader.error);
         reader.readAsDataURL(nextFile);
       });
@@ -177,14 +181,23 @@ export function MoaSignatureInput({
     { id: "type" as const, title: "Type", icon: Type },
     { id: "upload" as const, title: "Upload", icon: ImageUp },
     { id: "draw" as const, title: "Draw", icon: PenLine },
-  ];
+  ].filter((option) => modes.includes(option.id));
 
   return (
     <div className="space-y-2">
       <Label>Signature</Label>
       <div className="space-y-4 rounded-[0.33em] border border-gray-300 p-4 px-5">
         <div className="space-y-2">
-          <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Signature method">
+          <div
+            className={cn(
+              "grid gap-2",
+              signatureModeOptions.length === 2
+                ? "sm:grid-cols-2"
+                : "sm:grid-cols-3",
+            )}
+            role="radiogroup"
+            aria-label="Signature method"
+          >
             {signatureModeOptions.map((option) => {
               const active = mode === option.id;
               const Icon = option.icon;
@@ -206,20 +219,31 @@ export function MoaSignatureInput({
                   <span
                     className={cn(
                       "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors",
-                      active ? "border-primary" : "border-slate-300 group-hover:border-primary/60",
+                      active
+                        ? "border-primary"
+                        : "border-slate-300 group-hover:border-primary/60",
                     )}
                   >
-                    <span className={cn("h-2 w-2 rounded-full", active ? "bg-primary" : "bg-transparent")} />
+                    <span
+                      className={cn(
+                        "h-2 w-2 rounded-full",
+                        active ? "bg-primary" : "bg-transparent",
+                      )}
+                    />
                   </span>
                   <span
                     className={cn(
                       "flex h-7 w-7 shrink-0 items-center justify-center transition-colors",
-                      active ? "text-primary" : "text-slate-600 group-hover:text-primary",
+                      active
+                        ? "text-primary"
+                        : "text-slate-600 group-hover:text-primary",
                     )}
                   >
                     <Icon className="h-4.5 w-4.5" />
                   </span>
-                  <span className="truncate text-sm font-semibold text-slate-950">{option.title}</span>
+                  <span className="truncate text-sm font-semibold text-slate-950">
+                    {option.title}
+                  </span>
                 </button>
               );
             })}
@@ -263,7 +287,11 @@ export function MoaSignatureInput({
               }}
               onDragLeave={(event) => {
                 event.preventDefault();
-                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                if (
+                  !event.currentTarget.contains(
+                    event.relatedTarget as Node | null,
+                  )
+                ) {
                   setIsUploadDragging(false);
                 }
               }}
@@ -275,16 +303,26 @@ export function MoaSignatureInput({
             >
               {previewUrl ? (
                 <>
-                  <img src={previewUrl} alt="Uploaded signature" className="max-h-28 w-full object-contain" />
-                  <span className="text-xs font-medium text-slate-500">{file?.name}</span>
+                  <img
+                    src={previewUrl}
+                    alt="Uploaded signature"
+                    className="max-h-28 w-full object-contain"
+                  />
+                  <span className="text-xs font-medium text-slate-500">
+                    {file?.name}
+                  </span>
                 </>
               ) : (
                 <>
                   <span className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-700">
                     <UploadCloud className="h-4.5 w-4.5" />
                   </span>
-                  <span className="text-sm font-medium text-slate-900">Choose a signature image</span>
-                  <span className="text-xs text-slate-500">PNG or JPEG, 10 MB maximum</span>
+                  <span className="text-sm font-medium text-slate-900">
+                    Choose a signature image
+                  </span>
+                  <span className="text-xs text-slate-500">
+                    PNG or JPEG, 10 MB maximum
+                  </span>
                 </>
               )}
               <input

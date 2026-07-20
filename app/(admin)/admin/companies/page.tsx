@@ -2,7 +2,6 @@
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import type { ColumnDef } from "@tanstack/react-table";
 import { toast } from "sonner";
 import { Check, ChevronDown, Loader2, Plus, Upload } from "lucide-react";
 import {
@@ -22,30 +21,48 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 import {
-  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
 } from "@/components/ui/select";
 import { FormError } from "@/components/auth-shell";
-import { DataTable } from "@/components/ui/data-table";
+import {
+  ResourceTable,
+  type ResourceTableColumn,
+} from "@/components/ui/resource-table";
+import { useResourceTable } from "@/components/ui/use-resource-table";
 import { useModal } from "@/app/providers/modal-provider";
 import {
-  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { formatDateWithoutTime } from "@/lib/utils";
 
-const columns: ColumnDef<AdminCompanyListItemDto>[] = [
+const columns: Array<ResourceTableColumn<AdminCompanyListItemDto>> = [
   {
     id: "name",
     header: "Company",
-    accessorFn: (row) => row.registered_name,
-    cell: ({ row }) => (
+    width: "w-[45%]",
+    getSortValue: (company) => company.registered_name,
+    render: (company) => (
       <div className="flex items-center gap-2 min-w-0">
-        <p className="font-medium text-gray-900">{row.original.registered_name}</p>
-        {row.original.is_deactivated ? (
-          <Badge type="destructive" strength="medium">Deactivated</Badge>
-        ) : row.original.has_pending_review ? (
-          <Badge type="warning" strength="medium">Pending</Badge>
-        ) : row.original.is_profile_incomplete ? (
-          <Badge type="default" strength="medium">Incomplete</Badge>
+        <p className="font-medium text-gray-900">{company.registered_name}</p>
+        {company.is_deactivated ? (
+          <Badge type="destructive" strength="medium">
+            Deactivated
+          </Badge>
+        ) : company.has_pending_review ? (
+          <Badge type="warning" strength="medium">
+            Pending
+          </Badge>
+        ) : company.is_profile_incomplete ? (
+          <Badge type="default" strength="medium">
+            Incomplete
+          </Badge>
         ) : null}
       </div>
     ),
@@ -53,22 +70,25 @@ const columns: ColumnDef<AdminCompanyListItemDto>[] = [
   {
     id: "email",
     header: "Email",
-    accessorFn: (row) => row.email,
-    cell: ({ row }) => (
-      row.original.email ? (
-        <span className="text-muted-foreground">{row.original.email}</span>
+    width: "w-[35%]",
+    getSortValue: (company) => company.email,
+    render: (company) =>
+      company.email ? (
+        <span className="text-muted-foreground">{company.email}</span>
       ) : (
-        <Badge type="default" strength="medium">Record only</Badge>
-      )
-    ),
+        <Badge type="default" strength="medium">
+          Record only
+        </Badge>
+      ),
   },
   {
     id: "joined",
     header: "Joined",
-    accessorFn: (row) => row.created_at,
-    cell: ({ row }) => (
+    width: "w-[20%]",
+    getSortValue: (company) => new Date(company.created_at),
+    render: (company) => (
       <span className="text-muted-foreground">
-        {formatDateWithoutTime(row.original.created_at)}
+        {formatDateWithoutTime(company.created_at)}
       </span>
     ),
   },
@@ -99,26 +119,40 @@ function CreateCompanyForm({ onClose }: { onClose: () => void }) {
   const create = useAdminControllerCreateCompany({
     mutation: {
       onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: getAdminControllerListCompaniesQueryKey() });
-      toast.success("Company created");
-      onClose();
-    },
-    onError: (e: Error) => setError(e.message),
+        queryClient.invalidateQueries({
+          queryKey: getAdminControllerListCompaniesQueryKey(),
+        });
+        toast.success("Company created");
+        onClose();
+      },
+      onError: (e: Error) => setError(e.message),
     },
   });
 
   const verify = useAdminControllerVerifyTin({
     mutation: {
-    onSuccess: (data) => {
-      if (data.valid) {
-        setVerifyState({ loading: false, result: "verified", message: data.message });
-      } else {
-        setVerifyState({ loading: false, result: "failed", message: data.message });
-      }
-    },
-    onError: (e: Error) => {
-      setVerifyState({ loading: false, result: "failed", message: e.message });
-    },
+      onSuccess: (data) => {
+        if (data.valid) {
+          setVerifyState({
+            loading: false,
+            result: "verified",
+            message: data.message,
+          });
+        } else {
+          setVerifyState({
+            loading: false,
+            result: "failed",
+            message: data.message,
+          });
+        }
+      },
+      onError: (e: Error) => {
+        setVerifyState({
+          loading: false,
+          result: "failed",
+          message: e.message,
+        });
+      },
     },
   });
 
@@ -128,12 +162,20 @@ function CreateCompanyForm({ onClose }: { onClose: () => void }) {
     <>
       <form
         id="create-company"
-        onSubmit={(e) => { e.preventDefault(); setError(""); create.mutate({ data: {
-          registered_name: form.registered_name,
-          tin: form.tin || undefined,
-          company_type: (form.company_type || undefined) as CreateCompanyAdminDtoCompanyType | undefined,
-          registered_address: form.registered_address || undefined,
-        } }); }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          setError("");
+          create.mutate({
+            data: {
+              registered_name: form.registered_name,
+              tin: form.tin || undefined,
+              company_type: (form.company_type || undefined) as
+                | CreateCompanyAdminDtoCompanyType
+                | undefined,
+              registered_address: form.registered_address || undefined,
+            },
+          });
+        }}
         className="space-y-4"
       >
         <FormError>{error}</FormError>
@@ -144,7 +186,12 @@ function CreateCompanyForm({ onClose }: { onClose: () => void }) {
             id="registered_name"
             placeholder="Company legal name"
             value={form.registered_name}
-            onChange={(e) => setForm({ ...form, registered_name: e.target.value.toUpperCase() })}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                registered_name: e.target.value.toUpperCase(),
+              })
+            }
             required
           />
         </div>
@@ -167,7 +214,12 @@ function CreateCompanyForm({ onClose }: { onClose: () => void }) {
               title={!form.tin ? "Enter a TIN to verify" : undefined}
               onClick={() => {
                 setVerifyState({ loading: true, result: "idle" });
-                verify.mutate({ data: { tin: form.tin, registered_name: form.registered_name } });
+                verify.mutate({
+                  data: {
+                    tin: form.tin,
+                    registered_name: form.registered_name,
+                  },
+                });
               }}
             >
               {verify.isPending ? (
@@ -197,7 +249,9 @@ function CreateCompanyForm({ onClose }: { onClose: () => void }) {
             </SelectTrigger>
             <SelectContent>
               {COMPANY_TYPES.map((t) => (
-                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                <SelectItem key={t.value} value={t.value}>
+                  {t.label}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -209,13 +263,21 @@ function CreateCompanyForm({ onClose }: { onClose: () => void }) {
             id="registered_address"
             placeholder="123 Main St, City"
             value={form.registered_address}
-            onChange={(e) => setForm({ ...form, registered_address: e.target.value })}
+            onChange={(e) =>
+              setForm({ ...form, registered_address: e.target.value })
+            }
           />
         </div>
 
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button type="submit" form="create-company" disabled={!valid || create.isPending}>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form="create-company"
+            disabled={!valid || create.isPending}
+          >
             {create.isPending && <Loader2 className="animate-spin" />}
             {create.isPending ? "Creating…" : "Create"}
           </Button>
@@ -234,12 +296,14 @@ function BulkUploadForm({ onClose }: { onClose: () => void }) {
 
   const upload = useAdminControllerBulkCreateCompanies({
     mutation: {
-    onSuccess: (data) => {
-      setResults(data);
-      queryClient.invalidateQueries({ queryKey: getAdminControllerListCompaniesQueryKey() });
-      toast.success(`Import complete: ${data.summary.created} created`);
-    },
-    onError: (e: Error) => setError(e.message),
+      onSuccess: (data) => {
+        setResults(data);
+        queryClient.invalidateQueries({
+          queryKey: getAdminControllerListCompaniesQueryKey(),
+        });
+        toast.success(`Import complete: ${data.summary.created} created`);
+      },
+      onError: (e: Error) => setError(e.message),
     },
   });
 
@@ -251,7 +315,9 @@ function BulkUploadForm({ onClose }: { onClose: () => void }) {
           <thead>
             <tr className="border-b border-border">
               <th className="py-1 pr-2 font-medium text-foreground">Column</th>
-              <th className="py-1 pr-2 font-medium text-foreground">Required</th>
+              <th className="py-1 pr-2 font-medium text-foreground">
+                Required
+              </th>
               <th className="py-1 font-medium text-foreground">Description</th>
             </tr>
           </thead>
@@ -269,7 +335,9 @@ function BulkUploadForm({ onClose }: { onClose: () => void }) {
             <tr className="border-b border-border">
               <td className="py-1 pr-2 font-mono">company_type</td>
               <td className="py-1 pr-2">No</td>
-              <td className="py-1">corporation, partnership, sole_proprietorship, government_agency</td>
+              <td className="py-1">
+                corporation, partnership, sole_proprietorship, government_agency
+              </td>
             </tr>
             <tr>
               <td className="py-1 pr-2 font-mono">registered_address</td>
@@ -302,7 +370,9 @@ function BulkUploadForm({ onClose }: { onClose: () => void }) {
               <p>Created</p>
             </div>
             <div className="rounded bg-yellow-50 p-2 text-yellow-700">
-              <p className="text-lg font-bold">{results.summary.duplicate_tin}</p>
+              <p className="text-lg font-bold">
+                {results.summary.duplicate_tin}
+              </p>
               <p>Duplicate</p>
             </div>
             <div className="rounded bg-red-50 p-2 text-red-700">
@@ -314,13 +384,15 @@ function BulkUploadForm({ onClose }: { onClose: () => void }) {
               <p>Failed</p>
             </div>
           </div>
-          {results.results?.filter((r: any) => r.status !== "created").length > 0 && (
+          {results.results?.filter((r: any) => r.status !== "created").length >
+            0 && (
             <div className="mt-2 max-h-40 overflow-y-auto space-y-1">
               {results.results
                 .filter((r: any) => r.status !== "created")
                 .map((r: any) => (
                   <p key={r.row} className="text-xs text-muted-foreground">
-                    Row {r.row}: <span className="font-medium">{r.status}</span> — {r.message}
+                    Row {r.row}: <span className="font-medium">{r.status}</span>{" "}
+                    — {r.message}
                   </p>
                 ))}
             </div>
@@ -333,7 +405,10 @@ function BulkUploadForm({ onClose }: { onClose: () => void }) {
           {results ? "Close" : "Cancel"}
         </Button>
         {!results && (
-          <Button disabled={!file || upload.isPending} onClick={() => file && upload.mutate({ data: { file } })}>
+          <Button
+            disabled={!file || upload.isPending}
+            onClick={() => file && upload.mutate({ data: { file } })}
+          >
             {upload.isPending && <Loader2 className="animate-spin" />}
             {upload.isPending ? "Uploading…" : "Upload"}
           </Button>
@@ -350,11 +425,15 @@ function AddCompanyDropdown() {
     <div className="flex">
       <Button
         onClick={() =>
-          openModal("create-company", <CreateCompanyForm onClose={() => closeModal("create-company")} />, {
-            title: "Create company",
-            description: "Add a new company/HTE record to the platform.",
-            panelClassName: "!w-full sm:!max-w-md",
-          })
+          openModal(
+            "create-company",
+            <CreateCompanyForm onClose={() => closeModal("create-company")} />,
+            {
+              title: "Create company",
+              description: "Add a new company/HTE record to the platform.",
+              panelClassName: "!w-full sm:!max-w-md",
+            },
+          )
         }
         className="rounded-r-none"
       >
@@ -369,11 +448,16 @@ function AddCompanyDropdown() {
         <DropdownMenuContent align="end">
           <DropdownMenuItem
             onSelect={() =>
-              openModal("bulk-upload", <BulkUploadForm onClose={() => closeModal("bulk-upload")} />, {
-                title: "Bulk upload companies",
-                description: "Upload a CSV file with company records. BIR verification is not performed on bulk uploads.",
-                panelClassName: "!w-full sm:!max-w-lg",
-              })
+              openModal(
+                "bulk-upload",
+                <BulkUploadForm onClose={() => closeModal("bulk-upload")} />,
+                {
+                  title: "Bulk upload companies",
+                  description:
+                    "Upload a CSV file with company records. BIR verification is not performed on bulk uploads.",
+                  panelClassName: "!w-full sm:!max-w-lg",
+                },
+              )
             }
           >
             <Upload className="h-4 w-4" />
@@ -389,6 +473,21 @@ export default function AdminCompaniesPage() {
   const router = useRouter();
 
   const { data, isLoading } = useAdminControllerListCompanies();
+  const companies = data?.companies ?? [];
+  const table = useResourceTable({
+    data: companies,
+    getRowId: (company) => company.id,
+    columns,
+    search: {
+      placeholder: "Search companies...",
+      ariaLabel: "Search companies",
+      matches: (company, query) =>
+        company.registered_name.toLowerCase().includes(query) ||
+        !!company.email?.toLowerCase().includes(query) ||
+        formatDateWithoutTime(company.created_at).toLowerCase().includes(query),
+    },
+    pagination: { pageSize: 20, pageSizeOptions: [10, 20, 50] },
+  });
 
   return (
     <PageContainer className="space-y-6">
@@ -405,14 +504,54 @@ export default function AdminCompaniesPage() {
           <Skeleton className="h-64 w-full" />
         </div>
       ) : (
-        <DataTable
-          id="admin-companies"
-          columns={columns}
-          data={data?.companies ?? []}
-          searchPlaceholder="Search companies..."
+        <ResourceTable
+          table={table}
+          renderMobileRow={(company) => (
+            <article
+              className="cursor-pointer px-4 py-4 transition-colors hover:bg-primary/[0.035]"
+              onClick={() => router.push(`/admin/companies/${company.id}`)}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold text-gray-900">
+                    {company.registered_name}
+                  </p>
+                  <p className="text-muted-foreground mt-1 break-all text-sm">
+                    {company.email || "Record only"}
+                  </p>
+                </div>
+                {company.is_deactivated ? (
+                  <Badge type="destructive" strength="medium">
+                    Deactivated
+                  </Badge>
+                ) : company.has_pending_review ? (
+                  <Badge type="warning" strength="medium">
+                    Pending
+                  </Badge>
+                ) : company.is_profile_incomplete ? (
+                  <Badge type="default" strength="medium">
+                    Incomplete
+                  </Badge>
+                ) : null}
+              </div>
+              <p className="text-muted-foreground mt-3 text-xs">
+                Joined {formatDateWithoutTime(company.created_at)}
+              </p>
+            </article>
+          )}
+          emptyState={{
+            title: "No companies yet",
+            description: "Add a company to create its platform record.",
+          }}
+          noResultsState={{
+            title: "No companies found",
+            description: "Try searching by another company name or email.",
+          }}
           rowLabelSingular="company"
           rowLabelPlural="companies"
-          onRowClick={(company) => router.push(`/admin/companies/${company.id}`)}
+          onRowClick={(company) =>
+            router.push(`/admin/companies/${company.id}`)
+          }
         />
       )}
     </PageContainer>

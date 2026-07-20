@@ -1,12 +1,24 @@
 "use client";
 
 import { useModal } from "@/app/providers/modal-provider";
+import { CompanyInviteForm } from "@/components/invites/company-invite-form";
+import { TemplatePreviewContent } from "@/components/moa-request-dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2 } from "lucide-react";
-import { useState } from "react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  FilePlus2,
+  Hourglass,
+  Loader2,
+  Mail,
+} from "lucide-react";
+import { useState, type ReactNode } from "react";
+
+const PREVIEW_MODAL_PANEL_CLASS = "!w-full sm:!max-w-4xl";
+const PREVIEW_MODAL_CONTENT_CLASS =
+  "h-[75dvh] overflow-hidden p-0 sm:h-[75vh] sm:min-h-[32rem]";
 
 export function useIomModalRegistry() {
   const { openModal, closeModal } = useModal();
@@ -16,35 +28,82 @@ export function useIomModalRegistry() {
       open: (url: string, title: string) =>
         openModal(
           "preview-document",
-          <iframe src={url} className="h-full w-full border-none" title={title} />,
+          <iframe
+            src={url}
+            className="h-full w-full border-none"
+            title={title}
+          />,
           {
             title,
-            panelClassName: "!w-full sm:!max-w-4xl",
-            contentClassName: "min-h-0 flex-1 overflow-hidden p-0 sm:p-0",
-            showHeaderDivider: true,
-          }
+            panelClassName: PREVIEW_MODAL_PANEL_CLASS,
+            contentClassName: PREVIEW_MODAL_CONTENT_CLASS,
+            showHeaderDivider: false,
+          },
         ),
       close: () => closeModal("preview-document"),
     },
-    invitePartner: {
-      open: (opts: {
-        companyName: string;
-        email: string;
-        onInvite: (email: string, companyName: string) => void;
-        isPending: boolean;
+    previewTemplate: {
+      open: (template: {
+        id: string;
+        name: string;
+        description: string | null;
       }) =>
         openModal(
-          "invite-partner",
-          <InviteForm
-            companyName={opts.companyName}
-            email={opts.email}
-            onInvite={opts.onInvite}
-            isPending={opts.isPending}
-            close={() => closeModal("invite-partner")}
+          "preview-template",
+          <TemplatePreviewContent
+            templateId={template.id}
+            templateName={template.name}
+            templateDescription={template.description}
           />,
-          { title: "Invite company", showHeaderDivider: false }
+          {
+            title: template.name,
+            panelClassName: PREVIEW_MODAL_PANEL_CLASS,
+            contentClassName: PREVIEW_MODAL_CONTENT_CLASS,
+            showHeaderDivider: false,
+          },
         ),
-      close: () => closeModal("invite-partner"),
+      close: () => closeModal("preview-template"),
+    },
+    inviteCompany: {
+      open: (opts: {
+        onSent: () => void;
+        initialMode?: "registered" | "new";
+        initialStep?: 1 | 2;
+        initialCompanyId?: string;
+        initialCompanyName?: string;
+        initialEmail?: string;
+        initialKind?: "moa" | "listing";
+        initialLegacyCompanyId?: string;
+        allowSearch?: boolean;
+        allowListingKind?: boolean;
+      }) =>
+        openModal(
+          "invite-company",
+          <CompanyInviteForm
+            onClose={() => closeModal("invite-company")}
+            onSent={opts.onSent}
+            initialMode={opts.initialMode}
+            initialStep={opts.initialStep}
+            initialCompanyId={opts.initialCompanyId}
+            initialCompanyName={opts.initialCompanyName}
+            initialEmail={opts.initialEmail}
+            initialKind={opts.initialKind}
+            initialLegacyCompanyId={opts.initialLegacyCompanyId}
+            allowSearch={opts.allowSearch}
+            allowListingKind={opts.allowListingKind}
+          />,
+          {
+            // No header title/close here — CompanyInviteForm renders its
+            // own header row (title + close) so the title can react to the
+            // invite kind (moa vs listing) as the university toggles it,
+            // which the shell's open-time-only title can't.
+            hasClose: false,
+            panelClassName: "!w-full sm:!max-w-xl sm:!overflow-visible",
+            contentClassName:
+              "max-h-[calc(100dvh-4rem)] overflow-auto px-4 pb-4 sm:max-h-none sm:overflow-visible",
+          },
+        ),
+      close: () => closeModal("invite-company"),
     },
     blacklistPartner: {
       open: (opts: {
@@ -60,17 +119,60 @@ export function useIomModalRegistry() {
             isPending={opts.isPending}
             close={() => closeModal("blacklist-partner")}
           />,
-          { title: "Blacklist company", showHeaderDivider: false }
+          { title: "Blacklist company", showHeaderDivider: false },
         ),
       close: () => closeModal("blacklist-partner"),
+    },
+    approvalPending: {
+      open: (opts: { onQueueMoa: () => void; onClose: () => void }) =>
+        openModal(
+          "approval-pending",
+          <ApprovalPendingContent
+            onQueueMoa={() => {
+              closeModal("approval-pending", { skipOnClose: true });
+              opts.onQueueMoa();
+            }}
+          />,
+          {
+            panelClassName: "!w-full sm:!max-w-xl",
+            headerClassName: "pb-0",
+            contentClassName: "px-6 pb-6 sm:px-8 sm:pb-7",
+            backdropClassName: "bg-black/35 backdrop-blur-[1px]",
+            onClose: opts.onClose,
+          },
+        ),
+      close: () => closeModal("approval-pending"),
+    },
+    universityProfileComplete: {
+      open: (opts: { onContinue: () => void; onClose: () => void }) =>
+        openModal(
+          "university-profile-complete",
+          <UniversityProfileCompleteContent
+            onContinue={() => {
+              closeModal("university-profile-complete", {
+                skipOnClose: true,
+              });
+              opts.onContinue();
+            }}
+          />,
+          {
+            panelClassName: "!w-full sm:!max-w-xl",
+            headerClassName: "pb-0",
+            contentClassName: "px-6 pb-6 sm:px-8 sm:pb-7",
+            backdropClassName: "bg-black/35 backdrop-blur-[1px]",
+            onClose: opts.onClose,
+          },
+        ),
+      close: () => closeModal("university-profile-complete"),
     },
     confirmAction: {
       open: (opts: {
         title: string;
-        description: string;
+        description: ReactNode;
         confirmLabel: string;
-        onConfirm: () => void;
+        onConfirm: () => void | Promise<void>;
         isPending?: boolean;
+        tone?: "default" | "warning";
       }) =>
         openModal(
           "confirm-action",
@@ -80,59 +182,98 @@ export function useIomModalRegistry() {
             confirmLabel={opts.confirmLabel}
             onConfirm={opts.onConfirm}
             isPending={opts.isPending}
+            tone={opts.tone}
             close={() => closeModal("confirm-action")}
           />,
-          { title: null, hasClose: false, contentClassName: "px-4 pb-4 pt-2" }
+          { title: null, hasClose: false, contentClassName: "px-4 pb-4 pt-2" },
         ),
       close: () => closeModal("confirm-action"),
     },
   };
 }
 
-function InviteForm({
-  companyName,
-  email: initialEmail,
-  onInvite,
-  isPending,
-  close,
+function UniversityProfileCompleteContent({
+  onContinue,
 }: {
-  companyName: string;
-  email: string;
-  onInvite: (email: string, companyName: string) => void;
-  isPending: boolean;
-  close: () => void;
+  onContinue: () => void;
 }) {
-  const [email, setEmail] = useState(initialEmail);
-  const [name, setName] = useState(companyName);
-
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">{companyName}</p>
-      <div className="space-y-1.5">
-        <Label htmlFor="invite-company-name">Company name</Label>
-        <Input id="invite-company-name" value={name} onChange={(e) => setName(e.target.value)} />
+    <div>
+      <div className="text-center">
+        <span className="bg-supportive/10 text-supportive mx-auto flex size-20 items-center justify-center rounded-full">
+          <CheckCircle2 className="size-10" aria-hidden="true" />
+        </span>
+        <h2 className="mt-5 text-xl font-semibold tracking-tight text-gray-950">
+          Profile complete!
+        </h2>
+        <p className="text-muted-foreground mx-auto mt-2 max-w-sm text-sm leading-6">
+          You can now offer MOAs to companies.
+        </p>
       </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="invite-email">Company email</Label>
-        <Input
-          id="invite-email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
+
+      <Button size="lg" className="mt-6 w-full" onClick={onContinue}>
+        Choose templates
+      </Button>
+    </div>
+  );
+}
+
+function ApprovalPendingContent({ onQueueMoa }: { onQueueMoa: () => void }) {
+  return (
+    <div>
+      <div className="text-center">
+        <span className="border-primary text-primary mx-auto flex size-14 items-center justify-center rounded-full border-2">
+          <Hourglass className="size-6" aria-hidden="true" />
+        </span>
+        <h2 className="mt-5 text-xl font-semibold tracking-tight text-gray-950">
+          Waiting for approval
+        </h2>
+        <p className="text-muted-foreground mx-auto mt-2 max-w-sm text-sm leading-6">
+          Your company profile has been submitted.
+          <br />
+          Our team is reviewing it now.
+        </p>
       </div>
-      <div className="flex justify-end gap-2">
-        <Button variant="outline" onClick={close}>
-          Cancel
-        </Button>
-        <Button
-          disabled={!email.trim() || isPending}
-          onClick={() => onInvite(email.trim(), name.trim())}
-        >
-          {isPending && <Loader2 className="animate-spin" />}
-          {isPending ? "Sending…" : "Send invite"}
-        </Button>
+
+      <div className="mt-6 space-y-4 border-t border-gray-200 pt-5">
+        <div className="flex items-center gap-3">
+          <span className="bg-primary/5 text-primary flex size-9 shrink-0 items-center justify-center rounded-full">
+            <FilePlus2 className="size-4" aria-hidden="true" />
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">
+              Continue requesting MOAs
+            </p>
+            <p className="text-muted-foreground mt-0.5 text-xs">
+              We&apos;ll queue them until approval.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="bg-primary/5 text-primary flex size-9 shrink-0 items-center justify-center rounded-full">
+            <Clock className="size-4" aria-hidden="true" />
+          </span>
+          <p className="text-sm font-semibold text-gray-900">
+            Usually takes less than 1 business day
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="bg-primary/5 text-primary flex size-9 shrink-0 items-center justify-center rounded-full">
+            <Mail className="size-4" aria-hidden="true" />
+          </span>
+          <p className="text-sm font-semibold text-gray-900">
+            We&apos;ll notify you via email
+          </p>
+        </div>
       </div>
+
+      <Button size="lg" className="mt-6 w-full" onClick={onQueueMoa}>
+        Request MOA anyway
+      </Button>
+
+      <p className="text-muted-foreground mt-3 text-center text-xs">
+        You can keep using the platform while you wait.
+      </p>
     </div>
   );
 }
@@ -155,12 +296,12 @@ function BlacklistForm({
       <p className="text-sm text-muted-foreground">{companyName}</p>
       <div className="border-destructive/30 bg-destructive/5 text-destructive space-y-1 rounded-[0.33em] border p-3 text-sm">
         <p>
-          This immediately <strong>revokes all active MOAs</strong> with this company and
-          blocks new requests.
+          This immediately <strong>revokes all active MOAs</strong> with this
+          company and blocks new requests.
         </p>
         <p className="text-destructive/80 text-xs">
-          Revoked MOAs cannot be restored. The company is not notified. This action is logged
-          under your name.
+          Revoked MOAs cannot be restored. The company is not notified. This
+          action is logged under your name.
         </p>
       </div>
       <Textarea
@@ -192,25 +333,55 @@ function ConfirmForm({
   confirmLabel,
   onConfirm,
   isPending,
+  tone = "default",
   close,
 }: {
   title: string;
-  description: string;
+  description: ReactNode;
   confirmLabel: string;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
   isPending?: boolean;
+  tone?: "default" | "warning";
   close: () => void;
 }) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const pending = isPending || isSubmitting;
+
+  const handleConfirm = async () => {
+    setIsSubmitting(true);
+    try {
+      await onConfirm();
+    } catch {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      <p className="text-sm text-muted-foreground">{description}</p>
+      {tone === "warning" ? (
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <span className="text-destructive flex shrink-0 items-center justify-center">
+              <AlertTriangle className="h-6 w-6" aria-hidden="true" />
+            </span>
+            <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+          </div>
+          <div className="border-destructive/30 bg-destructive/5 rounded-[0.33em] border px-4 py-3 text-left">
+            <p className="text-destructive text-sm leading-6">{description}</p>
+          </div>
+        </div>
+      ) : (
+        <>
+          <h2 className="text-lg font-semibold">{title}</h2>
+          <p className="text-sm text-muted-foreground">{description}</p>
+        </>
+      )}
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={close}>
           Cancel
         </Button>
-        <Button disabled={isPending} onClick={onConfirm}>
-          {isPending && <Loader2 className="animate-spin" />}
+        <Button disabled={pending} onClick={handleConfirm}>
+          {pending && <Loader2 className="animate-spin" />}
           {confirmLabel}
         </Button>
       </div>

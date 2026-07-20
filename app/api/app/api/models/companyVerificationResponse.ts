@@ -12,4 +12,5 @@ export interface CompanyVerificationResponse {
   status: string;
   /** @nullable */
   rejectionReason: string | null;
+  canPostListing: boolean;
 }
