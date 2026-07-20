@@ -9,7 +9,6 @@ import {
   useResourceTable,
   type ResourceFilterValue,
 } from "@/components/ui/use-resource-table";
-import { Badge } from "@/components/ui/badge";
 import { PartnershipStatusBadge } from "@/components/partnership-status-badge";
 import { TruncatedTooltip } from "@/components/ui/truncated-tooltip";
 import { formatDateWithoutTime } from "@/lib/utils";
@@ -26,14 +25,6 @@ export interface CompanyInvite {
   created_at: string;
   expires_at: string;
   registered_company: { registered_name: string } | null;
-}
-
-function InviteKindChip({ kind }: { kind: CompanyInvite["kind"] }) {
-  return (
-    <Badge type={kind === "listing" ? "primary" : "default"}>
-      {kind === "listing" ? "Listing" : "MOA"}
-    </Badge>
-  );
 }
 
 function InviteStatusBadge({ status }: { status: CompanyInvite["status"] }) {
@@ -103,7 +94,7 @@ export function UniversityInvitesTable({
     {
       id: "status",
       header: "Status",
-      width: "w-[18%]",
+      width: "w-[22%]",
       getSortValue: (invite) => invite.status,
       render: (invite) => <InviteStatusBadge status={invite.status} />,
     },
@@ -130,16 +121,9 @@ export function UniversityInvitesTable({
       },
     },
     {
-      id: "kind",
-      header: "Kind",
-      width: "w-[10%]",
-      getSortValue: (invite) => invite.kind,
-      render: (invite) => <InviteKindChip kind={invite.kind} />,
-    },
-    {
       id: "template",
       header: "Template",
-      width: "w-[19%]",
+      width: "w-[23%]",
       getSortValue: (invite) => invite.template_name ?? "",
       render: (invite) => (
         <span className="text-muted-foreground">
@@ -162,7 +146,7 @@ export function UniversityInvitesTable({
     {
       id: "expires",
       header: "Expires",
-      width: "w-[14%]",
+      width: "w-[16%]",
       getSortValue: (invite) => invite.expires_at,
       render: (invite) => (
         <span className="text-muted-foreground">
@@ -189,32 +173,12 @@ export function UniversityInvitesTable({
         ].some((value) => value.toLowerCase().includes(query)),
     },
     filters: {
-      groups: [
-        { id: "status", label: "Status", options: statusOptions },
-        {
-          id: "kind",
-          label: "Kind",
-          options: [
-            {
-              value: "moa",
-              label: "MOA",
-              count: invites.filter((invite) => invite.kind === "moa").length,
-            },
-            {
-              value: "listing",
-              label: "Listing",
-              count: invites.filter((invite) => invite.kind === "listing").length,
-            },
-          ],
-        },
-      ],
+      groups: [{ id: "status", label: "Status", options: statusOptions }],
       matches: (invite, filters: ResourceFilterValue) => {
         const selectedStatuses = filters.status ?? [];
-        const selectedKinds = filters.kind ?? [];
         return (
-          (selectedStatuses.length === 0 ||
-            selectedStatuses.includes(invite.status)) &&
-          (selectedKinds.length === 0 || selectedKinds.includes(invite.kind))
+          selectedStatuses.length === 0 ||
+          selectedStatuses.includes(invite.status)
         );
       },
     },
@@ -244,9 +208,8 @@ export function UniversityInvitesTable({
                   </p>
                 )}
               </div>
-              <div className="flex shrink-0 flex-col items-end gap-1.5">
+              <div className="shrink-0">
                 <InviteStatusBadge status={invite.status} />
-                <InviteKindChip kind={invite.kind} />
               </div>
             </div>
             <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
