@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Building2, CheckCircle2, Loader2, Mail } from "lucide-react";
+import { Building2, CheckCircle2, Loader2, Mail, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { preconfiguredAxios } from "@/app/api/preconfig.axios";
@@ -99,6 +99,8 @@ export function CompanyInviteForm({
   initialEmail = "",
   initialKind,
   initialLegacyCompanyId,
+  allowSearch = true,
+  allowListingKind = false,
 }: {
   onClose: () => void;
   onSent: () => void;
@@ -109,6 +111,11 @@ export function CompanyInviteForm({
   initialEmail?: string;
   initialKind?: CompanyInviteKind;
   initialLegacyCompanyId?: string;
+  // Invites page (blank open): company search stays available, but every
+  // invite from there is moa-only — listing invites only ever originate
+  // from a specific Partners-page row, which already knows the company.
+  allowSearch?: boolean;
+  allowListingKind?: boolean;
 }) {
   const [step, setStep] = useState<1 | 2>(initialStep);
   const [mode, setMode] = useState<"registered" | "new">(initialMode);
@@ -124,11 +131,14 @@ export function CompanyInviteForm({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  // Invite kind (D1/D3): defaults from row context when opened from a
-  // Partners row (initialKind set); otherwise 'moa' until a debounced
-  // server lookup below suggests otherwise. A manual toggle click always
-  // wins over any later suggestion.
-  const [kind, setKind] = useState<CompanyInviteKind>(initialKind ?? "moa");
+  // Invite kind (D1/D3): only ever selectable when allowListingKind (the
+  // Partners-page row context) — defaults from row data (initialKind);
+  // otherwise 'moa' until a debounced server lookup below suggests
+  // otherwise. A manual toggle click always wins over any later suggestion.
+  // The Invites page's blank dialog stays moa-only regardless.
+  const [kind, setKind] = useState<CompanyInviteKind>(
+    allowListingKind ? (initialKind ?? "moa") : "moa",
+  );
   const [legacyCompanyId, setLegacyCompanyId] = useState<string | undefined>(
     initialLegacyCompanyId,
   );
@@ -213,7 +223,11 @@ export function CompanyInviteForm({
               matchedCompanyName?: string;
             },
         ),
-    enabled: !initialKind && !kindManuallySet && debouncedEmail.includes("@"),
+    enabled:
+      allowListingKind &&
+      !initialKind &&
+      !kindManuallySet &&
+      debouncedEmail.includes("@"),
   });
 
   useEffect(() => {
@@ -263,6 +277,26 @@ export function CompanyInviteForm({
 
   return (
     <div className="space-y-4">
+      {/* Owns the modal's whole header row (title + close) — the shared
+          modal shell's title is fixed at open-time and can't react to
+          `kind` toggling in here, so this replaces it entirely (opened with
+          hasClose: false to suppress the shell's own close button). */}
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="text-2xl leading-snug font-semibold tracking-tight">
+          {kind === "moa"
+            ? "Invite to sign an MOA"
+            : "Invite to post an internship"}
+        </h2>
+        <button
+          type="button"
+          aria-label="Close"
+          onClick={onClose}
+          className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full hover:bg-gray-100 active:bg-gray-200"
+        >
+          <X className="h-4 w-4 text-gray-500" />
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
         {inviteSteps.map((inviteStep, index) => {
           const Icon = inviteStep.icon;
@@ -383,16 +417,18 @@ export function CompanyInviteForm({
                       placeholder="Search companies..."
                     />
                   )}
-                  <button
-                    type="button"
-                    className="text-primary cursor-pointer text-sm hover:underline"
-                    onClick={() => {
-                      setSelectedCompany(null);
-                      switchMode("new");
-                    }}
-                  >
-                    Company not listed? Invite by email
-                  </button>
+                  {allowSearch && (
+                    <button
+                      type="button"
+                      className="text-primary cursor-pointer text-sm hover:underline"
+                      onClick={() => {
+                        setSelectedCompany(null);
+                        switchMode("new");
+                      }}
+                    >
+                      Company not listed? Invite by email
+                    </button>
+                  )}
                 </>
               ) : (
                 <>
@@ -418,17 +454,19 @@ export function CompanyInviteForm({
                       onChange={(e) => setEmail(e.target.value)}
                     />
                   </div>
-                  <button
-                    type="button"
-                    className="text-primary cursor-pointer text-sm hover:underline"
-                    onClick={() => {
-                      setCompanyName("");
-                      setEmail("");
-                      switchMode("registered");
-                    }}
-                  >
-                    ← Search registered companies
-                  </button>
+                  {allowSearch && (
+                    <button
+                      type="button"
+                      className="text-primary cursor-pointer text-sm hover:underline"
+                      onClick={() => {
+                        setCompanyName("");
+                        setEmail("");
+                        switchMode("registered");
+                      }}
+                    >
+                      ← Search registered companies
+                    </button>
+                  )}
                 </>
               )}
             </div>
@@ -476,13 +514,15 @@ export function CompanyInviteForm({
                       </Link>
                       .
                     </p>
-                    <button
-                      type="button"
-                      onClick={toggleKind}
-                      className="text-primary cursor-pointer font-medium underline"
-                    >
-                      Invite them to post a listing instead
-                    </button>
+                    {allowListingKind && (
+                      <button
+                        type="button"
+                        onClick={toggleKind}
+                        className="text-primary cursor-pointer font-medium underline"
+                      >
+                        Invite them to post a listing instead
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <>
@@ -512,17 +552,7 @@ export function CompanyInviteForm({
                   </>
                 )}
               </div>
-            ) : (
-              <div className="border-primary/30 bg-primary/5 space-y-1 rounded-[0.33em] border p-3 text-sm">
-                <p className="font-medium text-gray-900">
-                  Listing invite — no MOA template needed
-                </p>
-                <p className="text-muted-foreground">
-                  They&apos;ll get instant BetterInternship and IOM accounts
-                  and land straight on the create-listing page.
-                </p>
-              </div>
-            )}
+            ) : null}
 
             <div className="space-y-2">
               <Label htmlFor="invite-message">Welcome message (optional)</Label>
@@ -549,15 +579,17 @@ export function CompanyInviteForm({
         )}
       </MorphHeight>
 
-      <button
-        type="button"
-        onClick={toggleKind}
-        className="text-primary cursor-pointer text-sm hover:underline"
-      >
-        {kind === "moa"
-          ? "Already have an MOA? Invite them to post a listing instead"
-          : "Invite them to sign an MOA instead"}
-      </button>
+      {allowListingKind && (
+        <button
+          type="button"
+          onClick={toggleKind}
+          className="text-primary cursor-pointer text-sm hover:underline"
+        >
+          {kind === "moa"
+            ? "Already have an MOA? Invite them to post a listing instead"
+            : "Invite them to sign an MOA instead"}
+        </button>
+      )}
 
       <div className="flex justify-end gap-2 pt-2">
         {step === 1 ? (
@@ -571,15 +603,19 @@ export function CompanyInviteForm({
           </>
         ) : (
           <>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setStep(1);
-                setError("");
-              }}
-            >
-              Back
-            </Button>
+            {/* Registered-mode step 1 is just the company search box — with
+                allowSearch off there's nothing there to go back to. */}
+            {(allowSearch || mode !== "registered") && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setStep(1);
+                  setError("");
+                }}
+              >
+                Back
+              </Button>
+            )}
             <Button
               onClick={() => {
                 setError("");

@@ -187,20 +187,6 @@ function ImportedMarker() {
   );
 }
 
-// D10: legacy row linked to a registered company via an accepted listing
-// invite (iom_legacy_companies.registered_company_id) — link-only, the
-// legacy and registered rows still aren't merged into one.
-function RegisteredMarker() {
-  return (
-    <span
-      className="text-supportive bg-supportive/20 inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-semibold"
-      title="Linked to a registered company"
-    >
-      Registered
-    </span>
-  );
-}
-
 function PartnersTableSkeleton() {
   return (
     <div className="space-y-4">
@@ -276,9 +262,8 @@ export function UniversityPartnersTable({
             <TruncatedTooltip className="font-medium text-gray-900">
               {row.displayName}
             </TruncatedTooltip>
-            {row.isImported && <ImportedMarker />}
-            {row.isImported && row.legacyEntry?.registered_company_id && (
-              <RegisteredMarker />
+            {row.isImported && !row.legacyEntry?.registered_company_id && (
+              <ImportedMarker />
             )}
             {row.isBlacklisted && (
               <span className="inline-flex shrink-0 items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
@@ -437,9 +422,8 @@ export function UniversityPartnersTable({
                   <TruncatedTooltip className="text-sm font-semibold text-gray-900">
                     {row.displayName}
                   </TruncatedTooltip>
-                  {row.isImported && <ImportedMarker />}
-                  {row.isImported && row.legacyEntry?.registered_company_id && (
-                    <RegisteredMarker />
+                  {row.isImported && !row.legacyEntry?.registered_company_id && (
+                    <ImportedMarker />
                   )}
                 </div>
                 <div className="mt-1.5">

@@ -752,6 +752,11 @@ function PartnersContent({
         initialEmail: contactEmail,
         initialKind,
         initialLegacyCompanyId: row.isImported ? row.legacyEntry?.id : undefined,
+        // The row already identifies a specific company — no reason to let
+        // the university search for/switch to a different one.
+        allowSearch: false,
+        // Listing invites only ever originate from a Partners-page row.
+        allowListingKind: true,
       });
     },
     [modal.inviteCompany, refresh],
