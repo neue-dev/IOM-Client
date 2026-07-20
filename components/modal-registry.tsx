@@ -72,6 +72,8 @@ export function useIomModalRegistry() {
         initialCompanyId?: string;
         initialCompanyName?: string;
         initialEmail?: string;
+        initialKind?: "moa" | "listing";
+        initialLegacyCompanyId?: string;
       }) =>
         openModal(
           "invite-company",
@@ -83,6 +85,8 @@ export function useIomModalRegistry() {
             initialCompanyId={opts.initialCompanyId}
             initialCompanyName={opts.initialCompanyName}
             initialEmail={opts.initialEmail}
+            initialKind={opts.initialKind}
+            initialLegacyCompanyId={opts.initialLegacyCompanyId}
           />,
           {
             title: "Invite a company",

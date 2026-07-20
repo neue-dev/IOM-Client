@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Building2, CheckCircle2, Loader2, Mail } from "lucide-react";
 import { toast } from "sonner";
@@ -21,6 +22,8 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+
+export type CompanyInviteKind = "moa" | "listing";
 
 interface AvailableTemplate {
   id: string;
@@ -94,6 +97,8 @@ export function CompanyInviteForm({
   initialCompanyId,
   initialCompanyName = "",
   initialEmail = "",
+  initialKind,
+  initialLegacyCompanyId,
 }: {
   onClose: () => void;
   onSent: () => void;
@@ -102,6 +107,8 @@ export function CompanyInviteForm({
   initialCompanyId?: string;
   initialCompanyName?: string;
   initialEmail?: string;
+  initialKind?: CompanyInviteKind;
+  initialLegacyCompanyId?: string;
 }) {
   const [step, setStep] = useState<1 | 2>(initialStep);
   const [mode, setMode] = useState<"registered" | "new">(initialMode);
@@ -116,6 +123,16 @@ export function CompanyInviteForm({
   const [templateId, setTemplateId] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  // Invite kind (D1/D3): defaults from row context when opened from a
+  // Partners row (initialKind set); otherwise 'moa' until a debounced
+  // server lookup below suggests otherwise. A manual toggle click always
+  // wins over any later suggestion.
+  const [kind, setKind] = useState<CompanyInviteKind>(initialKind ?? "moa");
+  const [legacyCompanyId, setLegacyCompanyId] = useState<string | undefined>(
+    initialLegacyCompanyId,
+  );
+  const [kindManuallySet, setKindManuallySet] = useState(!!initialKind);
 
   function switchMode(next: "registered" | "new") {
     if (transitionTimer.current) clearTimeout(transitionTimer.current);
@@ -168,14 +185,58 @@ export function CompanyInviteForm({
       ? selectedCompany?.registered_name
       : companyName.trim() || undefined;
 
+  // D3: blank-dialog default — debounce the email (+ name) against a
+  // server-side match, but only when no row context already decided the
+  // kind (initialKind) and the user hasn't manually toggled it.
+  const [debouncedEmail, setDebouncedEmail] = useState("");
+  const [debouncedName, setDebouncedName] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedEmail(invitedEmail);
+      setDebouncedName(invitedName ?? "");
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [invitedEmail, invitedName]);
+
+  const { data: suggestionData } = useQuery({
+    queryKey: ["university-invite-suggestion", debouncedEmail, debouncedName],
+    queryFn: () =>
+      preconfiguredAxios
+        .get("/api/university/invite-suggestion", {
+          params: { email: debouncedEmail, name: debouncedName || undefined },
+        })
+        .then(
+          (r) =>
+            r.data as {
+              suggestedKind: CompanyInviteKind;
+              legacyCompanyId?: string;
+              matchedCompanyName?: string;
+            },
+        ),
+    enabled: !initialKind && !kindManuallySet && debouncedEmail.includes("@"),
+  });
+
+  useEffect(() => {
+    if (!suggestionData || kindManuallySet) return;
+    setKind(suggestionData.suggestedKind);
+    setLegacyCompanyId(suggestionData.legacyCompanyId);
+  }, [suggestionData, kindManuallySet]);
+
+  const toggleKind = () => {
+    setKind((current) => (current === "moa" ? "listing" : "moa"));
+    setKindManuallySet(true);
+  };
+
   const send = useMutation({
     mutationFn: () =>
       preconfiguredAxios
         .post("/api/university/invites", {
           invitedEmail,
           companyName: invitedName,
-          templateId: templateId || undefined,
+          templateId: kind === "moa" ? templateId || undefined : undefined,
           personalMessage: message.trim() || undefined,
+          kind,
+          legacyCompanyId: kind === "listing" ? legacyCompanyId : undefined,
         })
         .then((r) => r.data as { superseded: boolean; message: string }),
     onSuccess: (res) => {
@@ -195,7 +256,10 @@ export function CompanyInviteForm({
     mode === "registered"
       ? !!selectedCompany
       : !!companyName.trim() && !!email.trim();
-  const canSend = !!invitedEmail && (mode === "new" || !!selectedCompany);
+  const canSend =
+    !!invitedEmail &&
+    (mode === "new" || !!selectedCompany) &&
+    (kind !== "moa" || availableTemplates.length > 0);
 
   return (
     <div className="space-y-4">
@@ -394,34 +458,71 @@ export function CompanyInviteForm({
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="invite-template">
-                Preferred MOA template (optional)
-              </Label>
-              <Select
-                value={templateId || "company-decides"}
-                onValueChange={(value) =>
-                  setTemplateId(value === "company-decides" ? "" : value)
-                }
-              >
-                <SelectTrigger id="invite-template" className="h-10 max-h-10">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="company-decides">
-                    Company decides
-                  </SelectItem>
-                  {availableTemplates.map((t) => (
-                    <SelectItem key={t.template.id} value={t.template.id}>
-                      {t.template.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-muted-foreground text-xs">
-                They can choose their preferred template during setup.
-              </p>
-            </div>
+            {kind === "moa" ? (
+              <div className="space-y-2">
+                <Label htmlFor="invite-template">
+                  Preferred MOA template (optional)
+                </Label>
+                {availableTemplates.length === 0 ? (
+                  <div className="border-warning/40 bg-warning/5 space-y-1.5 rounded-[0.33em] border p-3 text-sm text-gray-700">
+                    <p>
+                      You need at least one active MOA template before you can
+                      invite a company to sign a MOA.{" "}
+                      <Link
+                        href="/templates"
+                        className="text-primary font-medium underline"
+                      >
+                        Go to Templates
+                      </Link>
+                      .
+                    </p>
+                    <button
+                      type="button"
+                      onClick={toggleKind}
+                      className="text-primary cursor-pointer font-medium underline"
+                    >
+                      Invite them to post a listing instead
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <Select
+                      value={templateId || "company-decides"}
+                      onValueChange={(value) =>
+                        setTemplateId(value === "company-decides" ? "" : value)
+                      }
+                    >
+                      <SelectTrigger id="invite-template" className="h-10 max-h-10">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="company-decides">
+                          Company decides
+                        </SelectItem>
+                        {availableTemplates.map((t) => (
+                          <SelectItem key={t.template.id} value={t.template.id}>
+                            {t.template.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-muted-foreground text-xs">
+                      They can choose their preferred template during setup.
+                    </p>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="border-primary/30 bg-primary/5 space-y-1 rounded-[0.33em] border p-3 text-sm">
+                <p className="font-medium text-gray-900">
+                  Listing invite — no MOA template needed
+                </p>
+                <p className="text-muted-foreground">
+                  They&apos;ll get instant BetterInternship and IOM accounts
+                  and land straight on the create-listing page.
+                </p>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="invite-message">Welcome message (optional)</Label>
@@ -447,6 +548,16 @@ export function CompanyInviteForm({
           </div>
         )}
       </MorphHeight>
+
+      <button
+        type="button"
+        onClick={toggleKind}
+        className="text-primary cursor-pointer text-sm hover:underline"
+      >
+        {kind === "moa"
+          ? "Already have an MOA? Invite them to post a listing instead"
+          : "Invite them to sign an MOA instead"}
+      </button>
 
       <div className="flex justify-end gap-2 pt-2">
         {step === 1 ? (
