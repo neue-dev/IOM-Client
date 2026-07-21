@@ -1097,7 +1097,6 @@ function PartnersContent({
                   expiringSoonDays={expiringSoonDays}
                   onPartnerClick={navigateToDetail}
                   onInvite={(row) => openInviteModal(row, "listing")}
-                  onAddEmail={(row) => openInviteModal(row, "listing")}
                   onBulkAction={openBulkInviteSheet}
                 />
               </TabsContent>
@@ -1109,7 +1108,6 @@ function PartnersContent({
                   expiringSoonDays={expiringSoonDays}
                   onPartnerClick={navigateToDetail}
                   onInvite={(row) => openInviteModal(row, "moa")}
-                  onAddEmail={(row) => openInviteModal(row, "moa")}
                   onBulkAction={openBulkInviteSheet}
                 />
               </TabsContent>

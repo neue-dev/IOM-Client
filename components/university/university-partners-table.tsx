@@ -223,29 +223,27 @@ function relativeDays(iso: string): string {
   return `${days}d ago`;
 }
 
-/** D15/D7/D11 — the name cell's second line: at most one of these applies. */
+/**
+ * D15/D7/D11 — the name cell's second line: at most one of these applies.
+ * "Cannot invite" is informational only — it used to offer an inline "Add
+ * email" link, but that was a button nested inside the row's own
+ * PartnerLink, which fought the row-click navigation. Adding an email
+ * happens from the partner's detail page instead. Only shown while the
+ * university is actively mid-selection (1+ rows checked) — before that,
+ * calling out an unselectable row is just noise, since selection isn't in
+ * play yet. Gone entirely on the blacklisted tab, where there's no
+ * bulk-select to begin with (D3).
+ */
 function CompanySecondLine({
   row,
-  onAddEmail,
+  isBulkSelecting,
 }: {
   row: UniversityPartnerTableRow;
-  onAddEmail?: (row: UniversityPartnerTableRow) => void;
+  isBulkSelecting: boolean;
 }) {
-  if (row.isImported && !row.contactEmail) {
+  if (isBulkSelecting && row.isImported && !row.contactEmail) {
     return (
-      <p className="text-muted-foreground mt-0.5 text-xs">
-        No email ·{" "}
-        <button
-          type="button"
-          className="text-primary cursor-pointer hover:underline"
-          onClick={(event) => {
-            event.stopPropagation();
-            onAddEmail?.(row);
-          }}
-        >
-          Add email
-        </button>
-      </p>
+      <p className="text-muted-foreground mt-0.5 text-xs">Cannot invite (missing email)</p>
     );
   }
   if (row.lastRenewalRequestedAt) {
@@ -298,7 +296,6 @@ export function UniversityPartnersTable({
   onPartnerClick,
   onInvite,
   onBulkAction,
-  onAddEmail,
 }: {
   rows: UniversityPartnerTableRow[];
   isLoading: boolean;
@@ -309,7 +306,6 @@ export function UniversityPartnersTable({
   // Unused for tab="blacklisted" — no invite affordance renders there (D3).
   onInvite?: (row: UniversityPartnerTableRow) => void;
   onBulkAction?: (action: BulkInviteAction, rows: UniversityPartnerTableRow[]) => void;
-  onAddEmail?: (row: UniversityPartnerTableRow) => void;
 }) {
   const showStatusColumn = tab === "expired";
   const showSelection = tab !== "blacklisted";
@@ -364,7 +360,10 @@ export function UniversityPartnersTable({
                 </span>
               )}
           </div>
-          <CompanySecondLine row={row} onAddEmail={onAddEmail} />
+          <CompanySecondLine
+            row={row}
+            isBulkSelecting={!!table.selection && table.selection.selectedCount > 0}
+          />
         </div>
       </PartnerLink>
     ),
@@ -559,7 +558,10 @@ export function UniversityPartnersTable({
                         </span>
                       )}
                   </div>
-                  <CompanySecondLine row={row} onAddEmail={onAddEmail} />
+                  <CompanySecondLine
+                    row={row}
+                    isBulkSelecting={!!table.selection && table.selection.selectedCount > 0}
+                  />
                   {showStatusColumn && (
                     <div className="mt-1.5">
                       <PartnerStatus row={row} />
