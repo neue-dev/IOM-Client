@@ -130,7 +130,7 @@ export function useIomModalRegistry() {
                   ? "Invite to sign an MOA"
                   : "Invite to renew their MOA",
             panelClassName: "!w-full sm:!max-w-lg",
-            contentClassName: "max-h-[calc(100dvh-8rem)] overflow-auto",
+            contentClassName: "max-h-[calc(100dvh-8rem)] overflow-auto px-4 pb-4",
           },
         ),
       close: () => closeModal("bulk-invite-companies"),

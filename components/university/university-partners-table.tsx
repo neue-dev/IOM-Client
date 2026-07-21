@@ -2,6 +2,7 @@
 
 import type { KeyboardEvent, ReactNode } from "react";
 import Link from "next/link";
+import { AnimatePresence, motion, type Transition } from "framer-motion";
 import { ChevronRight, UserPlus } from "lucide-react";
 
 import {
@@ -223,6 +224,10 @@ function relativeDays(iso: string): string {
   return `${days}d ago`;
 }
 
+const SECOND_LINE_TRANSITION = { duration: 0.15 } satisfies Transition;
+// Matches the easing modal-provider.tsx uses for its fade-exit panels.
+const BULK_BAR_TRANSITION = { duration: 0.22, ease: [0.16, 1, 0.3, 1] } satisfies Transition;
+
 /**
  * D15/D7/D11 — the name cell's second line: at most one of these applies.
  * "Cannot invite" is informational only — it used to offer an inline "Add
@@ -233,6 +238,11 @@ function relativeDays(iso: string): string {
  * calling out an unselectable row is just noise, since selection isn't in
  * play yet. Gone entirely on the blacklisted tab, where there's no
  * bulk-select to begin with (D3).
+ *
+ * The wrapper below always reserves one line's worth of height, whether or
+ * not it has content — row height stays constant across every state
+ * (selecting/deselecting, with/without a renewal) instead of reflowing;
+ * only the text's opacity animates.
  */
 function CompanySecondLine({
   row,
@@ -241,19 +251,39 @@ function CompanySecondLine({
   row: UniversityPartnerTableRow;
   isBulkSelecting: boolean;
 }) {
-  if (isBulkSelecting && row.isImported && !row.contactEmail) {
-    return (
-      <p className="text-muted-foreground mt-0.5 text-xs">Cannot invite (missing email)</p>
-    );
-  }
-  if (row.lastRenewalRequestedAt) {
-    return (
-      <p className="text-muted-foreground mt-0.5 text-xs">
-        Renewal requested · {relativeDays(row.lastRenewalRequestedAt)}
-      </p>
-    );
-  }
-  return null;
+  const showCannotInvite = isBulkSelecting && row.isImported && !row.contactEmail;
+  const renewalRequestedAt = showCannotInvite ? null : row.lastRenewalRequestedAt;
+
+  return (
+    <div className="mt-0.5 h-4">
+      <AnimatePresence initial={false}>
+        {showCannotInvite && (
+          <motion.p
+            key="cannot-invite"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={SECOND_LINE_TRANSITION}
+            className="text-muted-foreground truncate text-xs"
+          >
+            Cannot invite (missing email)
+          </motion.p>
+        )}
+        {renewalRequestedAt && (
+          <motion.p
+            key="renewal"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={SECOND_LINE_TRANSITION}
+            className="text-muted-foreground truncate text-xs"
+          >
+            Renewal requested · {relativeDays(renewalRequestedAt)}
+          </motion.p>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 }
 
 function PartnersTableSkeleton() {
@@ -639,36 +669,45 @@ export function UniversityPartnersTable({
         rowLabelPlural={labels.plural}
       />
 
-      {selection && selection.selectedCount > 0 && (
-        <div className="sticky bottom-4 z-40 mt-4 flex w-full justify-center">
-          <div className="flex flex-wrap items-center gap-3 rounded-[0.33em] border border-gray-200 bg-white px-4 py-3 shadow-lg">
-            <span className="text-sm font-medium text-gray-700">
-              {selection.selectedCount} selected
-            </span>
-            <Button variant="ghost" size="sm" onClick={selection.clear}>
-              Clear
-            </Button>
-            {tab === "outstanding" ? (
-              <>
-                <Button size="sm" onClick={() => onBulkAction?.("listing", selection.selectedRows)}>
-                  Invite to post a listing
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onBulkAction?.("renew", selection.selectedRows)}
-                >
-                  Invite to renew their MOA
-                </Button>
-              </>
-            ) : (
-              <Button size="sm" onClick={() => onBulkAction?.("moa", selection.selectedRows)}>
-                Invite to sign an MOA
+      <AnimatePresence>
+        {selection && selection.selectedCount > 0 && (
+          <motion.div
+            key="bulk-action-bar"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16 }}
+            transition={BULK_BAR_TRANSITION}
+            className="sticky bottom-4 z-40 mt-4 flex w-full justify-center"
+          >
+            <div className="flex flex-wrap items-center gap-3 rounded-[0.33em] border border-gray-200 bg-white px-4 py-3 shadow-lg">
+              <span className="text-sm font-medium text-gray-700">
+                {selection.selectedCount} selected
+              </span>
+              <Button variant="ghost" size="sm" onClick={selection.clear}>
+                Clear
               </Button>
-            )}
-          </div>
-        </div>
-      )}
+              {tab === "outstanding" ? (
+                <>
+                  <Button size="sm" onClick={() => onBulkAction?.("listing", selection.selectedRows)}>
+                    Invite to post a listing
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onBulkAction?.("renew", selection.selectedRows)}
+                  >
+                    Invite to renew their MOA
+                  </Button>
+                </>
+              ) : (
+                <Button size="sm" onClick={() => onBulkAction?.("moa", selection.selectedRows)}>
+                  Invite to sign an MOA
+                </Button>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

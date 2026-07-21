@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { MorphHeight } from "@/components/ui/morph-height";
 import { cn } from "@/lib/utils";
 
 export type CompanyInviteKind = "moa" | "listing";
@@ -41,53 +42,6 @@ const inviteSteps = [
   { title: "Choose company", icon: Building2 },
   { title: "Invitation details", icon: Mail },
 ];
-
-function MorphHeight({ children }: { children: React.ReactNode }) {
-  const outerRef = useRef<HTMLDivElement>(null);
-  const innerRef = useRef<HTMLDivElement>(null);
-  const prevHeightRef = useRef(0);
-
-  useEffect(() => {
-    const outer = outerRef.current;
-    const inner = innerRef.current;
-    if (!outer || !inner) return;
-
-    prevHeightRef.current = inner.offsetHeight;
-
-    const onTransitionEnd = (e: TransitionEvent) => {
-      if (e.propertyName !== "height") return;
-      outer.style.height = "";
-      outer.style.overflow = "";
-      outer.style.transition = "";
-    };
-    outer.addEventListener("transitionend", onTransitionEnd);
-
-    const ro = new ResizeObserver(() => {
-      const newHeight = inner.offsetHeight;
-      const prevHeight = prevHeightRef.current;
-      if (newHeight === prevHeight) return;
-      prevHeightRef.current = newHeight;
-      outer.style.overflow = "hidden";
-      outer.style.transition = "none";
-      outer.style.height = `${prevHeight}px`;
-      outer.offsetHeight;
-      outer.style.transition = "height 200ms ease";
-      outer.style.height = `${newHeight}px`;
-    });
-    ro.observe(inner);
-
-    return () => {
-      ro.disconnect();
-      outer.removeEventListener("transitionend", onTransitionEnd);
-    };
-  }, []);
-
-  return (
-    <div ref={outerRef}>
-      <div ref={innerRef}>{children}</div>
-    </div>
-  );
-}
 
 export function CompanyInviteForm({
   onClose,
