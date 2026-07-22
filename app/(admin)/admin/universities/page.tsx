@@ -80,7 +80,11 @@ function CreateUniversityForm({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState("");
 
   const create = useMutation({
-    mutationFn: () => preconfiguredAxios.post("/api/admin/universities", form),
+    mutationFn: () =>
+      preconfiguredAxios.post("/api/admin/universities", {
+        ...form,
+        superadmin_display_name: "Super Admin",
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-universities"] });
       toast("University created", toastPresets.success);
@@ -125,17 +129,6 @@ function CreateUniversityForm({ onClose }: { onClose: () => void }) {
             setForm({ ...form, superadmin_email: e.target.value })
           }
           required
-        />
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="superadmin_display_name">Superadmin name</Label>
-        <Input
-          id="superadmin_display_name"
-          placeholder="Juan Dela Cruz"
-          value={form.superadmin_display_name}
-          onChange={(e) =>
-            setForm({ ...form, superadmin_display_name: e.target.value })
-          }
         />
       </div>
       <div className="flex justify-end gap-2 pt-2">
