@@ -450,7 +450,7 @@ function ReadOnlyLegacyDetail({
                     {
                       title: "Add documents",
                       description:
-                        "Upload additional company documents (PDF, max 2.5MB each).",
+                        "Upload additional company documents (PDF, max 7MB each).",
                       panelClassName: "!w-full sm:!max-w-md",
                     },
                   );
@@ -739,7 +739,9 @@ function PartnersContent({
         initialCompanyName: row.displayName,
         initialEmail: contactEmail,
         initialKind: kind,
-        initialLegacyCompanyId: row.isImported ? row.legacyEntry?.id : undefined,
+        initialLegacyCompanyId: row.isImported
+          ? row.legacyEntry?.id
+          : undefined,
         // The row already identifies a specific company — no reason to let
         // the university search for/switch to a different one.
         allowSearch: false,
@@ -1014,6 +1016,13 @@ function PartnersContent({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onSelect={() =>
+                        router.push("/university/partners/import-wizard")
+                      }
+                    >
+                      <Upload className="h-4 w-4" /> anaj00&apos;s import wizard
+                    </DropdownMenuItem>
                     <DropdownMenuItem
                       onSelect={() =>
                         openModal(

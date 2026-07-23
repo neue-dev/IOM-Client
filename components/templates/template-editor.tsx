@@ -48,7 +48,7 @@ import {
   type Placement,
 } from "./template-fields";
 
-const MAX_PDF_BYTES = 2.5 * 1024 * 1024;
+const MAX_PDF_BYTES = 7 * 1024 * 1024;
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 2;
 
@@ -178,7 +178,7 @@ export function TemplateEditor({ mode, templateId, initial }: TemplateEditorProp
       return;
     }
     if (f.size > MAX_PDF_BYTES) {
-      toast.error("PDF is too large (max 2.5 MB)");
+      toast.error("PDF is too large (max 7 MB)");
       return;
     }
     setPlacements([]);
@@ -578,7 +578,7 @@ function UploadPrompt({ onPick }: { onPick: (f: File | undefined) => void }) {
       <FileText className="text-muted-foreground h-8 w-8" />
       <div>
         <p className="text-sm font-medium text-gray-900">Upload a template PDF</p>
-        <p className="text-muted-foreground mt-0.5 text-xs">Drag a file here, or browse. Max 2.5 MB.</p>
+        <p className="text-muted-foreground mt-0.5 text-xs">Drag a file here, or browse. Max 7 MB.</p>
       </div>
       <input
         ref={inputRef}
