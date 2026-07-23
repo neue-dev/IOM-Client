@@ -550,7 +550,7 @@ export function LegacyCompanyDetailView({
                   {
                     title: "Add Documents",
                     description:
-                      "Upload additional company documents (PDF, max 2.5MB each, max 10 files)",
+                      "Upload additional company documents (PDF, max 7MB each, max 10 files)",
                     panelClassName: "!w-full sm:!max-w-md",
                   },
                 )
@@ -897,7 +897,7 @@ export function MoaUploadDialog({
             </div>
             <div className="mt-2">
               <FileUpload
-                label="MOA Document (PDF, optional, max 2.5MB)"
+                label="MOA Document (PDF, optional, max 7MB)"
                 name={`moa-document-${moa.id}`}
                 accept=".pdf,application/pdf"
                 onFileSelect={(file) => {
@@ -1193,7 +1193,7 @@ export function UploadDialog({
               </div>
               <div className="mt-2">
                 <FileUpload
-                  label="MOA Document (PDF, optional, max 2.5MB)"
+                  label="MOA Document (PDF, optional, max 7MB)"
                   name={`moa-document-${moa.id}`}
                   accept=".pdf,application/pdf"
                   onFileSelect={(file) => {
@@ -1288,7 +1288,7 @@ export function UploadDialog({
           <div className="mt-3 space-y-3">
             <div className="space-y-3">
               <FileUpload
-                label="Company Documents (PDF, optional, max 2.5MB each, max 10)"
+                label="Company Documents (PDF, optional, max 7MB each, max 10)"
                 name="company-documents"
                 multiple
                 accept=".pdf,application/pdf"

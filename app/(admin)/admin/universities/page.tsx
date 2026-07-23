@@ -26,7 +26,11 @@ interface University {
   registered_name: string;
   logo_url: string | null;
   is_deactivated: boolean | null;
-  university_accounts: { email: string; display_name: string }[];
+  university_accounts: {
+    email: string;
+    display_name: string;
+    is_pending: boolean;
+  }[];
 }
 
 function UniversityIdentity({ university }: { university: University }) {
@@ -63,8 +67,11 @@ function UniversityIdentity({ university }: { university: University }) {
 function UniversityStatus({ university }: { university: University }) {
   return university.is_deactivated ? (
     <PartnershipStatusBadge status="rejected" label="Deactivated" />
+  ) : !university.university_accounts[0] ||
+    university.university_accounts[0].is_pending ? (
+    <PartnershipStatusBadge status="pending" label="Pending" />
   ) : (
-    <PartnershipStatusBadge status="active" />
+    <PartnershipStatusBadge status="active" label="Active" />
   );
 }
 
@@ -80,9 +87,16 @@ function CreateUniversityForm({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState("");
 
   const create = useMutation({
-    mutationFn: () => preconfiguredAxios.post("/api/admin/universities", form),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-universities"] });
+    mutationFn: () =>
+      preconfiguredAxios.post("/api/admin/universities", {
+        ...form,
+        superadmin_display_name: "Super Admin",
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["admin-universities"],
+        refetchType: "active",
+      });
       toast("University created", toastPresets.success);
       onClose();
     },
@@ -125,17 +139,6 @@ function CreateUniversityForm({ onClose }: { onClose: () => void }) {
             setForm({ ...form, superadmin_email: e.target.value })
           }
           required
-        />
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="superadmin_display_name">Superadmin name</Label>
-        <Input
-          id="superadmin_display_name"
-          placeholder="Juan Dela Cruz"
-          value={form.superadmin_display_name}
-          onChange={(e) =>
-            setForm({ ...form, superadmin_display_name: e.target.value })
-          }
         />
       </div>
       <div className="flex justify-end gap-2 pt-2">
